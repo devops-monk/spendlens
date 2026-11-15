@@ -3,7 +3,7 @@
 FinOps lens for AWS, built on [Steampipe](https://steampipe.io) and [Powerpipe](https://powerpipe.io).
 It finds untagged and non-compliant resources, over-provisioned and wasted spend, and month-over-month cost changes, and you can ask an AI about your bill. All of it uses the AWS role you already have assumed in your terminal.
 
-> Status: phases 1–5 are done (tags, rightsizing/waste, cost analysis, anomalies, forecast, savings). See [PLAN.md](PLAN.md).
+> Status: phases 1–6 are done (tags, rightsizing/waste, cost analysis, anomalies, forecast, savings, HTML dashboard). See [PLAN.md](PLAN.md).
 
 ## Install (dev)
 
@@ -78,6 +78,21 @@ spendlens savings summary                        # one de-duplicated total acros
 - Commitments are counted once.
 
 Required IAM permissions: [docs/permissions.md](docs/permissions.md).
+
+## HTML dashboard
+
+```bash
+spendlens dashboard -o report.html               # from your latest saved runs (no AWS calls)
+spendlens dashboard --source demo -o demo.html   # try it with the bundled sample data
+spendlens waste -f html -o waste.html            # any command can write a branded HTML table
+```
+
+The dashboard is a single self-contained file with no network requests, so it works offline, as a CI artifact, and when printed.
+- **Tabs:** Overview, Cost diff & trend, Showback, Anomalies, Forecast, Tags, Rightsizing, Waste and Savings.
+- **Readability:** light and dark mode, hover and keyboard tooltips, and a table view for every chart.
+- **Branding:** `dashboard.*` in `finops.yaml` sets the title, organisation, brand colours and font. Brand colours style chrome only; chart data colours are a fixed palette validated for colour-blind readers.
+- **Layout and style:** live in `src/spendlens/templates/report/` (Jinja2 templates plus `style.css` and `app.js`). Python only builds the view model, which is also embedded in the page as JSON (`#spendlens-data`).
+- **Extending:** plugins add tabs with `registry.add_dashboard_section(id, title, fn)`.
 
 ## Data sources and history
 

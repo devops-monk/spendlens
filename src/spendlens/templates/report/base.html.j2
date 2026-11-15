@@ -1,0 +1,24 @@
+{#- Page shell for every spendlens HTML output. Self-contained: CSS/JS are inlined, no network requests.
+    Context: title, subtitle, theme (DashboardConfig), tabs [(id, name)] | none, footer, data_json | none -#}
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="generator" content="spendlens"><title>{{ title }}</title>
+{#- CSS context: HTML-escaping would corrupt quotes in the font stack. These values are pattern-validated in
+    config.DashboardConfig (#RRGGBB colours; font stack without < > ; { }), so they are safe to emit raw. -#}
+<style>:root{--brand:{{ theme.brand_primary|safe }};--brand-ink:{{ theme.brand_ink|safe }};--brand-on-ink:{{ theme.brand_on_ink|safe }};--font:{{ theme.font_family|safe }}}
+{{ assets.css }}</style></head>
+<body>
+<header class="top"><div class="row"><div><h1>{{ title }}</h1>
+<div class="sub">{{ subtitle }}{% if theme.organisation %} · {{ theme.organisation }}{% endif %}</div></div>
+<button class="theme" type="button">Light / dark</button></div></header>
+{%- if tabs %}
+<nav class="tabs" role="tablist">{% for id, name in tabs %}<button role="tab" data-tab="{{ id }}" aria-selected="false">{{ name }}</button>{% endfor %}</nav>
+{%- endif %}
+<main>{% block main %}{% endblock %}</main>
+<footer>{{ footer }}</footer>
+<div id="tip" role="tooltip"></div>
+{%- if data_json %}
+<script type="application/json" id="spendlens-data">{{ data_json }}</script>
+{%- endif %}
+<script>{{ assets.js }}</script>
+</body></html>

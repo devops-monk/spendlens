@@ -69,6 +69,9 @@ def load(
     except (FileNotFoundError, ConfigError) as e:
         err.print(f"[red]Config error:[/] {e}")
         raise typer.Exit(2) from e
+    from .render.html import set_theme
+
+    set_theme(cfg.dashboard)
     if profile:
         cfg.aws.profile = profile
     if cfg.aws.profile:

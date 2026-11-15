@@ -67,7 +67,9 @@ def render(
 
         text = render_json(records, meta)
     else:
-        raise NotImplementedError("HTML output arrives in phase 6 (`spendlens dashboard`).")
+        from .html import render_html
+
+        text = render_html(records, cols, meta)
     if out:
         out.parent.mkdir(parents=True, exist_ok=True)
         out.write_text(text)

@@ -74,6 +74,16 @@ savings:
   commitment_min_on_demand: 100
   savings_plan_expiration_warning_days: 45
 
+# spendlens dashboard / --format html. Brand colours are used for chrome only (header, accents);
+# chart data colours are a fixed colour-blind-safe palette. Replace with your brand guidelines' values.
+dashboard:
+  title: spendlens FinOps report
+  organisation: ""
+  brand_primary: "#E6007E"       # accent (placeholder: confirm against brand guidelines)
+  brand_ink: "#000000"           # header background
+  brand_on_ink: "#FFFFFF"
+  # font_family: '"Your Brand Sans", system-ui, sans-serif'
+
 budgets:
   monthly_total: null          # e.g. 25000 -- checked by `spendlens forecast` (AWS Budgets are read too)
   warn_pct: 80                 # forecast above this % of a budget = at risk

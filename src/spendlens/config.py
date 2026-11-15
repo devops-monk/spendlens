@@ -263,6 +263,22 @@ class SavingsConfig(_Strict):
     hub_min_saving: float = Field(0.0, ge=0)
 
 
+class DashboardConfig(_Strict):
+    """HTML dashboard / --format html. Brand values are chrome only (header, accents); data colours come from a
+    validated, colour-blind-safe chart palette and are not themeable. Set these from your brand guidelines."""
+
+    title: str = "spendlens FinOps report"
+    organisation: str = ""  # shown in the header, e.g. "Very Group - Platform"
+    brand_primary: str = Field("#E6007E", pattern=r"^#[0-9a-fA-F]{6}$")  # accent: header rule, active tab, links
+    brand_ink: str = Field("#000000", pattern=r"^#[0-9a-fA-F]{6}$")  # header background
+    brand_on_ink: str = Field("#FFFFFF", pattern=r"^#[0-9a-fA-F]{6}$")  # header text
+    # CSS font stack only (letters, digits, spaces, quotes, commas, hyphens, dots): emitted raw inside <style>
+    font_family: str = Field('system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
+                             pattern=r"""^[A-Za-z0-9 ,'"\-.]+$""", max_length=200)
+    top_n: int = Field(15, ge=3, le=100)  # rows per chart
+    table_rows: int = Field(50, ge=5, le=1000)  # rows per findings table
+
+
 class AWSConfig(_Strict):
     profile: str | None = None
     accounts: list[str] = Field(default_factory=list)
@@ -283,6 +299,7 @@ class Config(_Strict):
     steampipe: SteampipeConfig = Field(default_factory=SteampipeConfig)
     powerpipe: PowerpipeConfig = Field(default_factory=PowerpipeConfig)
     savings: SavingsConfig = Field(default_factory=SavingsConfig)
+    dashboard: DashboardConfig = Field(default_factory=DashboardConfig)
     history: HistoryConfig = Field(default_factory=HistoryConfig)
     aws: AWSConfig = Field(default_factory=AWSConfig)
     powerpipe_vars: dict[str, Any] = Field(default_factory=dict)  # raw passthrough, merged last

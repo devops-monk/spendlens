@@ -23,6 +23,7 @@ are discovered through the `spendlens.plugins` entry-point group:
         reg.add_doctor_check(lambda cfg: [...])          # extra `spendlens doctor` rows
         reg.add_ai_tool(my_tool)                         # extra tool for `spendlens ask`
         reg.add_estimator("my_control", fn)              # $/month savings for a control's alarms
+        reg.add_dashboard_section("gpu", "GPU", render)  # extra dashboard tab
 
 Plugin settings live under `plugins.<name>` in finops.yaml (or --set plugins.acme.x=1)
 and are available as `cfg.plugins.get("acme", {})`.
@@ -55,6 +56,7 @@ BUILTIN_FEATURES: tuple[str, ...] = (
     "spendlens.features.anomalies",
     "spendlens.features.forecast",
     "spendlens.features.savings_cmd",
+    "spendlens.features.dashboard",
     "spendlens.features.history_cmd",
 )
 
@@ -82,6 +84,7 @@ class Registry:
     ai_tools: dict[str, AITool] = field(default_factory=dict)
     mod_paths: list[Path] = field(default_factory=list)
     estimators: dict[str, Callable[..., float | None]] = field(default_factory=dict)
+    dashboard_sections: list[tuple[str, str, Callable[..., str]]] = field(default_factory=list)
     plugins: list[PluginInfo] = field(default_factory=list)
 
     def add_command(self, fn: Callable[..., Any], name: str | None = None) -> None:
@@ -101,6 +104,10 @@ class Registry:
     def add_estimator(self, control: str, fn: Callable[..., float | None]) -> None:
         """Savings estimator for a control: fn(finding, pricing) -> USD/month or None."""
         self.estimators[control] = fn
+
+    def add_dashboard_section(self, section_id: str, title: str, fn: Callable[..., str]) -> None:
+        """Extra dashboard tab: fn(data, cfg) -> HTML (trusted plugin markup; escape any data you embed)."""
+        self.dashboard_sections.append((section_id, title, fn))
 
     def add_mod(self, path: Path) -> None:
         self.mod_paths.append(Path(path))

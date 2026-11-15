@@ -2,8 +2,6 @@ import csv
 import io
 import json
 
-import pytest
-
 from spendlens.models import CostDelta, Finding, ReportMeta, Status
 from spendlens.render import Format, render
 
@@ -54,7 +52,10 @@ def test_table_writes_file(tmp_path):
 
 
 
-def test_html_not_yet():
-    with pytest.raises(NotImplementedError):
-        render([], Format.html, meta=META)
+def test_html_page_is_self_contained_and_escaped():
+    rows = [{"status": "alarm", "resource": "<script>alert(1)</script>", "change_pct": 12.5, "saving": 10.0}]
+    html = render(rows, Format.html, meta=META)
+    assert html.startswith("<!doctype html>") and "<script>alert(1)</script>" not in html
+    assert "&lt;script&gt;" in html and "+12.5%" in html
+    assert "http://" not in html and "https://" not in html  # no network dependencies
 

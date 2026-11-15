@@ -1,0 +1,38 @@
+{#- Reusable building blocks. Everything is autoescaped; chart helpers return pre-escaped Markup. -#}
+
+{% macro card(title, hint="") -%}
+<div class="card"><h2>{{ title }}</h2>{% if hint %}<p class="hint">{{ hint }}</p>{% endif %}{{ caller() }}</div>
+{%- endmacro %}
+
+{% macro missing(cmd) -%}
+<p class="empty">No saved run yet. Run <code>spendlens {{ cmd }}</code> to populate this section.</p>
+{%- endmacro %}
+
+{% macro tile(t) -%}
+<div class="tile"><div class="k">{{ t.label }}</div><div class="v">{{ t.value }}</div><div class="d">{{ t.detail }}</div></div>
+{%- endmacro %}
+
+{% macro hero(h) -%}
+<div class="hero"><div class="k">{{ h.label }}</div><div class="v">{{ h.value }}</div>
+{%- if h.delta %}<div class="delta {{ h.direction }}">{{ "▲" if h.direction == "up" else "▼" }} {{ h.delta }}</div>{% endif %}</div>
+{%- endmacro %}
+
+{% macro data_table(t) -%}
+{%- if not t.rows -%}<p class="empty">No rows.</p>
+{%- else -%}
+<div class="tablewrap"><table class="sortable"><thead><tr>
+{%- for c in t.cols %}<th class="{{ 'num' if c.numeric }}" title="{{ c.key }}">{{ c.label }}</th>{% endfor -%}
+</tr></thead><tbody>
+{%- for row in t.rows %}<tr>{% for cell in row %}<td class="{{ cell.cls }}"{% if cell.sort is not none %} data-v="{{ cell.sort }}"{% endif %}>{{ cell.text }}</td>{% endfor %}</tr>{% endfor -%}
+</tbody></table></div>
+{%- if t.total > t.rows|length %}<p class="note">Showing {{ t.rows|length }} of {{ t.total }} rows; use --format csv/json for all.</p>{% endif %}
+{%- endif -%}
+{%- endmacro %}
+
+{% macro table_view(t) -%}
+<details class="tv"><summary>Table view</summary>{{ data_table(t) }}</details>
+{%- endmacro %}
+
+{% macro notes(items) -%}
+{% for n in items %}<p class="note">· {{ n }}</p>{% endfor %}
+{%- endmacro %}

@@ -242,7 +242,11 @@ PLAN.md
    - **`savings summary`:** a de-duplicated total across sources.
    - **Offline SQL checker:** now applies type rules (JSON operators, arithmetic on text, `inet` coalesce) from a typed schema snapshot. These came from the system tests, which found a budgets JSON-operator bug and a misleading permissions hint.
    - **IAM:** required permissions are documented in `docs/permissions.md`.
-6. HTML dashboard with Very branding.
+6. ✅ HTML dashboard and `--format html` on every command:
+   - **Structure:** Jinja2 templates (base, macros, dashboard, table) plus `style.css` and `app.js` package files. Python builds a plain view model; templates present it with autoescape on. The view model is also embedded as JSON for tools and the Phase 7 AI.
+   - **Charts:** dependency-free server-side SVG (diverging bars, ranked bars, lines, meters, segmented bar) built to the dataviz mark specs. Palettes were validated with the dataviz validator (CVD/contrast, light and dark). Every chart has hover and keyboard tooltips plus a table view.
+   - **Branding:** comes from config and styles chrome only. The default `#E6007E` is a placeholder until the real Very values are supplied: very.co.uk blocks automated fetching, so nothing was guessed.
+   - **Visual checks:** headless Chrome screenshots at desktop and phone width, in light and dark. These caught chart scaling, a hash-anchor scroll, grid overflow, and a CSS-escaping font regression.
 7. AI `ask`: the multi-provider adapter, read-only tools, the SQL guard, and the REPL.
 8. `notify` (Slack/Teams) and the GitLab CI schedule template.
 

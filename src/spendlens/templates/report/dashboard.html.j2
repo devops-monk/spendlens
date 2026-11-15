@@ -1,0 +1,93 @@
+{#- The dashboard. Context: vm (view model from features/dashboard.py), charts (chart helpers), plus base.html.j2's.
+    Each section is a block: restyle or reorder here without touching Python. Plugin sections arrive pre-rendered
+    in vm.extra_sections. -#}
+{% extends "base.html.j2" %}
+{% from "macros.html.j2" import card, missing, tile, hero, data_table, table_view, notes %}
+
+{% macro cost_diff(s, width) -%}
+{% if not s %}{% call card("Cost change", "Month over month") %}{{ missing("cost diff") }}{% endcall %}
+{% else %}{% call card("Biggest cost changes", s.hint) %}
+{{ charts.diverging_hbars(s.bars, label=s.chart_label, cur=vm.currency, width=width) }}
+<div class="legend"><span class="key"><i style="background:var(--div-pos)"></i>Increase</span><span class="key"><i style="background:var(--div-neg)"></i>Decrease</span></div>
+{{ table_view(s.table) }}{% endcall %}{% endif %}
+{%- endmacro %}
+
+{% macro forecast(s) -%}
+{% if not s %}{% call card("Forecast vs budgets") %}{{ missing("forecast") }}{% endcall %}
+{% else %}{% call card("Month-end forecast vs budgets", s.hint) %}
+{% for m in s.meters %}{{ charts.meter(m.name, m.pct, m.status, m.detail) }}{% endfor %}
+{{ table_view(s.table) }}{% endcall %}{% endif %}
+{%- endmacro %}
+
+{% block main %}
+
+<section class="tab" id="tab-overview" role="tabpanel">
+{% if vm.hero %}{{ hero(vm.hero) }}{% endif %}
+{% if vm.tiles %}<div class="tiles">{% for t in vm.tiles %}{{ tile(t) }}{% endfor %}</div>
+{% else %}{{ missing("tags / rightsize / waste / cost diff") }}{% endif %}
+<div class="grid2">{{ cost_diff(vm.cost_diff, 520) }}{{ forecast(vm.forecast) }}</div>
+</section>
+
+<section class="tab" id="tab-cost" role="tabpanel">
+{{ cost_diff(vm.cost_diff, 1080) }}
+{% set t = vm.trend %}
+{% if not t %}{% call card("Monthly trend") %}{{ missing("cost trend") }}{% endcall %}
+{% else %}{% call card("Monthly trend: top " ~ t.series|length, t.hint) %}
+{{ charts.legend(t.series) }}{{ charts.lines(t.series, t.x_labels, label="Monthly cost, top groups", cur=vm.currency, width=1080, height=340) }}
+{{ table_view(t.table) }}{% endcall %}{% endif %}
+</section>
+
+<section class="tab" id="tab-showback" role="tabpanel">
+{% if not vm.showback %}{% call card("Showback") %}{{ missing("cost showback") }}{% endcall %}
+{% else %}<div class="grid2">{% for s in vm.showback %}{% call card("Spend by " ~ s.key, s.hint) %}
+{{ charts.hbars(s.bars, label="Spend by " ~ s.key, cur=vm.currency, width=520) }}
+{% if s.untagged_pct is not none %}<p class="note">Grey bar: spend without a <b>{{ s.key }}</b> tag ({{ s.untagged_pct }}). Tag it to allocate it.</p>{% endif %}
+{{ table_view(s.table) }}{% endcall %}{% endfor %}</div>{% endif %}
+</section>
+
+<section class="tab" id="tab-anomalies" role="tabpanel">
+{% set a = vm.anomalies %}
+{% if not a %}{% call card("Cost anomalies") %}{{ missing("anomalies") }}{% endcall %}
+{% else %}{% call card("Cost anomalies", a.hint) %}
+{% if a.bars %}{{ charts.hbars(a.bars, label="Excess spend per anomaly", fill="var(--div-pos)", cur=vm.currency, width=1080) }}
+{% else %}<p class="empty">No anomalies in the last check. Spend is within its normal range.</p>{% endif %}
+{{ table_view(a.table) }}{% endcall %}{% endif %}
+</section>
+
+<section class="tab" id="tab-forecast" role="tabpanel">{{ forecast(vm.forecast) }}</section>
+
+<section class="tab" id="tab-tags" role="tabpanel">
+{% set g = vm.tags %}
+{% if not g %}{% call card("Tag compliance") %}{{ missing("tags") }}{% endcall %}
+{% else %}{% call card("Tag compliance", g.hint) %}
+<div class="grid2"><div>{% for m in g.meters %}{{ charts.meter(m.name, m.pct, m.status, m.detail) }}{% endfor %}</div>
+<div>{{ charts.hbars(g.by_type, label="Tag alarms by resource type", fmt=charts.count, width=520) }}</div></div>
+<h2 style="font-size:15px;margin-top:12px">Alarms</h2>{{ data_table(g.table) }}{% endcall %}{% endif %}
+</section>
+
+{% for key, title, cmd in [("rightsize", "Rightsizing & company standards", "rightsize"), ("waste", "Idle & orphaned resources", "waste")] %}
+<section class="tab" id="tab-{{ key }}" role="tabpanel">
+{% set f = vm[key] %}
+{% if not f %}{% call card(title) %}{{ missing(cmd) }}{% endcall %}
+{% else %}{% call card(title, f.hint) %}
+{% if f.bars %}{{ charts.hbars(f.bars, label=title ~ ": est. monthly saving by service", cur=vm.currency, width=1080) }}{% endif %}
+{{ data_table(f.table) }}{% endcall %}{% endif %}
+</section>
+{% endfor %}
+
+<section class="tab" id="tab-savings" role="tabpanel">
+{% set s = vm.savings %}
+{% if not s %}{% call card("Savings") %}{{ missing("rightsize / waste / savings hub / savings commitments") }}{% endcall %}
+{% else %}{% call card("Savings summary", "Estimates are indicative: review before acting. AWS figures win where both exist.") %}
+<div class="hero" style="margin:0 0 8px;padding:0;border:0"><div class="k">Potential saving</div>
+<div class="v">{{ s.total }}<span style="font-size:20px;font-weight:500">/month</span></div>
+<div class="d note">{{ s.yearly }} a year · {{ s.count }} item(s), de-duplicated</div></div>
+{{ charts.segmented(s.parts, label="Potential saving by source", cur=vm.currency) }}
+{{ notes(s.notes) }}{{ data_table(s.table) }}{% endcall %}{% endif %}
+</section>
+
+{% for sec in vm.extra_sections %}
+<section class="tab" id="tab-{{ sec.id }}" role="tabpanel">{{ sec.html }}</section>
+{% endfor %}
+
+{% endblock %}

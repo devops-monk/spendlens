@@ -1,0 +1,6 @@
+{#- `--format html` for any command: one branded, sortable table. Context: heading, facts, table -#}
+{% extends "base.html.j2" %}
+{% from "macros.html.j2" import card, data_table %}
+{% block main %}
+{% call card(heading, facts) %}{{ data_table(table) }}{% endcall %}
+{% endblock %}
