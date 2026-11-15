@@ -244,7 +244,99 @@ def demo_finops(store: HistoryStore, rng: random.Random) -> None:
                            started_at=datetime(2026, 11, day, 6, 5, tzinfo=UTC))
 
 
-GENERATORS = [demo_tags, demo_finops]
+# ------------------------------------------------------------------ cost
+
+DEMO_TODAY = "2026-11-09"
+SERVICE_BASE = {  # monthly USD, roughly a mid-size retail estate
+    "Amazon Elastic Compute Cloud - Compute": 18400, "Amazon Relational Database Service": 9200,
+    "Amazon Simple Storage Service": 4100, "Amazon CloudFront": 2600, "EC2 - Other": 3300,
+    "Amazon Elastic Container Service": 2900, "AWS Lambda": 640, "Amazon DynamoDB": 1150,
+    "Amazon CloudWatch": 980, "Amazon OpenSearch Service": 2100, "AWS Key Management Service": 85,
+    "Amazon Route 53": 120, "Amazon ElastiCache": 1450, "Amazon Redshift": 3800,
+}
+
+
+def _monthly_by_service(month_index: int, rng: random.Random) -> dict[str, float]:
+    """month_index 0..6 (oldest -> newest full month). EC2 and CloudWatch grow, Redshift is decommissioned,
+    Bedrock appears in the last two months."""
+    out = {}
+    for svc, base in SERVICE_BASE.items():
+        v = base * (1 + rng.uniform(-0.04, 0.04))
+        if svc.startswith("Amazon Elastic Compute"):
+            v *= 1 + 0.03 * month_index + (0.22 if month_index == 6 else 0)
+        if svc == "Amazon CloudWatch":
+            v *= 1 + 0.12 * month_index
+        if svc == "Amazon Redshift" and month_index == 6:
+            continue
+        if svc == "Amazon Simple Storage Service" and month_index == 6:
+            v *= 0.82  # lifecycle rules added
+        out[svc] = round(v, 2)
+    if month_index >= 5:
+        out["Amazon Bedrock"] = 1900 if month_index == 6 else 240
+    return out
+
+
+def demo_costs(store: HistoryStore, rng: random.Random) -> None:
+    from datetime import date
+
+    from spendlens.engines import cost as ce
+
+    today = date.fromisoformat(DEMO_TODAY)
+    meta_base = {"demo": True, "CI_PIPELINE_ID": "1002"}
+    started = datetime(2026, 11, 9, 6, 10, tzinfo=UTC)
+    months = ce.trailing_months(today, 7)
+    per_month = [_monthly_by_service(i, random.Random(200 + i)) for i in range(7)]
+
+    def rows_for(periods_values, dimension):
+        rows = []
+        for i, (p, values) in enumerate(periods_values):
+            rows += [{"kind": f"p{i}", "period": p.label, "dimension": dimension, "grp": g, "amount": a,
+                      "currency": "USD"} for g, a in values.items()]
+        return rows
+
+    # cost diff: last full month vs month before (by service)
+    diff_periods = list(ce.last_full_months(today))
+    store.save_run("cost_diff", cost_rows=rows_for(zip(diff_periods, per_month[-2:], strict=True), "service"),
+                   account_id=ACCOUNT, caller_arn=CALLER, started_at=started,
+                   meta={**meta_base, "periods": [p.as_dict() for p in diff_periods], "group_by": "service",
+                         "metric": "net_unblended", "include_credits": False})
+    # trend: 6 months by service
+    trend_periods = months[-6:]
+    store.save_run("cost_trend", cost_rows=rows_for(zip(trend_periods, per_month[-6:], strict=True), "service"),
+                   account_id=ACCOUNT, caller_arn=CALLER, started_at=started,
+                   meta={**meta_base, "periods": [p.as_dict() for p in trend_periods], "group_by": "service",
+                         "metric": "net_unblended"})
+    # showback: last month by Service Owner + Environment
+    last = diff_periods[1]
+    total = sum(per_month[-1].values())
+    owners = {"payments@example.com": 0.27, "search@example.com": 0.19, "checkout@example.com": 0.16,
+              "platform@example.com": 0.21, "data@example.com": 0.09, "(untagged)": 0.08}
+    envs = {"prod": 0.68, "staging": 0.11, "dev": 0.13, "(untagged)": 0.08}
+    rows = []
+    for key, split in (("Service Owner", owners), ("Environment", envs)):
+        rows += [{"kind": "p0", "period": last.label, "dimension": f"tag:{key}", "grp": v,
+                  "amount": round(total * share, 2), "currency": "USD"} for v, share in split.items()]
+    store.save_run("cost_showback", cost_rows=rows, account_id=ACCOUNT, caller_arn=CALLER, started_at=started,
+                   meta={**meta_base, "periods": [last.as_dict()], "tag_keys": ["Service Owner", "Environment"],
+                         "metric": "net_unblended"})
+    # resources: last 7 days vs previous 7 days
+    windows = list(ce.resource_windows(today, 7))
+    res = {}
+    for i in range(25):
+        rid = f"arn:aws:ec2:eu-west-1:{ACCOUNT}:instance/i-{rng.getrandbits(64):016x}"
+        a = round(rng.uniform(20, 400), 2)
+        b = round(a * rng.choice([0.6, 0.95, 1.0, 1.05, 1.4, 2.2]), 2)
+        res[rid] = (a, b)
+    res[f"arn:aws:bedrock:us-east-1:{ACCOUNT}:provisioned-model/claims-assistant"] = (0.0, 410.0)
+    rows = []
+    for i, w in enumerate(windows):
+        rows += [{"kind": f"p{i}", "period": w.label, "dimension": "resource", "grp": rid, "amount": v[i],
+                  "currency": "USD"} for rid, v in res.items()]
+    store.save_run("cost_resources", cost_rows=rows, account_id=ACCOUNT, caller_arn=CALLER, started_at=started,
+                   meta={**meta_base, "periods": [w.as_dict() for w in windows], "metric": "net_unblended"})
+
+
+GENERATORS = [demo_tags, demo_finops, demo_costs]
 
 
 def main() -> int:

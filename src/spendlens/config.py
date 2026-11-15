@@ -172,6 +172,23 @@ class PricingConfig(_Strict):
     newer_generation_saving_pct: float = Field(0.1, ge=0, le=1)
 
 
+CostMetric = Literal["unblended", "net_unblended", "amortized", "net_amortized", "blended"]
+
+
+class CostConfig(_Strict):
+    """`spendlens cost ...` defaults."""
+
+    metric: CostMetric = "net_unblended"  # after discounts/credits applied at line-item level (as the legacy mod)
+    exclude_record_types: list[str] = Field(default_factory=lambda: ["Credit", "Refund"])
+    default_group_by: str = "service"
+    change_alarm_abs: float = Field(10.0, ge=0)  # flag |change| >= this ... (legacy: 10 cost units)
+    change_alarm_pct: float = Field(20.0, ge=0)  # ... and |change %| >= this
+    min_amount: float = Field(0.01, ge=0)
+    trend_months: int = Field(6, ge=2, le=13)  # Cost Explorer keeps ~13 months of history by default
+    showback_tag_keys: list[str] = Field(default_factory=lambda: ["Service Owner", "Environment"])
+    resource_days: int = Field(7, ge=1, le=7)
+
+
 class AnomalyConfig(_Strict):
     lookback_days: int = Field(30, ge=7, le=365)
     threshold: float = Field(3.0, gt=0)  # robust z-score
@@ -237,6 +254,7 @@ class Config(_Strict):
     tag_dimensions: list[str] = Field(default_factory=list)
     tagging: TaggingPolicy = Field(default_factory=TaggingPolicy)
     sizing: SizingStandards = Field(default_factory=SizingStandards)
+    cost: CostConfig = Field(default_factory=CostConfig)
     anomaly: AnomalyConfig = Field(default_factory=AnomalyConfig)
     pricing: PricingConfig = Field(default_factory=PricingConfig)
     budgets: Budgets = Field(default_factory=Budgets)

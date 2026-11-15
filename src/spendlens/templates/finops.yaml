@@ -48,6 +48,16 @@ pricing:
   reservation_saving_pct: 0.3
   # ec2_hourly: {m5.large: 0.107}       # add/override instance prices for your region
 
+# spendlens cost diff | trend | showback | resources
+cost:
+  metric: net_unblended          # unblended | net_unblended | amortized | net_amortized | blended
+  exclude_record_types: [Credit, Refund]
+  default_group_by: service      # service | account | region | usage-type | instance-type | operation | tag:<Key>
+  change_alarm_abs: 10           # flag a change when |change| >= this ...
+  change_alarm_pct: 20           # ... and |change %| >= this (new/removed groups need only the absolute amount)
+  trend_months: 6
+  showback_tag_keys: [Service Owner, Environment]
+
 anomaly:
   lookback_days: 30
   threshold: 3.0

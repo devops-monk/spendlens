@@ -32,7 +32,7 @@ spendlens adds the following:
 | `ecs_tasks_memory_usage` | `ecs_task_memory_over_max` | **Bug fix:** same integer division. The reason text also printed the CPU value instead of memory. |
 | `log_group_encryption_at_rest_enabled` | `cloudwatch_log_group_kms_policy` | Can be switched off with `cloudwatch_log_group_kms_required`. |
 | `cloudwatch_log_group_retention_period_in_days` | `cloudwatch_log_group_retention_policy` | The reason now shows stored GB. |
-| `full_month_cost_changes` | `spendlens cost diff` (phase 4) | **Bug fix planned:** `where prev.cost != base.cost` dropped new and removed services, because comparing against null removes the row. |
+| `full_month_cost_changes` | `spendlens cost diff` | **Bug fix:** `where prev.cost != base.cost` dropped new and removed services, because comparing against null removes the row. They now appear as `new` / `gone`. The threshold (`cost_explorer_service_cost_max_cost_units = 10`) is `cost.change_alarm_abs`, plus `cost.change_alarm_pct`. Any month, month range or month-to-date can be compared, grouped by service, account, region, usage type or tag. |
 
 ## Upstream fixes in controls taken from turbot/steampipe-mod-aws-thrifty
 

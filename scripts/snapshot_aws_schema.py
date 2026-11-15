@@ -36,7 +36,15 @@ def table_columns(go_file: Path) -> tuple[str, list[str]]:
     cols = NAME_RE.findall(section)
     if "cwMetricColumns(" in section:
         cols += CW_METRIC
+    if "costExplorerColumns(" in section:
+        cols += ce_columns(go_file.parent)
     return table, sorted(set(cols + COMMON))
+
+
+def ce_columns(src_dir: Path) -> list[str]:
+    text = (src_dir / "cost_explorer.go").read_text()
+    start = text.find("var costExplorerColumnDefs")
+    return NAME_RE.findall(text[start: text.find("\n}", start)])
 
 
 def main() -> int:
@@ -45,7 +53,7 @@ def main() -> int:
         return 2
     src_dir = Path(sys.argv[1]).expanduser() / "aws"
     used = set()
-    for f in MOD.rglob("*.pp"):
+    for f in [*MOD.rglob("*.pp"), *(ROOT / "src" / "spendlens" / "engines").glob("*.py")]:
         used.update(re.findall(r"\b(aws_[a-z0-9_]+)\b", f.read_text()))
     schema: dict[str, list[str]] = {}
     for go in sorted(src_dir.glob("table_aws_*.go")):

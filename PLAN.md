@@ -228,7 +228,12 @@ PLAN.md
        - Lambda `timeout`, which the plugin exposes as text
        - `round(double, int)` in the NAT gateway control
        Doctor and run metadata now pass `--endpoint-url` explicitly, because AWS CLI < 2.13 ignores `AWS_ENDPOINT_URL`.
-4. Cost: add `cost diff` (MoM and custom range, with grouping and by-resource) and `cost showback`.
+4. ✅ Cost: `cost diff` (last month, MTD normalised to the same days, any month or month-range pair; grouped by service, account, region, usage type, instance type, operation, record type or tag), `cost trend`, `cost showback` (share %, untagged %, budget variance) and `cost resources` (last N vs previous N days). Details:
+   - The legacy month-over-month bug (dropped new and removed services) is fixed.
+   - Flagging uses absolute plus % thresholds, and unequal-length periods also get a daily-rate %.
+   - Each query is a single bounded Cost Explorer call: exactly one `period_start >=` / `period_end <=` qual pair, and only the selected metric.
+   - Cost rows are saved to history, so `--source last|demo` replay works.
+   - Moto Cost Explorer system tests caught a placeholder bug: the engine emitted Powerpipe-style `$n`, but psycopg needs `%(name)s`. The fake client now enforces the psycopg contract.
 5. Savings, anomalies and forecast.
 6. HTML dashboard with Very branding.
 7. AI `ask`: the multi-provider adapter, read-only tools, the SQL guard, and the REPL.

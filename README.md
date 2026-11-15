@@ -3,7 +3,7 @@
 FinOps lens for AWS, built on [Steampipe](https://steampipe.io) and [Powerpipe](https://powerpipe.io).
 It finds untagged and non-compliant resources, over-provisioned and wasted spend, and month-over-month cost changes, and you can ask an AI about your bill. All of it uses the AWS role you already have assumed in your terminal.
 
-> Status: phases 1–2 are done (scaffold, tag compliance, history and demo data). See [PLAN.md](PLAN.md).
+> Status: phases 1–4 are done (tags, rightsizing, waste and savings, cost analysis). See [PLAN.md](PLAN.md).
 
 ## Install (dev)
 
@@ -35,6 +35,31 @@ spendlens tags types                             # 70 resource types covered
 ```
 
 Checks: `mandatory`, `untagged`, `prohibited`, `limit` and `expected_values` (SQL LIKE patterns). They come from `tagging.*` in `finops.yaml`.
+
+## Rightsizing and waste
+
+```bash
+spendlens rightsize --summary --by service       # 41 controls; company standards come from finops.yaml sizing.*
+spendlens waste --min-saving 20                  # 24 controls; idle/orphaned resources with $/month estimates
+spendlens rightsize -S rds -C rds_instance_multi_az_policy --status all
+spendlens waste controls                         # what is checked
+```
+
+Catalog: [docs/controls.md](docs/controls.md). Mapping from the legacy mods: [docs/control-mapping.md](docs/control-mapping.md).
+
+## Cost analysis
+
+```bash
+spendlens cost diff                              # last full month vs the month before, by service
+spendlens cost diff --mtd -g account             # month to date vs the same days last month
+spendlens cost diff --from 2026-07..2026-09 --to 2026-10..2026-12 -g tag:Team
+spendlens cost diff --show flagged --fail-on-flag   # CI gate on big changes (cost.change_alarm_*)
+spendlens cost trend -n 6 --include-current      # monthly pivot with month-over-month change
+spendlens cost showback -t Team                  # share per tag value, untagged spend, budget variance
+spendlens cost resources --days 7                # resources whose cost rose/fell (needs CE resource-level data)
+```
+
+New and removed services are reported as `new` and `gone`; the legacy mod dropped them. Credits and refunds are excluded by default (`cost.exclude_record_types`).
 
 ## Data sources and history
 

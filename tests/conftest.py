@@ -12,11 +12,14 @@
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 import pytest
 
 from spendlens.models import Finding, Status
+
+sys.path.insert(0, str(Path(__file__).parent))  # shared helpers (sqlcheck)
 
 LAYERS = ("unit", "integration", "system")
 

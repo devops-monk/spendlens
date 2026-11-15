@@ -184,3 +184,48 @@ def findings_from_source(
               + (f", account {run.account_id}" if run.account_id else "") + "[/]")
     return findings, ReportMeta(title=feature, account_id=run.account_id, caller_arn=run.caller_arn,
                                 extra={"source": source.value, "run_id": run.id, "run_started_at": run.started_at})
+
+
+def costs_from_source(
+    feature: str,
+    source: Source,
+    cfg: Config,
+    run_live: Callable[[], tuple[list[dict[str, Any]], dict[str, Any]]],
+) -> tuple[list[dict[str, Any]], dict[str, Any], ReportMeta]:
+    """Cost rows (kind, period, dimension, grp, amount, currency) + run meta, live (saved) or replayed."""
+    from .history import HistoryStore, demo_db_path
+
+    if source is Source.live:
+        rows, run_meta = run_live()
+        ident = caller_identity()
+        report = ReportMeta(title=feature, account_id=ident.get("Account"), caller_arn=ident.get("Arn"),
+                            extra={"source": "live"})
+        if cfg.history.enabled:
+            try:
+                with HistoryStore(history_path(cfg)) as store:
+                    report.extra["run_id"] = store.save_run(
+                        feature, cost_rows=rows, account_id=report.account_id, caller_arn=report.caller_arn,
+                        params=cfg.cost.model_dump(mode="json"), meta={**ci_meta(), **run_meta},
+                    )
+                    store.prune(cfg.history.keep_runs)
+            except Exception as e:  # noqa: BLE001 - history must never break a live run
+                err.print(f"[yellow]Warning: could not save run to history: {e}[/]")
+        return rows, run_meta, report
+
+    path = demo_db_path() if source is Source.demo else history_path(cfg)
+    try:
+        store = HistoryStore(path, read_only=True)
+    except FileNotFoundError as e:
+        err.print(f"[red]{e}[/]" + ("" if source is Source.demo else " (run once with --source live first)"))
+        raise typer.Exit(1) from e
+    with store:
+        run = store.latest_run(feature)
+        if run is None:
+            err.print(f"[red]No saved '{feature}' run in {path}[/]")
+            raise typer.Exit(1)
+        rows = store.cost_rows(run.id)
+    err.print(f"[dim]Using {source.value} data: run #{run.id} from {run.started_at}"
+              + (f", account {run.account_id}" if run.account_id else "") + "[/]")
+    return rows, run.meta, ReportMeta(title=feature, account_id=run.account_id, caller_arn=run.caller_arn,
+                                      extra={"source": source.value, "run_id": run.id,
+                                             "run_started_at": run.started_at})

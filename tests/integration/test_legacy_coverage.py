@@ -38,9 +38,8 @@ LEGACY_COST_ANALYSIS = {
     "ecs_tasks_memory_usage": "ecs_task_memory_over_max",
     "log_group_encryption_at_rest_enabled": "cloudwatch_log_group_kms_policy",
     "cloudwatch_log_group_retention_period_in_days": "cloudwatch_log_group_retention_policy",
-    "full_month_cost_changes": "feature:cost diff",  # phase 4
+    "full_month_cost_changes": "command:cost diff",
 }
-PLANNED_FEATURES = {"feature:cost diff"}
 
 
 
@@ -60,7 +59,13 @@ def test_all_legacy_cost_analysis_controls_covered():
     assert len(LEGACY_COST_ANALYSIS) == 13
     controls = mod_controls(bundled_mod_dir())
     for legacy, target in LEGACY_COST_ANALYSIS.items():
-        if target in PLANNED_FEATURES:
+        if target.startswith("command:"):
+            from typer.testing import CliRunner
+
+            from spendlens.cli import app
+
+            r = CliRunner().invoke(app, [*target.removeprefix("command:").split(), "--help"])
+            assert r.exit_code == 0, f"{legacy} -> {target} is not a working command"
             continue
         assert target in controls, f"{legacy} -> {target} does not exist"
 
