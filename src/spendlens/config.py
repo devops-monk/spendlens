@@ -190,13 +190,20 @@ class CostConfig(_Strict):
 
 
 class AnomalyConfig(_Strict):
-    lookback_days: int = Field(30, ge=7, le=365)
+    """`spendlens anomalies`: daily cost per group vs a trailing baseline (median + MAD robust z-score)."""
+
+    lookback_days: int = Field(30, ge=7, le=90)  # baseline window before each checked day
+    detect_days: int = Field(3, ge=1, le=14)  # most recent complete days to check
     threshold: float = Field(3.0, gt=0)  # robust z-score
-    min_daily_cost: float = Field(1.0, ge=0)  # ignore noise below this
+    min_daily_cost: float = Field(1.0, ge=0)  # ignore days below this
+    min_increase: float = Field(10.0, ge=0)  # and changes smaller than this (currency units/day)
+    include_drops: bool = False  # also report sudden decreases (e.g. a service went down)
+    group_by: str = "service"
 
 
 class Budgets(_Strict):
-    monthly_total: float | None = None
+    monthly_total: float | None = None  # account-level monthly budget checked by `spendlens forecast`
+    warn_pct: float = Field(80.0, gt=0, le=100)  # forecast above this % of a budget = at risk
     per_tag: dict[str, dict[str, float]] = Field(default_factory=dict)  # {"Team": {"payments": 5000}}
 
 
@@ -243,6 +250,19 @@ class HistoryConfig(_Strict):
     keep_runs: int = Field(200, ge=1)  # per feature
 
 
+class SavingsConfig(_Strict):
+    """`spendlens savings`: Cost Optimization Hub, commitment coverage, Savings Plan expiry."""
+
+    commitment_coverage_target_pct: float = Field(70.0, ge=0, le=100)
+    commitment_min_on_demand: float = Field(100.0, ge=0)  # ignore services with less on-demand spend/month
+    commitment_services: list[str] = Field(default_factory=lambda: [
+        "Amazon Elastic Compute Cloud - Compute", "Amazon Relational Database Service", "Amazon ElastiCache",
+        "Amazon OpenSearch Service", "Amazon Redshift", "AWS Lambda", "Amazon Elastic Container Service",
+        "Amazon SageMaker"])
+    savings_plan_expiration_warning_days: int = Field(45, ge=1)
+    hub_min_saving: float = Field(0.0, ge=0)
+
+
 class AWSConfig(_Strict):
     profile: str | None = None
     accounts: list[str] = Field(default_factory=list)
@@ -262,6 +282,7 @@ class Config(_Strict):
     notifications: Notifications = Field(default_factory=Notifications)
     steampipe: SteampipeConfig = Field(default_factory=SteampipeConfig)
     powerpipe: PowerpipeConfig = Field(default_factory=PowerpipeConfig)
+    savings: SavingsConfig = Field(default_factory=SavingsConfig)
     history: HistoryConfig = Field(default_factory=HistoryConfig)
     aws: AWSConfig = Field(default_factory=AWSConfig)
     powerpipe_vars: dict[str, Any] = Field(default_factory=dict)  # raw passthrough, merged last

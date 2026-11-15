@@ -336,7 +336,85 @@ def demo_costs(store: HistoryStore, rng: random.Random) -> None:
                    meta={**meta_base, "periods": [w.as_dict() for w in windows], "metric": "net_unblended"})
 
 
-GENERATORS = [demo_tags, demo_finops, demo_costs]
+# ------------------------------------------------------------------ anomalies / forecast / savings
+
+def demo_phase5(store: HistoryStore, rng: random.Random) -> None:
+    from spendlens.models import Finding, Severity, Status
+
+    started = datetime(2026, 11, 9, 6, 15, tzinfo=UTC)
+    meta = {"demo": True, "CI_PIPELINE_ID": "1002"}
+    anomalies = [
+        ("2026-11-07", "Amazon Elastic Compute Cloud - Compute", 1468.2, 802.4, 9.1, "high"),
+        ("2026-11-08", "Amazon CloudWatch", 142.6, 38.9, 7.4, "high"),
+        ("2026-11-08", "AWS Data Transfer", 96.3, 41.2, 4.2, "medium"),
+    ]
+    store.save_run("anomalies", [
+        Finding(control="cost_anomaly_spike", title="Daily cost spike", check="anomaly", resource=f"service:{g}",
+                status=Status.ALARM, severity=Severity(sev),
+                reason=f"{g} cost {c:,.2f} on {d} vs baseline {b:,.2f}: +{c - b:,.2f} (+{(c - b) / b * 100:.1f}%), z={z}.",
+                dimensions={"date": d, "group": g, "direction": "spike", "cost": c, "baseline": b,
+                            "delta": round(c - b, 2), "delta_pct": round((c - b) / b * 100, 1), "z": z})
+        for d, g, c, b, z, sev in anomalies
+    ], account_id=ACCOUNT, caller_arn=CALLER, started_at=started, meta={**meta, "group_by": "service"})
+
+    def fc(scope, status, label, limit, actual, forecast, method):
+        pct = round(forecast / limit * 100, 1) if limit else None
+        return Finding(control="budget_forecast", title="Month-end forecast vs budget", check="forecast",
+                       resource=scope, status=Status(status),
+                       severity=Severity.HIGH if status == "alarm" else Severity.MEDIUM if status == "info" else Severity.LOW,
+                       reason=f"{scope}: actual {actual}, forecast {forecast} vs limit {limit} ({pct}%) -> {label}.",
+                       dimensions={"scope": scope, "limit": limit, "actual": actual, "forecast": forecast,
+                                   "forecast_pct_of_limit": pct, "label": label, "method": method})
+    store.save_run("forecast", [
+        fc("account", "alarm", "forecast over budget", 55000.0, 15890.4, 59120.8, "cost_explorer_forecast"),
+        fc("budget:platform-monthly", "info", "at risk", 14000.0, 3920.1, 12110.0, "aws_budgets"),
+        fc("budget:data-monthly", "ok", "on track", 6000.0, 1010.7, 3870.2, "aws_budgets"),
+    ], account_id=ACCOUNT, caller_arn=CALLER, started_at=started, meta=meta)
+
+    hub = [
+        ("Rightsize", "arn:aws:ec2:eu-west-1:123456789012:instance/i-0a11", "m5.2xlarge", "m7g.xlarge", 182.4, "Medium", True),
+        ("MigrateToGraviton", "arn:aws:rds:eu-west-1:123456789012:db:checkout-db", "db.r5.xlarge", "db.r7g.xlarge", 96.1, "Low", True),
+        ("Stop", "arn:aws:ec2:eu-west-2:123456789012:instance/i-0b22", "t3.large", "", 60.7, "Low", False),
+        ("Delete", "arn:aws:ec2:eu-west-1:123456789012:volume/vol-0c33", "gp2 500 GB", "", 50.0, "VeryLow", False),
+        ("PurchaseSavingsPlans", "arn:aws:savingsplans::123456789012:compute", "On-Demand", "Compute SP 1yr", 1240.0, "Low", False),
+    ]
+    from spendlens.engines.savings import hub_reason, service_from_arn
+
+    store.save_run("savings_hub", [
+        Finding(control=f"coh_{a.lower()}", title="Cost Optimization Hub recommendation", check="savings",
+                service=service_from_arn(arn), resource=arn, account_id=ACCOUNT, region=arn.split(":")[3] or None,
+                status=Status.ALARM, severity=Severity.HIGH if s >= 100 else Severity.MEDIUM,
+                reason=hub_reason({"action_type": a, "current_resource_type": cur, "recommended_resource_type": rec,
+                                   "implementation_effort": eff, "restart_needed": rs}),
+                est_monthly_saving=s, dimensions={"action": a, "effort": eff, "current": cur, "recommended": rec,
+                                                  "source": "cost_optimization_hub"})
+        for a, arn, cur, rec, s, eff, rs in hub
+    ], account_id=ACCOUNT, caller_arn=CALLER, started_at=started, meta=meta)
+
+    from spendlens.engines.savings import coverage
+
+    rows = [
+        {"purchase_type": "On Demand Instances", "service": "Amazon Elastic Compute Cloud - Compute", "amount": 13900},
+        {"purchase_type": "Savings Plans", "service": "Amazon Elastic Compute Cloud - Compute", "amount": 9800},
+        {"purchase_type": "Spot Instances", "service": "Amazon Elastic Compute Cloud - Compute", "amount": 1050},
+        {"purchase_type": "On Demand Instances", "service": "Amazon Relational Database Service", "amount": 4100},
+        {"purchase_type": "Reserved Instances", "service": "Amazon Relational Database Service", "amount": 4950},
+        {"purchase_type": "On Demand Instances", "service": "Amazon ElastiCache", "amount": 1450},
+    ]
+    findings = []
+    for c in coverage(rows, [], 70, 100, 0.3):
+        findings.append(Finding(control="commitment_coverage", title="Savings Plan / RI coverage", check="savings",
+                                resource=f"service:{c['service']}", status=Status(c["status"]),
+                                reason=f"{c['service']}: {c['coverage_pct']}% committed (target 70%).",
+                                est_monthly_saving=c["est_monthly_saving"], dimensions={**c, "period": "2026-10"}))
+    findings.append(Finding(control="savings_plan_expiring", title="Savings Plan expiry", check="savings",
+                            resource="arn:aws:savingsplans::123456789012:savingsplan/sp-0d44", status=Status.ALARM,
+                            severity=Severity.HIGH, reason="Compute plan (4.2/h) ends 2026-12-01.",
+                            dimensions={"type": "Compute", "commitment_per_hour": "4.2", "end_time": "2026-12-01T00:00:00+00:00"}))
+    store.save_run("savings_commitments", findings, account_id=ACCOUNT, caller_arn=CALLER, started_at=started, meta=meta)
+
+
+GENERATORS = [demo_tags, demo_finops, demo_costs, demo_phase5]
 
 
 def main() -> int:

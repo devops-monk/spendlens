@@ -19,12 +19,17 @@ ROOT = Path(__file__).resolve().parents[1]
 MOD = ROOT / "src" / "spendlens" / "mod"
 OUT = ROOT / "tests" / "fixtures" / "aws_schema.json"
 
-COMMON = ["partition", "region", "account_id", "_ctx", "sp_connection_name", "sp_ctx"]
-CW_METRIC = ["metric_name", "namespace", "average", "maximum", "minimum", "sample_count", "sum", "unit", "timestamp"]
+COMMON = {"partition": "STRING", "region": "STRING", "account_id": "STRING", "_ctx": "JSON",
+          "sp_connection_name": "STRING", "sp_ctx": "JSON"}
+CW_METRIC = {"metric_name": "STRING", "namespace": "STRING", "average": "DOUBLE", "maximum": "DOUBLE",
+             "minimum": "DOUBLE", "sample_count": "DOUBLE", "sum": "DOUBLE", "unit": "STRING", "timestamp": "TIMESTAMP"}
 NAME_RE = re.compile(r'\bName:\s*"([a-z0-9_]+)"')
+# a column definition: Name ... Type within the same {...} block (no nested braces in between)
+COL_RE = re.compile(r'Name:\s*"([a-z0-9_]+)"[^{}]*?Type:\s*proto\.ColumnType_([A-Z]+)', re.DOTALL)
 
 
-def table_columns(go_file: Path) -> tuple[str, list[str]]:
+def table_columns(go_file: Path) -> tuple[str, dict[str, str]]:
+    """table name and {column: steampipe type} (STRING, INT, DOUBLE, BOOL, JSON, TIMESTAMP, IPADDR, CIDR, ...)."""
     src = go_file.read_text()
     table = NAME_RE.search(src).group(1)  # first Name: is the table name
     idx = src.find("\t\tColumns:")
@@ -33,18 +38,20 @@ def table_columns(go_file: Path) -> tuple[str, list[str]]:
     section = src[idx:]
     end = section.find("\nfunc ")
     section = section[: end if end > 0 else None]
-    cols = NAME_RE.findall(section)
+    cols = dict(COL_RE.findall(section))
+    for name in NAME_RE.findall(section):  # columns whose Type we could not parse
+        cols.setdefault(name, "UNKNOWN")
     if "cwMetricColumns(" in section:
-        cols += CW_METRIC
+        cols.update(CW_METRIC)
     if "costExplorerColumns(" in section:
-        cols += ce_columns(go_file.parent)
-    return table, sorted(set(cols + COMMON))
+        cols.update(ce_columns(go_file.parent))
+    return table, dict(sorted({**COMMON, **cols}.items()))
 
 
-def ce_columns(src_dir: Path) -> list[str]:
+def ce_columns(src_dir: Path) -> dict[str, str]:
     text = (src_dir / "cost_explorer.go").read_text()
     start = text.find("var costExplorerColumnDefs")
-    return NAME_RE.findall(text[start: text.find("\n}", start)])
+    return dict(COL_RE.findall(text[start: text.find("\n}", start)]))
 
 
 def main() -> int:

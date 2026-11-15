@@ -3,7 +3,7 @@
 FinOps lens for AWS, built on [Steampipe](https://steampipe.io) and [Powerpipe](https://powerpipe.io).
 It finds untagged and non-compliant resources, over-provisioned and wasted spend, and month-over-month cost changes, and you can ask an AI about your bill. All of it uses the AWS role you already have assumed in your terminal.
 
-> Status: phases 1–4 are done (tags, rightsizing, waste and savings, cost analysis). See [PLAN.md](PLAN.md).
+> Status: phases 1–5 are done (tags, rightsizing/waste, cost analysis, anomalies, forecast, savings). See [PLAN.md](PLAN.md).
 
 ## Install (dev)
 
@@ -60,6 +60,24 @@ spendlens cost resources --days 7                # resources whose cost rose/fel
 ```
 
 New and removed services are reported as `new` and `gone`; the legacy mod dropped them. Credits and refunds are excluded by default (`cost.exclude_record_types`).
+
+## Anomalies, forecast and savings
+
+```bash
+spendlens anomalies                              # daily spikes per service vs a 30-day robust baseline
+spendlens anomalies -g account --days 7 --fail-on-anomaly
+spendlens forecast                               # month-end projection vs budgets.monthly_total + AWS Budgets
+spendlens savings hub --min-saving 50            # AWS Cost Optimization Hub recommendations
+spendlens savings commitments                    # Savings Plan / RI coverage per service, expiring plans
+spendlens savings summary                        # one de-duplicated total across rightsize, waste, hub, commitments
+```
+
+`savings summary` never double counts:
+- When several actions apply to one resource, it keeps only the largest.
+- When AWS and spendlens both estimate the same resource, AWS's estimate wins.
+- Commitments are counted once.
+
+Required IAM permissions: [docs/permissions.md](docs/permissions.md).
 
 ## Data sources and history
 

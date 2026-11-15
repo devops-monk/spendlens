@@ -229,3 +229,17 @@ def costs_from_source(
     return rows, run.meta, ReportMeta(title=feature, account_id=run.account_id, caller_arn=run.caller_arn,
                                       extra={"source": source.value, "run_id": run.id,
                                              "run_started_at": run.started_at})
+
+
+def steampipe_rows(cfg: Config, sql: str, params: Any = None, *, what: str = "query",
+                   hint: str = "") -> list[dict[str, Any]]:
+    """Run one read-only query for a feature; exit with a readable message (and optional hint) on failure."""
+    from .steampipe import SteampipeClient, SteampipeError
+
+    try:
+        with SteampipeClient(cfg.steampipe) as c:
+            return c.query(sql, params)
+    except SteampipeError as e:
+        tip = f"\n[dim]{hint}[/]" if hint and ("AccessDenied" in str(e) or "not authorized" in str(e).lower()) else ""
+        err.print(f"[red]{what} failed:[/] {e}{tip}")
+        raise typer.Exit(1) from e

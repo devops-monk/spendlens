@@ -118,3 +118,17 @@ def test_control_docs_up_to_date():
                        capture_output=True, text=True, check=False)
     assert r.returncode == 0, r.stdout
 
+
+
+def test_checker_type_rules_catch_past_bugs():
+    """Each of these reached the system tests before the type rules existed."""
+    assert check_sql("select calculated_spend_actual_spend ->> 'Amount' from aws_budgets_budget") == [
+        "calculated_spend_actual_spend is STRING, not JSON: cannot use '->>'"]
+    assert check_sql("select f.timeout * 1000 from aws_lambda_function as f") == [
+        "f.timeout is STRING: cast before '*' (e.g. f.timeout::numeric)"]
+    assert check_sql("select coalesce(private_ip_address, 'a resource') from aws_vpc_eip") == [
+        "coalesce(private_ip_address IPADDR, text): use host(private_ip_address)"]
+    # the fixed forms pass
+    assert check_sql("select f.timeout::numeric * 1000, coalesce(host(private_ip_address), 'x') "
+                     "from aws_lambda_function as f, aws_vpc_eip") == []
+    assert check_sql("select tags ->> 'Team', tags ? 'Env' from aws_s3_bucket") == []

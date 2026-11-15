@@ -234,7 +234,14 @@ PLAN.md
    - Each query is a single bounded Cost Explorer call: exactly one `period_start >=` / `period_end <=` qual pair, and only the selected metric.
    - Cost rows are saved to history, so `--source last|demo` replay works.
    - Moto Cost Explorer system tests caught a placeholder bug: the engine emitted Powerpipe-style `$n`, but psycopg needs `%(name)s`. The fake client now enforces the psycopg contract.
-5. Savings, anomalies and forecast.
+5. ✅ Savings, anomalies and forecast:
+   - **`anomalies`:** daily spend per group, robust z-score (median and MAD) over a trailing baseline, a minimum $ increase, optional drops, and a `--fail-on-anomaly` CI gate.
+   - **`forecast`:** month-to-date plus the Cost Explorer forecast for the rest of the month, falling back to a linear run-rate. Checked against `budgets.monthly_total` and every monthly AWS Budget (using AWS's own forecasted spend), with `--fail-on-risk`.
+   - **`savings hub`:** AWS Cost Optimization Hub recommendations.
+   - **`savings commitments`:** Savings Plan / RI coverage from amortized spend by purchase type, plus expiring Savings Plans.
+   - **`savings summary`:** a de-duplicated total across sources.
+   - **Offline SQL checker:** now applies type rules (JSON operators, arithmetic on text, `inet` coalesce) from a typed schema snapshot. These came from the system tests, which found a budgets JSON-operator bug and a misleading permissions hint.
+   - **IAM:** required permissions are documented in `docs/permissions.md`.
 6. HTML dashboard with Very branding.
 7. AI `ask`: the multi-provider adapter, read-only tools, the SQL guard, and the REPL.
 8. `notify` (Slack/Teams) and the GitLab CI schedule template.

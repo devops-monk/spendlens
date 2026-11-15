@@ -58,13 +58,25 @@ cost:
   trend_months: 6
   showback_tag_keys: [Service Owner, Environment]
 
+# spendlens anomalies: daily cost per group vs trailing baseline (robust z-score)
 anomaly:
   lookback_days: 30
+  detect_days: 3
   threshold: 3.0
   min_daily_cost: 1.0
+  min_increase: 10             # ignore spikes smaller than this per day
+  include_drops: false
+  group_by: service            # service | account | region | usage-type | tag:<Key>
+
+# spendlens savings: Cost Optimization Hub + commitment (Savings Plans / RI) coverage
+savings:
+  commitment_coverage_target_pct: 70
+  commitment_min_on_demand: 100
+  savings_plan_expiration_warning_days: 45
 
 budgets:
-  monthly_total: null          # e.g. 25000
+  monthly_total: null          # e.g. 25000 -- checked by `spendlens forecast` (AWS Budgets are read too)
+  warn_pct: 80                 # forecast above this % of a budget = at risk
   per_tag: {}                  # e.g. {Team: {payments: 5000, search: 3000}}
 
 llm:

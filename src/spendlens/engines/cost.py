@@ -148,34 +148,39 @@ class GroupBy:
         return cls("dimension", DIMENSIONS[s.lower()], s.lower())
 
 
-def cost_sql(group: GroupBy, metric: str, exclude_record_types: Iterable[str]) -> str:
-    """SQL returning (grp, amount, currency) for one period. psycopg named params: start, end (exclusive),
-    excluded (record types) or tag (tag key) -- see cost_params()."""
+def cost_sql(group: GroupBy, metric: str, exclude_record_types: Iterable[str], granularity: str = "MONTHLY") -> str:
+    """SQL returning (grp, amount, currency) for one period -- plus `day` when granularity is DAILY.
+    psycopg named params: start, end (exclusive), excluded (record types) or tag (tag key) -- see cost_params()."""
+    if granularity not in ("MONTHLY", "DAILY"):
+        raise ValueError(f"granularity must be MONTHLY or DAILY, got {granularity}")
     col = METRICS[metric]
     unit = col.replace("_amount", "_unit")
+    daily = granularity == "DAILY"
+    day_col = "period_start::date as day,\n  " if daily else ""
+    group_cols = "1, 2" if daily else "1"
     if group.kind == "tag":
         return (
             "select coalesce(nullif(tag_value_1, ''), '(untagged)') as grp,\n"
-            f"  sum({col}::numeric) as amount, max({unit}) as currency\n"
+            f"  {day_col}sum({col}::numeric) as amount, max({unit}) as currency\n"
             "from aws_cost_by_tag\n"
-            "where granularity = 'MONTHLY' and tag_key_1 = %(tag)s\n"
+            f"where granularity = '{granularity}' and tag_key_1 = %(tag)s\n"
             "  and period_start >= %(start)s::timestamptz and period_end <= %(end)s::timestamptz\n"
-            "group by 1"
+            f"group by {group_cols}"
         )
-    excluded = [r for r in exclude_record_types]
+    excluded = list(exclude_record_types)
     if group.key == "RECORD_TYPE":
-        dim, dim2, rec = "dimension_1", "SERVICE", "dimension_1"
+        dim2, rec = "SERVICE", "dimension_1"
     else:
-        dim, dim2, rec = "dimension_1", "RECORD_TYPE", "dimension_2"
+        dim2, rec = "RECORD_TYPE", "dimension_2"
     record_filter = (f"\n  and {rec} <> all(%(excluded)s::text[])" if excluded else "")
     return (
-        f"select coalesce(nullif({dim}, ''), '(none)') as grp,\n"
-        f"  sum({col}::numeric) as amount, max({unit}) as currency\n"
+        "select coalesce(nullif(dimension_1, ''), '(none)') as grp,\n"
+        f"  {day_col}sum({col}::numeric) as amount, max({unit}) as currency\n"
         "from aws_cost_usage\n"
-        f"where granularity = 'MONTHLY' and dimension_type_1 = '{group.key}' and dimension_type_2 = '{dim2}'\n"
+        f"where granularity = '{granularity}' and dimension_type_1 = '{group.key}' and dimension_type_2 = '{dim2}'\n"
         "  and period_start >= %(start)s::timestamptz and period_end <= %(end)s::timestamptz"
         f"{record_filter}\n"
-        "group by 1"
+        f"group by {group_cols}"
     )
 
 
