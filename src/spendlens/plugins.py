@@ -46,7 +46,10 @@ if TYPE_CHECKING:
     from .doctor import Check
 
 ENTRY_POINT_GROUP = "spendlens.plugins"
-BUILTIN_FEATURES: tuple[str, ...] = ()  # e.g. "spendlens.features.tags" as phases land
+BUILTIN_FEATURES: tuple[str, ...] = (
+    "spendlens.features.tags",
+    "spendlens.features.history_cmd",
+)
 
 
 @dataclass

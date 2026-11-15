@@ -3,7 +3,7 @@
 FinOps lens for AWS, built on [Steampipe](https://steampipe.io) and [Powerpipe](https://powerpipe.io).
 It finds untagged and non-compliant resources, over-provisioned and wasted spend, and month-over-month cost changes, and you can ask an AI about your bill. All of it uses the AWS role you already have assumed in your terminal.
 
-> Status: phase 1 (scaffold) is done. See [PLAN.md](PLAN.md) for the roadmap.
+> Status: phases 1–2 are done (scaffold, tag compliance, history and demo data). See [PLAN.md](PLAN.md).
 
 ## Install (dev)
 
@@ -15,6 +15,38 @@ python3 -m venv .venv && .venv/bin/pip install -e ".[dev]"
 .venv/bin/spendlens init        # writes finops.yaml (your company policy)
 .venv/bin/spendlens doctor      # verifies tools, AWS identity, Cost Explorer access
 ```
+
+## Try it without AWS
+
+```bash
+spendlens tags --source demo --summary          # bundled sample account
+spendlens tags --source demo -k mandatory -r s3_bucket -f csv
+spendlens history diff --source demo            # what changed between two pipeline runs
+```
+
+## Tag compliance
+
+```bash
+spendlens tags                                   # all checks, alarms only
+spendlens tags -k mandatory -k prohibited -r ec2_instance --status all
+spendlens tags --summary -f json -o tags.json
+spendlens tags --fail-on-alarm                   # exit 3 on any alarm (CI gate)
+spendlens tags types                             # 70 resource types covered
+```
+
+Checks: `mandatory`, `untagged`, `prohibited`, `limit` and `expected_values` (SQL LIKE patterns). They come from `tagging.*` in `finops.yaml`.
+
+## Data sources and history
+
+`--source live` (default) queries AWS and saves the run to the local history DB. `--source last` replays the latest saved run offline. `--source demo` uses the bundled sample data.
+
+```bash
+spendlens history list
+spendlens history diff --feature tags           # new alarms / resolved / resource gone
+spendlens history path                          # for CI: restore/save this file between jobs
+```
+
+In CI, set `SPENDLENS__HISTORY__PATH=.spendlens/history.db` and restore and save that file (S3 or cache) around the job, so trends work across pipeline runs.
 
 ## Control parameters
 
@@ -64,5 +96,9 @@ Plugin settings go under `plugins.<name>` in `finops.yaml`. Run `spendlens plugi
 ## Development
 
 ```bash
-.venv/bin/pytest && .venv/bin/ruff check src tests
+.venv/bin/pytest && .venv/bin/ruff check src tests scripts
+python scripts/gen_tag_controls.py     # after editing features/tags_catalog.py
+python scripts/build_demo_db.py        # after changing demo generators
 ```
+
+Tag control SQL is derived from turbot/steampipe-mod-aws-tags (Apache-2.0).

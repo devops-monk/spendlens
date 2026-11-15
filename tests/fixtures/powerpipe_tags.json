@@ -1,0 +1,40 @@
+{
+ "group_id": "root_result_group",
+ "title": "Mandatory tags",
+ "summary": {"status": {"alarm": 1, "ok": 1, "info": 0, "skip": 0, "error": 1}},
+ "groups": [
+  {
+   "group_id": "spendlens.benchmark.tags_mandatory",
+   "title": "Mandatory tags",
+   "groups": [],
+   "controls": [
+    {
+     "control_id": "control.tags_mandatory_s3_bucket",
+     "title": "S3 buckets should have mandatory tags",
+     "description": "Check if S3 buckets have all mandatory tags.",
+     "severity": "high",
+     "tags": {"spendlens_check": "tags_mandatory", "resource_type": "s3_bucket"},
+     "run_status": 4,
+     "run_error": "",
+     "results": [
+      {"reason": "logs is missing tags: CostCentre.", "resource": "arn:aws:s3:::logs", "status": "alarm",
+       "dimensions": [{"key": "account_id", "value": "111122223333"}, {"key": "region", "value": "eu-west-1"},
+                      {"key": "Environment", "value": "prod"}]},
+      {"reason": "web has all mandatory tags.", "resource": "arn:aws:s3:::web", "status": "ok",
+       "dimensions": [{"key": "account_id", "value": "111122223333"}, {"key": "region", "value": "eu-west-2"}]}
+     ]
+    },
+    {
+     "control_id": "control.tags_mandatory_sagemaker_model",
+     "title": "SageMaker models should have mandatory tags",
+     "severity": "high",
+     "tags": {"spendlens_check": "tags_mandatory", "resource_type": "sagemaker_model"},
+     "run_status": 8,
+     "run_error": "AccessDeniedException: not authorized to perform sagemaker:ListModels",
+     "results": null
+    }
+   ]
+  }
+ ],
+ "controls": null
+}

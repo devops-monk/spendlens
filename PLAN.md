@@ -149,6 +149,31 @@ Rules:
   - The `Finding` / `CostDelta` models plug straight into every renderer, including the HTML dashboard.
 - **Custom controls without Python (phase 2+):** drop `.pp` files into a mod dir listed in config. They are picked up by the benchmark runner and inherit all parameters.
 
+## Local data: history store and demo DB (SQLite)
+- **History store:** `history.path`, default `~/.local/share/spendlens/spendlens.db`.
+  - Every live run is saved: findings, cost rows, effective params, caller identity, CI metadata.
+  - Enables trends, `spendlens history list`, and `history diff` (new alarms, resolved, resource gone, new resource).
+  - Old runs are pruned per feature (`history.keep_runs`).
+- **Bundled demo DB:** `spendlens/data/demo.db`, built by `scripts/build_demo_db.py`.
+  - Deterministic synthetic data for account 123456789012.
+  - Each feature adds a `demo_<feature>()` generator.
+- **Source switch on every command:** `--source live|last|demo`.
+  - `live` queries AWS and saves the run.
+  - `last` replays the latest saved run with no AWS calls.
+  - `demo` uses the bundled data.
+- **Laptop use:** history builds up locally. Anyone can try the tool with `--source demo` without AWS.
+- **Pipeline use:** set `SPENDLENS__HISTORY__PATH`. The CI template restores and saves the DB file (S3 or cache) around the job, so trends span pipeline runs.
+- **AI over history (phase 7):**
+  - `ask` gets a read-only SQL tool over the history DB, alongside live Steampipe.
+  - People investigating an issue can chat about cached results offline. Examples: "why is this bucket alarming?", "what changed since last week's pipeline?"
+  - Live Steampipe is used only when history can't answer.
+
+## Live verification checklist (deferred until the product is ready; run with an assumed role)
+- [ ] `steampipe service start` (the first attempt failed while downloading steampipe-postgres-fdw; retry)
+- [ ] `spendlens doctor` all green
+- [ ] `spendlens tags` against a real account: the mandatory, prohibited and expected_values SQL return sensible rows; `--resource-type` filter (`--where`); `--search-path-prefix` with an aggregator
+- [ ] Tables in the catalog that error for permissions show up as `error` findings, not crashes
+
 ## Project layout
 ```
 spendlens/
@@ -158,6 +183,10 @@ spendlens/
     config.py               # finops.yaml schema + loader
     doctor.py
     plugins.py              # Registry, entry-point discovery
+    common.py               # shared options, load(), emit(), --source handling
+    history.py              # SQLite history store + diff
+    data/demo.db            # bundled demo data
+    mod/                    # bundled Powerpipe mod (tags/*.pp generated)
     features/               # built-in features, each registers via plugins API
     steampipe.py            # connection, service start/check, query helper
     powerpipe.py            # benchmark runner + JSON → Findings
@@ -167,7 +196,7 @@ spendlens/
     render/{table,csv,json,html}.py
     templates/dashboard.html.j2, theme.css
     notify.py
-  mods/spendlens/           # migrated .pp mod
+  scripts/                  # gen_tag_controls.py, build_demo_db.py
   examples/finops.yaml
   ci/.gitlab-ci.yml
   tests/
@@ -176,7 +205,11 @@ PLAN.md
 
 ## Phases (built one at a time, with user sign-off after each)
 1. ✅ Scaffold: write `PLAN.md`, set up pyproject and the CLI skeleton, add the config with `init` and `doctor`, the Steampipe query helper, the findings model, and the table/CSV/JSON renderers. Also delivered: the parameter layers (`--set`, `--var`, env), the `params`, `config`, `query` and `plugins` commands, and the plugin registry.
-2. Tags: migrate the tags mod to `.pp` and add the `spendlens tags` command.
+2. ✅ Tags: migrate the tags mod to `.pp` and add the `spendlens tags` command. Delivered:
+   - a generated mod covering 70 resource types × 5 checks, with Turbot's expected-values precedence bug fixed
+   - a Powerpipe runner that uses the non-deprecated connection config, `--where` filtering and a concatenated-JSON parser
+   - the `--summary`, `--fail-on-alarm` and `tags types` commands
+   - the SQLite history store, `history list|diff|path`, the bundled demo DB, and `--source live|last|demo`
 3. Rightsizing and waste: migrate cost-analysis plus the chosen thrifty controls, and add the `rightsize` and `waste` commands.
 4. Cost: add `cost diff` (MoM and custom range, with grouping and by-resource) and `cost showback`.
 5. Savings, anomalies and forecast.

@@ -120,6 +120,19 @@ class SteampipeConfig(_Strict):
     connection: str = "aws"  # steampipe connection / aggregator name used as search_path
 
 
+class PowerpipeConfig(_Strict):
+    binary: str = "powerpipe"
+    max_parallel: int = Field(10, ge=1, le=100)
+    timeout_s: int = Field(1800, ge=10)
+    extra_args: list[str] = Field(default_factory=list)  # appended to every powerpipe invocation
+
+
+class HistoryConfig(_Strict):
+    enabled: bool = True  # save every live run to the local SQLite store
+    path: str | None = None  # default ~/.local/share/spendlens/spendlens.db; in CI restore/save between jobs
+    keep_runs: int = Field(200, ge=1)  # per feature
+
+
 class AWSConfig(_Strict):
     profile: str | None = None
     accounts: list[str] = Field(default_factory=list)
@@ -136,6 +149,8 @@ class Config(_Strict):
     llm: LLMConfig = Field(default_factory=LLMConfig)
     notifications: Notifications = Field(default_factory=Notifications)
     steampipe: SteampipeConfig = Field(default_factory=SteampipeConfig)
+    powerpipe: PowerpipeConfig = Field(default_factory=PowerpipeConfig)
+    history: HistoryConfig = Field(default_factory=HistoryConfig)
     aws: AWSConfig = Field(default_factory=AWSConfig)
     powerpipe_vars: dict[str, Any] = Field(default_factory=dict)  # raw passthrough, merged last
     plugins: dict[str, dict[str, Any]] = Field(default_factory=dict)  # per-plugin settings

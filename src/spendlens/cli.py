@@ -3,19 +3,29 @@
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated
 
 import typer
-from rich.console import Console
 from rich.table import Table
 
 from . import __version__
-from .config import Config, ConfigError, flatten, load_config, param_keys, template_text
-from .models import ReportMeta
+from .common import (
+    BRAND,
+    ConfigOpt,
+    FormatOpt,
+    OutOpt,
+    ProfileOpt,
+    SetOpt,
+    VarOpt,
+    console,
+    emit,
+    err,
+    load,
+)
+from .config import flatten, param_keys, template_text
 from .plugins import load_plugins, registry
-from .render import Format, render
+from .render import Format
 from .steampipe import SteampipeClient, SteampipeError
 
 app = typer.Typer(
@@ -24,58 +34,6 @@ app = typer.Typer(
     no_args_is_help=True,
     rich_markup_mode="rich",
 )
-console = Console()
-err = Console(stderr=True)
-
-BRAND = "#E6007E"
-
-# ----------------------------------------------------------- shared options
-# Every feature command takes these so parameters work identically everywhere.
-ConfigOpt = Annotated[Path | None, typer.Option("--config", "-c", help="Policy file (default: ./finops.yaml).")]
-ProfileOpt = Annotated[str | None, typer.Option("--profile", "-p", help="AWS profile (default: current credentials).")]
-SetOpt = Annotated[
-    list[str] | None,
-    typer.Option("--set", "-s", help="Override a parameter, e.g. --set sizing.ec2_cpu_low=10 (repeatable)."),
-]
-VarOpt = Annotated[
-    list[str] | None,
-    typer.Option("--var", help="Raw Powerpipe mod variable, e.g. --var my_threshold=5 (repeatable)."),
-]
-FormatOpt = Annotated[Format, typer.Option("--format", "-f", help="Output format.")]
-OutOpt = Annotated[Path | None, typer.Option("--out", "-o", help="Write output to this file.")]
-
-
-def load(
-    config: Path | None = None,
-    profile: str | None = None,
-    sets: list[str] | None = None,
-    pp_vars: list[str] | None = None,
-) -> Config:
-    """Resolve config for a command. Feature modules and plugins should call this."""
-    try:
-        cfg = load_config(config, sets=sets, pp_vars=pp_vars)
-    except (FileNotFoundError, ConfigError) as e:
-        err.print(f"[red]Config error:[/] {e}")
-        raise typer.Exit(2) from e
-    if profile:
-        cfg.aws.profile = profile
-    if cfg.aws.profile:
-        # Steampipe's aws plugin and the aws CLI both honour AWS_PROFILE.
-        os.environ["AWS_PROFILE"] = cfg.aws.profile
-    return cfg
-
-
-def emit(rows: Any, fmt: Format, out: Path | None, title: str, columns: list[str] | None = None) -> None:
-    """Render rows in the chosen format. Feature modules and plugins should call this."""
-    try:
-        text = render(rows, fmt, meta=ReportMeta(title=title), out=out, columns=columns)
-    except NotImplementedError as e:
-        err.print(f"[yellow]{e}[/]")
-        raise typer.Exit(2) from e
-    if text is not None and out is None:
-        typer.echo(text, nl=False)
-    elif out is not None:
-        err.print(f"[green]Wrote[/] {out}")
 
 
 def _version_cb(value: bool) -> None:

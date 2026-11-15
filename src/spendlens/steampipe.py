@@ -14,7 +14,7 @@ import subprocess
 from collections.abc import Iterator
 from contextlib import contextmanager
 from typing import Any, Self
-from urllib.parse import quote
+from urllib.parse import quote, unquote, urlsplit
 
 from .config import SteampipeConfig
 
@@ -36,6 +36,26 @@ def discover_password() -> str | None:
         return None
     m = re.search(r"Password:\s*(\S+)", out)
     return m.group(1) if m else None
+
+
+def connection_params(cfg: SteampipeConfig, password: str | None = None) -> dict[str, Any]:
+    """Host/port/db/user/password for tools that need discrete values (Powerpipe connection blocks)."""
+    if cfg.dsn:
+        u = urlsplit(cfg.dsn)
+        return {
+            "host": u.hostname or "localhost",
+            "port": u.port or 9193,
+            "db": (u.path or "/steampipe").lstrip("/") or "steampipe",
+            "username": unquote(u.username or "steampipe"),
+            "password": unquote(u.password) if u.password else None,
+        }
+    return {
+        "host": cfg.host,
+        "port": cfg.port,
+        "db": cfg.database,
+        "username": cfg.user,
+        "password": password or os.environ.get(cfg.password_env) or discover_password(),
+    }
 
 
 def build_dsn(cfg: SteampipeConfig, password: str | None = None) -> str:
@@ -69,6 +89,10 @@ class SteampipeClient:
             self._conn.autocommit = True
             with self._conn.cursor() as cur:
                 cur.execute(f"set statement_timeout = {int(self.timeout_s) * 1000}")
+                if self.cfg.connection:
+                    from psycopg import sql as _sql
+
+                    cur.execute(_sql.SQL("set search_path to {}, public").format(_sql.Identifier(self.cfg.connection)))
                 if self.read_only:
                     cur.execute("set default_transaction_read_only = on")
         return self._conn
