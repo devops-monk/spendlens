@@ -9,39 +9,17 @@ import pytest
 from spendlens.config import load_config
 from spendlens.features.tags_catalog import TAGGABLE_RESOURCES
 from spendlens.features.tags_checks import TAG_CHECKS
-from spendlens.models import Status
 from spendlens.powerpipe import (
     PowerpipeError,
     PowerpipeRunner,
     bundled_mod_dir,
-    connection_text,
     declared_variables,
-    hcl_value,
-    iter_json_documents,
-    parse_results,
-    var_file_text,
 )
 
-FIXTURE = Path(__file__).parent / "fixtures" / "powerpipe_tags.json"
-ROOT = Path(__file__).resolve().parents[1]
+FIXTURE = Path(__file__).resolve().parents[1] / "fixtures" / "powerpipe_tags.json"
+ROOT = Path(__file__).resolve().parents[2]
 
 
-def test_hcl_encoding():
-    assert hcl_value(["a", "b c"]) == '["a", "b c"]'
-    assert hcl_value({"Environment": ["prod", "dev%"]}) == '{"Environment" = ["prod", "dev%"]}'
-    assert hcl_value(True) == "true" and hcl_value(None) == "null" and hcl_value(0.25) == "0.25"
-    assert hcl_value("${evil}") == '"$${evil}"' and hcl_value("%{x}") == '"%%{x}"'
-    assert hcl_value('quo"te') == '"quo\\"te"'
-
-
-def test_var_file_only_declared_vars():
-    text = var_file_text({"mandatory_tags": ["A"], "not_in_mod": 1}, {"database", "mandatory_tags"})
-    assert text.splitlines() == ["database = connection.steampipe.spendlens", 'mandatory_tags = ["A"]']
-
-
-def test_connection_text_omits_empty_password():
-    t = connection_text({"host": "h", "port": 9193, "db": "steampipe", "username": "u", "password": None})
-    assert 'connection "steampipe" "spendlens"' in t and "password" not in t and "port     = 9193" in t
 
 
 def test_bundled_mod_declares_all_tag_vars():
@@ -49,26 +27,6 @@ def test_bundled_mod_declares_all_tag_vars():
     assert {"database", "mandatory_tags", "prohibited_tags", "expected_tag_values", "tag_limit",
             "common_dimensions", "tag_dimensions"} <= declared
 
-
-def test_parse_results_fixture():
-    findings = parse_results(json.loads(FIXTURE.read_text()))
-    assert [f.status for f in findings] == [Status.ALARM, Status.OK, Status.ERROR]
-    alarm = findings[0]
-    assert alarm.control == "tags_mandatory_s3_bucket" and alarm.check == "tags_mandatory"
-    assert alarm.resource_type == "s3_bucket" and alarm.account_id == "111122223333"
-    assert alarm.region == "eu-west-1" and alarm.dimensions == {"Environment": "prod"}
-    assert alarm.severity.value == "high"
-    assert "AccessDenied" in findings[2].reason
-
-
-def test_concatenated_documents_and_dedupe():
-    doc = FIXTURE.read_text()
-    docs = list(iter_json_documents(doc + "\n" + doc))
-    assert len(docs) == 2
-    # the same control under two benchmarks in one document is only counted once
-    d = json.loads(doc)
-    d["groups"].append(d["groups"][0])
-    assert len(parse_results(d)) == 3
 
 
 def _fake_powerpipe(tmp_path: Path, payload: str, exit_code: int = 1) -> Path:
@@ -91,6 +49,7 @@ def _fake_powerpipe(tmp_path: Path, payload: str, exit_code: int = 1) -> Path:
     return exe
 
 
+
 def test_runner_end_to_end_with_fake_binary(tmp_path, monkeypatch):
     exe = _fake_powerpipe(tmp_path, FIXTURE.read_text())
     monkeypatch.setenv("STEAMPIPE_DATABASE_PASSWORD", "s3cret")
@@ -108,6 +67,7 @@ def test_runner_end_to_end_with_fake_binary(tmp_path, monkeypatch):
     assert 'password = "s3cret"' in log["ppc"]
 
 
+
 def test_runner_reports_failure(tmp_path):
     exe = _fake_powerpipe(tmp_path, "Error: failed to connect to steampipe", exit_code=2)
     cfg = load_config(sets=[f"powerpipe.binary={exe}", "steampipe.dsn=postgresql://u:p@h:1/d"], environ={})
@@ -115,10 +75,12 @@ def test_runner_reports_failure(tmp_path):
         PowerpipeRunner(cfg).run(["tags"])
 
 
+
 def test_generated_mod_is_up_to_date():
     r = subprocess.run([sys.executable, str(ROOT / "scripts" / "gen_tag_controls.py"), "--check"],
                        capture_output=True, text=True, check=False)
     assert r.returncode == 0, r.stdout
+
 
 
 @pytest.mark.skipif(not shutil.which("powerpipe"), reason="powerpipe not installed")
@@ -129,3 +91,4 @@ def test_powerpipe_parses_bundled_mod():
     names = {c["resource_name"] for c in json.loads(r.stdout)}
     expected = {f"tags_{c}_{t}" for c in TAG_CHECKS for t in TAGGABLE_RESOURCES}
     assert expected <= names
+

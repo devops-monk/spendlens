@@ -96,9 +96,10 @@ Plugin settings go under `plugins.<name>` in `finops.yaml`. Run `spendlens plugi
 ## Development
 
 ```bash
-.venv/bin/pytest && .venv/bin/ruff check src tests scripts
-python scripts/gen_tag_controls.py     # after editing features/tags_catalog.py
-python scripts/build_demo_db.py        # after changing demo generators
+make test              # unit + integration (fast, no cloud)
+make test-system       # end-to-end against the Moto AWS emulator via an isolated Steampipe install
+make lint
+make generate          # after changing config schema, tag catalog, controls or demo generators
 ```
 
 Tag control SQL is derived from turbot/steampipe-mod-aws-tags (Apache-2.0).

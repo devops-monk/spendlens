@@ -12,8 +12,8 @@ control "vpc_eip_unattached" {
         else 'ok'
       end as status,
       case
-        when association_id is null then public_ip || ' is not associated.'
-        else public_ip || ' is associated with ' || coalesce(private_ip_address, 'a resource') || '.'
+        when association_id is null then host(public_ip) || ' is not associated.'
+        else host(public_ip) || ' is associated with ' || coalesce(host(private_ip_address), 'a resource') || '.'
       end as reason
       ${local.tag_dimensions_sql}
       ${local.common_dimensions_sql}
@@ -35,7 +35,7 @@ control "vpc_nat_gateway_unused" {
     with traffic as (
       select
         nat_gateway_id,
-        sum(coalesce(sum, 0)) as bytes_out
+        sum(coalesce(sum, 0))::numeric as bytes_out
       from
         aws_vpc_nat_gateway_metric_bytes_out_to_destination
       group by
@@ -51,7 +51,7 @@ control "vpc_nat_gateway_unused" {
       case
         when n.state <> 'available' then n.title || ' is ' || n.state || '.'
         when coalesce(t.bytes_out, 0) = 0 then n.title || ' sent no traffic in the metric window.'
-        else n.title || ' is in use (' || round(t.bytes_out / 1048576.0, 1) || ' MB out).'
+        else n.title || ' is in use (' || round((t.bytes_out / 1048576.0)::numeric, 1) || ' MB out).'
       end as reason
       ${replace(local.tag_dimensions_qualifier_sql, "__QUALIFIER__", "n.")}
       ${replace(local.common_dimensions_qualifier_sql, "__QUALIFIER__", "n.")}

@@ -74,7 +74,7 @@ control "lambda_function_excessive_timeout" {
       f.arn as resource,
       case
         when d.avg_ms is null then 'skip'
-        when f.timeout * 1000 > d.avg_ms * $1 and f.timeout > 3 then 'alarm'
+        when f.timeout::numeric * 1000 > d.avg_ms * $1 and f.timeout::numeric > 3 then 'alarm'
         else 'ok'
       end as status,
       case

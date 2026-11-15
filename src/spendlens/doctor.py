@@ -54,12 +54,11 @@ def check_aws_plugin() -> Check:
 
 
 def check_aws_identity(profile: str | None) -> Check:
-    exe = shutil.which("aws")
-    if not exe:
+    from .common import sts_command
+
+    cmd = sts_command(profile)
+    if not cmd:
         return Check("aws identity", "warn", "aws CLI not found; cannot verify identity", "Install AWS CLI v2")
-    cmd = [exe, "sts", "get-caller-identity", "--output", "json"]
-    if profile:
-        cmd += ["--profile", profile]
     code, out = _run(cmd)
     if code != 0:
         return Check(

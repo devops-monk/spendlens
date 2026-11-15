@@ -10,3 +10,4 @@ build/
 /finops.yaml
 /out/
 /*.html
+/.e2e/

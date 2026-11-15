@@ -94,13 +94,29 @@ def emit(rows: Any, fmt: Format, out: Path | None, title: str, columns: list[str
 # ------------------------------------------------------------------ run metadata
 
 
-def caller_identity() -> dict[str, str]:
+def sts_command(profile: str | None = None) -> list[str] | None:
+    """`aws sts get-caller-identity` honouring endpoint overrides explicitly.
+
+    AWS_ENDPOINT_URL[_STS] is only read natively by AWS CLI >= 2.13; passing --endpoint-url works with every
+    version, so emulators (Moto/LocalStack) never fall through to real AWS.
+    """
     exe = shutil.which("aws")
     if not exe:
+        return None
+    cmd = [exe, "sts", "get-caller-identity", "--output", "json"]
+    if profile:
+        cmd += ["--profile", profile]
+    if endpoint := os.environ.get("AWS_ENDPOINT_URL_STS") or os.environ.get("AWS_ENDPOINT_URL"):
+        cmd += ["--endpoint-url", endpoint]
+    return cmd
+
+
+def caller_identity() -> dict[str, str]:
+    cmd = sts_command()
+    if not cmd:
         return {}
     try:
-        p = subprocess.run([exe, "sts", "get-caller-identity", "--output", "json"],
-                           capture_output=True, text=True, timeout=20, check=False)
+        p = subprocess.run(cmd, capture_output=True, text=True, timeout=20, check=False)
         return json.loads(p.stdout) if p.returncode == 0 else {}
     except (OSError, subprocess.SubprocessError, json.JSONDecodeError):
         return {}

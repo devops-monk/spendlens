@@ -16,16 +16,19 @@ def test_defaults_without_file(tmp_path, monkeypatch):
     assert cfg.tagging.mandatory == ["Environment", "Service Owner"]
 
 
+
 def test_mandatory_tags_deduped():
     # the original steampipe-mod-aws-tags test.spvars listed Environment twice
     cfg = Config.model_validate({"tagging": {"mandatory": ["Environment", "Environment", "Service Owner"]}})
     assert cfg.tagging.mandatory == ["Environment", "Service Owner"]
 
 
+
 def test_template_is_valid_config():
     cfg = Config.model_validate(yaml.safe_load(template_text()))
     assert "CostCentre" in cfg.tagging.mandatory
     assert cfg.llm.provider == "bedrock"
+
 
 
 def test_powerpipe_vars_mapping():
@@ -39,6 +42,7 @@ def test_powerpipe_vars_mapping():
     assert v["mandatory_tags"] == cfg.tagging.mandatory
 
 
+
 def test_env_overrides(tmp_path, monkeypatch):
     p = tmp_path / "f.yaml"
     p.write_text("llm: {provider: openai, model: gpt-x}\n")
@@ -49,11 +53,14 @@ def test_env_overrides(tmp_path, monkeypatch):
     assert cfg.source == str(p)
 
 
+
 def test_missing_explicit_file():
     with pytest.raises(FileNotFoundError):
         load_config(Path("/nonexistent/finops.yaml"))
 
 
+
 def test_invalid_provider_rejected():
     with pytest.raises(ValidationError):
         Config.model_validate({"llm": {"provider": "nope"}})
+

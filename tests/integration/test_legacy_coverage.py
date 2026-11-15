@@ -43,6 +43,8 @@ LEGACY_COST_ANALYSIS = {
 PLANNED_FEATURES = {"feature:cost diff"}
 
 
+
+
 def test_all_legacy_tag_controls_covered():
     assert len(LEGACY_TAG_SLUGS) == 54
     controls = mod_controls(bundled_mod_dir())
@@ -53,6 +55,7 @@ def test_all_legacy_tag_controls_covered():
             assert f"tags_{check}_{slug}" in controls
 
 
+
 def test_all_legacy_cost_analysis_controls_covered():
     assert len(LEGACY_COST_ANALYSIS) == 13
     controls = mod_controls(bundled_mod_dir())
@@ -60,3 +63,4 @@ def test_all_legacy_cost_analysis_controls_covered():
         if target in PLANNED_FEATURES:
             continue
         assert target in controls, f"{legacy} -> {target} does not exist"
+

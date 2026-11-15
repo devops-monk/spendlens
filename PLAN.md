@@ -219,12 +219,27 @@ PLAN.md
    - offline SQL verification: pglast grammar check plus a plugin schema snapshot
    - a test enforcing coverage of the legacy controls
    - history schema v2 with migrations
-   3b. ⏳ End-to-end harness against Moto server (isolated Steampipe install) to exercise every feature without real AWS.
+   3b. ✅ Three test layers (`make test`, `make test-system`):
+       - **unit:** pure logic
+       - **integration:** the CLI with the SQLite and demo DBs, real or stand-in Powerpipe, and offline SQL checks
+       - **system:** the real CLI → Powerpipe → isolated Steampipe → Moto, with seeded resources and 33 expected outcomes, plus scenario tests for formats, history replay, the CI gate, and fix → resolved in `history diff`
+       The system layer found three real bugs that offline checks could not:
+       - an inet `coalesce` in the EIP control
+       - Lambda `timeout`, which the plugin exposes as text
+       - `round(double, int)` in the NAT gateway control
+       Doctor and run metadata now pass `--endpoint-url` explicitly, because AWS CLI < 2.13 ignores `AWS_ENDPOINT_URL`.
 4. Cost: add `cost diff` (MoM and custom range, with grouping and by-resource) and `cost showback`.
 5. Savings, anomalies and forecast.
 6. HTML dashboard with Very branding.
 7. AI `ask`: the multi-provider adapter, read-only tools, the SQL guard, and the REPL.
 8. `notify` (Slack/Teams) and the GitLab CI schedule template.
+
+## Test strategy
+| Layer | Scope | How |
+|---|---|---|
+| unit | config/params, renderers, estimators, HCL/JSON parsing, history store/diff/migrations, plugin registry | `make test-unit` |
+| integration | CLI commands (demo/last sources, filters, gates), Powerpipe runner (stand-in binary + real mod parse), offline SQL verification (pglast + plugin schema snapshot), legacy coverage, generated files up to date | `make test-integration` |
+| system | full product against Moto. Steampipe runs from an isolated install (`~/.spendlens-e2e`), and dummy credentials, `AWS_CONFIG_FILE` pointed at nothing, and a forced endpoint keep it off real AWS | `make test-system` (opt-in) |
 
 ## Verification
 - `spendlens doctor` passes using the user's assumed role (`aws sts get-caller-identity`, Steampipe service up, Cost Explorer readable).
