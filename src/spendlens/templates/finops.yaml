@@ -89,16 +89,20 @@ budgets:
   warn_pct: 80                 # forecast above this % of a budget = at risk
   per_tag: {}                  # e.g. {Team: {payments: 5000, search: 3000}}
 
+# spendlens ask: AI assistant (read-only; history first, live Steampipe only with --live)
 llm:
-  # provider: openai | azure | bedrock | anthropic | openai_compatible
-  provider: bedrock            # bedrock uses the AWS role assumed in your terminal
-  model: anthropic.claude-sonnet-5-5
-  # base_url: http://localhost:11434/v1   # openai_compatible (Ollama, vLLM, LM Studio ...) / azure endpoint
-  # api_key_env: OPENAI_API_KEY           # NAME of the env var holding the key, never the key itself
-  # api_version: 2024-10-21               # azure only
+  # provider: bedrock | anthropic | openai | azure | openai_compatible
+  provider: bedrock              # uses the AWS role assumed in your terminal (no API key)
+  model: anthropic.claude-opus-5-5
   # region: eu-west-1                     # bedrock only
+  # anthropic:          model: claude-opus-5-5, api_key_env: ANTHROPIC_API_KEY
+  # openai:             model: <model>, api_key_env: OPENAI_API_KEY
+  # azure:              model: <deployment>, base_url: https://<res>.openai.azure.com, api_version: 2024-10-21, api_key_env: AZURE_OPENAI_API_KEY
+  # openai_compatible:  model: <model>, base_url: http://localhost:11434/v1  (Ollama, vLLM, LM Studio ...)
+  effort: medium                 # Claude only: low | medium | high | xhigh | max
+  max_steps: 12
+  fallbacks: true                # Claude: retry safety-declined requests on a fallback model
   max_rows: 500
-  query_timeout_s: 60
 
 notifications:
   slack_webhook_env: SPENDLENS_SLACK_WEBHOOK

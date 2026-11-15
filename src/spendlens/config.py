@@ -210,15 +210,27 @@ class Budgets(_Strict):
 Provider = Literal["openai", "azure", "bedrock", "anthropic", "openai_compatible"]
 
 
+Effort = Literal["low", "medium", "high", "xhigh", "max"]
+
+
 class LLMConfig(_Strict):
-    provider: Provider = "bedrock"
-    model: str = "anthropic.claude-sonnet-5-5"
-    base_url: str | None = None
+    """`spendlens ask`. Claude (anthropic / bedrock) goes through the official Anthropic SDK; OpenAI, Azure OpenAI
+    and OpenAI-compatible servers (Ollama, vLLM, LM Studio ...) through the official OpenAI SDK."""
+
+    provider: Provider = "bedrock"  # bedrock uses the AWS role assumed in the terminal (no API key)
+    model: str = "anthropic.claude-opus-5-5"  # anthropic: claude-opus-5-5; azure: your deployment name
+    base_url: str | None = None  # openai_compatible / azure endpoint / anthropic proxy
     api_key_env: str | None = None  # NAME of the env var holding the key, never the key itself
-    api_version: str | None = None  # azure
-    region: str | None = None  # bedrock
-    temperature: float = Field(0.0, ge=0, le=2)
+    api_version: str | None = None  # azure, e.g. 2024-10-21
+    region: str | None = None  # bedrock (else AWS_REGION / AWS_DEFAULT_REGION; required, never guessed)
+    effort: Effort | None = "medium"  # Claude only: thinking depth / token spend
+    temperature: float | None = Field(None, ge=0, le=2)  # OpenAI-family only (current Claude models reject it)
+    max_tokens: int = Field(16000, ge=256, le=128000)
+    max_steps: int = Field(12, ge=1, le=50)  # tool calls per question
+    fallbacks: bool = True  # Claude refusal fallbacks (server-side on the Anthropic API, SDK middleware on Bedrock)
+    fallback_model: str | None = None  # Bedrock middleware target (default anthropic.claude-opus-4-8)
     max_rows: int = Field(500, ge=1)
+    max_result_chars: int = Field(20000, ge=1000)  # per tool result sent to the model
     query_timeout_s: int = Field(60, ge=1)
 
 

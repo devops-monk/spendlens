@@ -100,6 +100,28 @@ def check_service_and_cost(cfg: Config) -> list[Check]:
     return checks
 
 
+def check_llm(cfg: Config) -> Check:
+    """`spendlens ask` setup, without calling the model (no cost)."""
+    import importlib.util
+    import os
+
+    llm = cfg.llm
+    sdk = "anthropic" if llm.provider in ("anthropic", "bedrock") else "openai"
+    if importlib.util.find_spec(sdk) is None or importlib.util.find_spec("sqlglot") is None:
+        return Check("ai assistant", "warn", f"{sdk} SDK not installed", "pip install 'spendlens[ai]'")
+    detail = f"{llm.provider} · {llm.model}"
+    if llm.provider == "bedrock":
+        return Check("ai assistant", "ok", detail + " · uses the assumed AWS role (bedrock:InvokeModel)")
+    need_url = llm.provider in ("azure", "openai_compatible")
+    if need_url and not llm.base_url:
+        return Check("ai assistant", "fail", detail + " · llm.base_url not set", "set llm.base_url in finops.yaml")
+    default_env = {"anthropic": "ANTHROPIC_API_KEY", "openai": "OPENAI_API_KEY", "azure": "AZURE_OPENAI_API_KEY"}
+    env = llm.api_key_env or default_env.get(llm.provider)
+    if env and not os.environ.get(env) and llm.provider != "anthropic":
+        return Check("ai assistant", "warn", detail + f" · {env} not set", f"export {env}=...")
+    return Check("ai assistant", "ok", detail)
+
+
 def run_checks(
     cfg: Config, *, skip_service: bool = False, extra: list[Callable[[Config], list[Check]]] | None = None
 ) -> list[Check]:
@@ -108,8 +130,10 @@ def run_checks(
         check_binary("steampipe", "brew install turbot/tap/steampipe"),
         check_binary("powerpipe", "brew install turbot/tap/powerpipe"),
         check_aws_plugin(),
-        check_aws_identity(cfg.aws.profile),
     ]
+    if not skip_service:  # network: STS + Steampipe/Cost Explorer. --offline runs local checks only
+        checks.append(check_aws_identity(cfg.aws.profile))
+    checks.append(check_llm(cfg))
     if not skip_service:
         checks += check_service_and_cost(cfg)
     for fn in extra or []:

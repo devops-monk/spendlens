@@ -3,7 +3,7 @@
 FinOps lens for AWS, built on [Steampipe](https://steampipe.io) and [Powerpipe](https://powerpipe.io).
 It finds untagged and non-compliant resources, over-provisioned and wasted spend, and month-over-month cost changes, and you can ask an AI about your bill. All of it uses the AWS role you already have assumed in your terminal.
 
-> Status: phases 1–6 are done (tags, rightsizing/waste, cost analysis, anomalies, forecast, savings, HTML dashboard). See [PLAN.md](PLAN.md).
+> Status: phases 1–7 are done (tags, rightsizing/waste, cost analysis, anomalies, forecast, savings, HTML dashboard, AI assistant). See [PLAN.md](PLAN.md).
 
 ## Install (dev)
 
@@ -93,6 +93,29 @@ The dashboard is a single self-contained file with no network requests, so it wo
 - **Branding:** `dashboard.*` in `finops.yaml` sets the title, organisation, brand colours and font. Brand colours style chrome only; chart data colours are a fixed palette validated for colour-blind readers.
 - **Layout and style:** live in `src/spendlens/templates/report/` (Jinja2 templates plus `style.css` and `app.js`). Python only builds the view model, which is also embedded in the page as JSON (`#spendlens-data`).
 - **Extending:** plugins add tabs with `registry.add_dashboard_section(id, title, fn)`.
+
+## Ask the AI assistant
+
+```bash
+spendlens ask "What are my top 5 savings opportunities?"
+spendlens ask "Why did EC2 cost go up last month?" --show-tools     # see every query behind the answer
+spendlens ask --live "Which running instances are outside the allowed families?"   # also query live AWS
+spendlens ask -i                                                    # interactive follow-ups
+spendlens ask --source demo "Summarise the waste findings"          # try it on sample data
+```
+
+The assistant is read-only. It answers from saved history first (offline and free), and queries live AWS through Steampipe only with `--live`.
+
+Every model-written query goes through three safety layers:
+1. A SQL guard that allows one read-only `SELECT`.
+2. A read-only Steampipe connection with a timeout and a row cap.
+3. A read-only SQLite connection with an authorizer that denies anything except reads.
+
+Providers are set with `llm.*` in `finops.yaml`:
+- **Claude** on the Anthropic API or Amazon Bedrock (official Anthropic SDK). Bedrock uses your assumed AWS role and needs `llm.region` or `AWS_REGION`. Refusal fallbacks are on by default.
+- **OpenAI, Azure OpenAI**, or any **OpenAI-compatible** server such as Ollama or vLLM (official OpenAI SDK).
+
+Install with `pip install 'spendlens[ai]'`. `spendlens doctor` checks the AI setup without calling the model.
 
 ## Data sources and history
 

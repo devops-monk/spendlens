@@ -12,6 +12,7 @@
 
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
@@ -39,9 +40,20 @@ def _isolate(request, tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.delenv("SPENDLENS_CONFIG", raising=False)
-    for k in [k for k in __import__("os").environ if k.startswith("SPENDLENS__")]:
+    for k in [k for k in os.environ if k.startswith("SPENDLENS__")]:
         monkeypatch.delenv(k)
     monkeypatch.setenv("SPENDLENS__HISTORY__PATH", str(tmp_path / "history.db"))
+    # never reach a real cloud or paid API from unit/integration tests, even by accident
+    for k in ("AWS_PROFILE", "AWS_REGION", "AWS_DEFAULT_REGION", "AWS_SESSION_TOKEN", "ANTHROPIC_API_KEY",
+              "ANTHROPIC_AUTH_TOKEN", "OPENAI_API_KEY", "AZURE_OPENAI_API_KEY", "ANTHROPIC_PROFILE"):
+        monkeypatch.delenv(k, raising=False)
+    monkeypatch.setenv("AWS_ACCESS_KEY_ID", "testing")
+    monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "testing")
+    monkeypatch.setenv("AWS_CONFIG_FILE", os.devnull)
+    monkeypatch.setenv("AWS_SHARED_CREDENTIALS_FILE", os.devnull)
+    monkeypatch.setenv("AWS_EC2_METADATA_DISABLED", "true")
+    # any accidental AWS SDK/CLI call goes to a dead local port, never to real AWS
+    monkeypatch.setenv("AWS_ENDPOINT_URL", "http://127.0.0.1:9")
     monkeypatch.setattr("spendlens.common.caller_identity", lambda: {"Account": "999", "Arn": "arn:test"})
 
 

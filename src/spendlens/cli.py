@@ -72,7 +72,7 @@ def doctor(
     config: ConfigOpt = None,
     profile: ProfileOpt = None,
     sets: SetOpt = None,
-    offline: Annotated[bool, typer.Option("--offline", help="Skip Steampipe service / Cost Explorer checks.")] = False,
+    offline: Annotated[bool, typer.Option("--offline", help="Local checks only: no AWS (STS), Steampipe or Cost Explorer calls.")] = False,
 ) -> None:
     """Check steampipe, powerpipe, aws plugin, AWS identity and Cost Explorer access."""
     from .doctor import run_checks

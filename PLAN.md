@@ -247,7 +247,14 @@ PLAN.md
    - **Charts:** dependency-free server-side SVG (diverging bars, ranked bars, lines, meters, segmented bar) built to the dataviz mark specs. Palettes were validated with the dataviz validator (CVD/contrast, light and dark). Every chart has hover and keyboard tooltips plus a table view.
    - **Branding:** comes from config and styles chrome only. The default `#E6007E` is a placeholder until the real Very values are supplied: very.co.uk blocks automated fetching, so nothing was guessed.
    - **Visual checks:** headless Chrome screenshots at desktop and phone width, in light and dark. These caught chart scaling, a hash-anchor scroll, grid overflow, and a CSS-escaping font regression.
-7. AI `ask`: the multi-provider adapter, read-only tools, the SQL guard, and the REPL.
+7. ✅ AI `ask`:
+   - **Native SDKs instead of LiteLLM.** Claude on the Anthropic API or Bedrock goes through the official Anthropic SDK (Bedrock via `AnthropicBedrockMantle`). OpenAI, Azure and OpenAI-compatible servers go through the official OpenAI SDK.
+   - **Claude defaults:** `claude-opus-5-5`, effort `medium`, prompt caching, strict tool schemas, and refusal fallbacks (server-side on the Anthropic API, SDK middleware on Bedrock).
+   - **Tools:** `history_overview` and `history_query` by default; Steampipe tools only with `--live`; plus plugin tools.
+   - **Read-only safety:** sqlglot SQL guard, a read-only Steampipe connection, and a read-only SQLite connection with an authorizer.
+   - **Commands:** `-i` interactive, `--show-tools` audit trail, `--json` output, `doctor` AI check.
+   - **Bedrock region is never guessed.** This followed one accidental Bedrock request during development; AWS rejected it.
+   - **Tests:** unit tests; integration tests driving the real SDKs against a localhost stub LLM (`tests/stubllm.py`); and a system test running `ask --live` → stub LLM → Steampipe → Moto.
 8. `notify` (Slack/Teams) and the GitLab CI schedule template.
 
 ## Test strategy
