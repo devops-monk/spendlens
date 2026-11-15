@@ -20,7 +20,7 @@ from typing import Any, Self
 
 from .models import Finding
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 SCHEMA = """
 create table if not exists runs (
   id            integer primary key autoincrement,
@@ -36,6 +36,7 @@ create table if not exists findings (
   control             text not null,
   title               text,
   "check"             text,
+  service             text,
   resource_type       text,
   resource            text not null,
   account_id          text,
@@ -61,7 +62,12 @@ create table if not exists cost_rows (
 create index if not exists cost_rows_run on cost_rows(run_id);
 """
 
-_FINDING_COLS = ("control", "title", "check", "resource_type", "resource", "account_id", "region", "status",
+# Additive migrations: version -> statements to go from version-1 to version.
+MIGRATIONS: dict[int, tuple[str, ...]] = {
+    2: ("alter table findings add column service text",),
+}
+
+_FINDING_COLS = ("control", "title", "check", "service", "resource_type", "resource", "account_id", "region", "status",
                  "reason", "severity", "est_monthly_saving", "tags", "dimensions")
 
 
@@ -101,10 +107,16 @@ class HistoryStore:
 
     def _migrate(self) -> None:
         version = self.conn.execute("pragma user_version").fetchone()[0]
-        if version < SCHEMA_VERSION:
+        if version == SCHEMA_VERSION:
+            return
+        if version == 0:
             self.conn.executescript(SCHEMA)
-            self.conn.execute(f"pragma user_version = {SCHEMA_VERSION}")
-            self.conn.commit()
+        else:
+            for v in range(version + 1, SCHEMA_VERSION + 1):
+                for stmt in MIGRATIONS.get(v, ()):
+                    self.conn.execute(stmt)
+        self.conn.execute(f"pragma user_version = {SCHEMA_VERSION}")
+        self.conn.commit()
 
     def close(self) -> None:
         self.conn.close()

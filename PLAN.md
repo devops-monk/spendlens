@@ -210,7 +210,16 @@ PLAN.md
    - a Powerpipe runner that uses the non-deprecated connection config, `--where` filtering and a concatenated-JSON parser
    - the `--summary`, `--fail-on-alarm` and `tags types` commands
    - the SQLite history store, `history list|diff|path`, the bundled demo DB, and `--source live|last|demo`
-3. Rightsizing and waste: migrate cost-analysis plus the chosen thrifty controls, and add the `rightsize` and `waste` commands.
+3. ✅ Rightsizing and waste: migrate cost-analysis plus the chosen thrifty controls, and add the `rightsize` and `waste` commands. Delivered:
+   - 65 controls (41 rightsize, 24 waste): all 12 cost-analysis controls migrated with bug fixes, plus selected Thrifty and aws-compliance controls (`docs/control-mapping.md`, `docs/controls.md`)
+   - environment-aware standards (`*_by_env`, keyed on `tagging.environment_tag`)
+   - $ savings estimators driven by the `pricing:` config, with plugin estimators via `registry.add_estimator`
+   - a shared control-feature builder (`--service/--control/--status/--summary --by/--min-saving/--fail-on-alarm`)
+   - mod variables generated from the config schema
+   - offline SQL verification: pglast grammar check plus a plugin schema snapshot
+   - a test enforcing coverage of the legacy controls
+   - history schema v2 with migrations
+   3b. ⏳ End-to-end harness against Moto server (isolated Steampipe install) to exercise every feature without real AWS.
 4. Cost: add `cost diff` (MoM and custom range, with grouping and by-resource) and `cost showback`.
 5. Savings, anomalies and forecast.
 6. HTML dashboard with Very branding.

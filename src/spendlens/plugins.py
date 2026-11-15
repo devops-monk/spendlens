@@ -22,6 +22,7 @@ are discovered through the `spendlens.plugins` entry-point group:
         reg.add_mod(Path(__file__).parent / "mod")       # extra Powerpipe controls/benchmarks
         reg.add_doctor_check(lambda cfg: [...])          # extra `spendlens doctor` rows
         reg.add_ai_tool(my_tool)                         # extra tool for `spendlens ask`
+        reg.add_estimator("my_control", fn)              # $/month savings for a control's alarms
 
 Plugin settings live under `plugins.<name>` in finops.yaml (or --set plugins.acme.x=1)
 and are available as `cfg.plugins.get("acme", {})`.
@@ -48,6 +49,8 @@ if TYPE_CHECKING:
 ENTRY_POINT_GROUP = "spendlens.plugins"
 BUILTIN_FEATURES: tuple[str, ...] = (
     "spendlens.features.tags",
+    "spendlens.features.rightsize",
+    "spendlens.features.waste",
     "spendlens.features.history_cmd",
 )
 
@@ -74,6 +77,7 @@ class Registry:
     doctor_checks: list[Callable[[Config], list[Check]]] = field(default_factory=list)
     ai_tools: dict[str, AITool] = field(default_factory=dict)
     mod_paths: list[Path] = field(default_factory=list)
+    estimators: dict[str, Callable[..., float | None]] = field(default_factory=dict)
     plugins: list[PluginInfo] = field(default_factory=list)
 
     def add_command(self, fn: Callable[..., Any], name: str | None = None) -> None:
@@ -89,6 +93,10 @@ class Registry:
         if tool.name in self.ai_tools:
             raise ValueError(f"AI tool '{tool.name}' already registered")
         self.ai_tools[tool.name] = tool
+
+    def add_estimator(self, control: str, fn: Callable[..., float | None]) -> None:
+        """Savings estimator for a control: fn(finding, pricing) -> USD/month or None."""
+        self.estimators[control] = fn
 
     def add_mod(self, path: Path) -> None:
         self.mod_paths.append(Path(path))

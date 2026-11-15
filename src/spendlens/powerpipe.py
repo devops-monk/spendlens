@@ -63,6 +63,26 @@ def hcl_value(v: Any) -> str:
     raise TypeError(f"Cannot encode {type(v).__name__} as HCL")
 
 
+_CONTROL_RE = re.compile(r'^control\s+"([A-Za-z0-9_]+)"\s*\{(.*?)^\}', re.MULTILINE | re.DOTALL)
+_TITLE_RE = re.compile(r'^\s*title\s*=\s*"([^"]*)"', re.MULTILINE)
+_SEVERITY_RE = re.compile(r'^\s*severity\s*=\s*"([^"]*)"', re.MULTILINE)
+_TAG_RE = re.compile(r'^\s*(spendlens_check|service|resource_type)\s*=\s*"([^"]*)"', re.MULTILINE)
+
+
+def mod_controls(mod_dir: Path) -> dict[str, dict[str, str]]:
+    """Static index of controls in a mod: name -> {title, spendlens_check, service, resource_type}."""
+    out: dict[str, dict[str, str]] = {}
+    for f in sorted(mod_dir.rglob("*.pp")):
+        for name, body in _CONTROL_RE.findall(f.read_text()):
+            info = dict(_TAG_RE.findall(body))
+            if m := _TITLE_RE.search(body):
+                info["title"] = m.group(1)
+            if m := _SEVERITY_RE.search(body):
+                info["severity"] = m.group(1)
+            out[name] = info
+    return out
+
+
 def declared_variables(mod_dir: Path) -> set[str]:
     names: set[str] = set()
     for f in mod_dir.rglob("*.pp"):
@@ -128,6 +148,7 @@ def parse_results(doc: dict[str, Any]) -> list[Finding]:
             "control": control,
             "title": ctl.get("title") or "",
             "check": tags.get("spendlens_check"),
+            "service": tags.get("service"),
             "resource_type": tags.get("resource_type"),
             "severity": _severity(ctl.get("severity")),
         }

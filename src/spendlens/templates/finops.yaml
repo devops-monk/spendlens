@@ -10,22 +10,43 @@ tagging:
     Environment: [prod, staging, dev, test]
   prohibited: [Password, Secret]
   tag_limit: 45
+  environment_tag: Environment     # used by environment-aware standards (*_by_env below)
 
+# Rightsizing / waste thresholds (names match the Powerpipe mod variables; `spendlens params --filter sizing`).
+# *_by_env maps are matched against the tagging.environment_tag value; "*" applies to everything else.
 sizing:
-  ec2_allowed_instance_types: ["t3.%", "t4g.%", "m6i.%", "m7g.%", "c6i.%", "r6i.%"]
-  ec2_cpu_high: 35
-  ec2_cpu_low: 20
-  ec2_running_instance_age_max_days: 90
+  ec2_allowed_instance_types: ["t3.%", "t4g.%", "m6i.%", "m7g.%", "c6i.%", "c7g.%", "r6i.%", "r7g.%"]
+  ec2_cpu_low: 20                       # alarm below this 30-day peak CPU %
+  ec2_cpu_high: 35                      # info below this
+  ec2_running_instance_age_max_days: 90 # reservation / savings plan candidate
+  ec2_stopped_instance_max_days: 30
   ebs_volume_max_size_gb: 100
   ebs_volume_max_iops: 32000
   ebs_snapshot_age_max_days: 90
-  rds_db_instance_avg_connections: 2
-  rds_cpu_high: 50
+  rds_allowed_instance_classes: ["db.t3.%", "db.t4g.%", "db.m5.%", "db.m6g.%", "db.m6i.%", "db.r6g.%", "db.r6i.%"]
+  rds_avg_connections_min: 2
   rds_cpu_low: 25
-  ecs_desired_tasks: 1
+  rds_cpu_high: 50
+  rds_multi_az_by_env: {prod: true, "*": false}
+  rds_performance_insights_by_env: {prod: true, "*": false}
+  rds_backup_retention_max_days_by_env: {prod: 14, "*": 1}
+  ecs_desired_tasks_by_env: {prod: 3, "*": 1}     # prod tasks must also be spread over that many AZs
   ecs_task_max_vcpu: 0.25
-  ecs_task_max_memory: 0.5
-  cloudwatch_log_group_retention_period_in_days: 30
+  ecs_task_max_memory_gb: 0.5
+  lambda_error_rate_max_pct: 10
+  cloudwatch_log_group_retention_max_days: 30
+  cloudwatch_log_group_kms_required: true
+  secretsmanager_unused_max_days: 90
+
+# Unit prices used for $ savings estimates (approx. us-east-1 on-demand list). Adjust for your region/discounts.
+pricing:
+  currency: USD
+  ebs_gb_month: {gp2: 0.10, gp3: 0.08, io1: 0.125, io2: 0.125, st1: 0.045, sc1: 0.015, standard: 0.05}
+  nat_gateway_hour: 0.045
+  eip_hour: 0.005
+  downsize_saving_pct: 0.5
+  reservation_saving_pct: 0.3
+  # ec2_hourly: {m5.large: 0.107}       # add/override instance prices for your region
 
 anomaly:
   lookback_days: 30

@@ -29,10 +29,13 @@ def test_template_is_valid_config():
 
 
 def test_powerpipe_vars_mapping():
-    cfg = Config.model_validate({"sizing": {"ec2_cpu_low": 10, "rds_cpu_high": 70}})
+    cfg = Config.model_validate({"sizing": {"ec2_cpu_low": 10, "rds_cpu_high": 70,
+                                            "rds_multi_az_by_env": {"PROD": True, "*": False}}})
     v = cfg.to_powerpipe_vars()
-    assert v["ec2_instance_avg_cpu_utilization_low"] == 10
-    assert v["rds_db_instance_avg_cpu_utilization_high"] == 70
+    assert v["ec2_cpu_low"] == 10
+    assert v["rds_cpu_high"] == 70
+    assert v["rds_multi_az_by_env"] == {"prod": True, "*": False}  # keys lower-cased
+    assert v["environment_tag"] == "Environment"
     assert v["mandatory_tags"] == cfg.tagging.mandatory
 
 

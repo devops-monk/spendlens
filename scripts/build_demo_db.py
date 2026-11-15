@@ -118,7 +118,133 @@ def demo_tags(store: HistoryStore, rng: random.Random) -> None:
                    meta={"CI_PIPELINE_ID": "1002", "demo": True}, started_at=datetime(2026, 11, 9, 6, 0, tzinfo=UTC))
 
 
-GENERATORS = [demo_tags]
+# ------------------------------------------------------------------ rightsize / waste
+
+def _ctl_index() -> dict[str, dict[str, str]]:
+    from spendlens.powerpipe import bundled_mod_dir, mod_controls
+
+    return mod_controls(bundled_mod_dir())
+
+
+def _finding(idx, control, resource, status, reason, region, **dims) -> Finding:
+    meta = idx[control]
+    return Finding(control=control, title=meta.get("title", ""), check=meta["spendlens_check"],
+                   severity=Severity(meta.get("severity", "low")),
+                   service=meta["service"], resource_type=meta["resource_type"], resource=resource,
+                   account_id=ACCOUNT, region=region, status=Status(status), reason=reason,
+                   dimensions={k: str(v) for k, v in dims.items()})
+
+
+def _finops_findings(rng: random.Random, week: int) -> list[Finding]:
+    """Synthetic EC2/EBS/RDS/ECS/network estate. week=1 has some issues fixed."""
+    from spendlens.config import PricingConfig
+    from spendlens.features.savings import apply_estimates
+
+    idx = _ctl_index()
+    fs: list[Finding] = []
+    fixed = (lambda: week == 1 and rng.random() < 0.35)
+    types = ["t3.medium", "m5.xlarge", "m5.2xlarge", "c5.xlarge", "r5.large", "t2.medium", "m4.large", "m6i.large"]
+    for i in range(24):
+        region, team = rng.choice(REGIONS), rng.choice(TEAMS)
+        itype = rng.choice(types)
+        arn = f"arn:aws:ec2:{region}:{ACCOUNT}:instance/i-{rng.getrandbits(64):016x}"
+        name = f"{team}-app-{i:02d}"
+        allowed = itype.split(".")[0] in ("t3", "m6i")
+        fs.append(_finding(idx, "ec2_instance_type_not_allowed", arn, "ok" if allowed or fixed() else "alarm",
+                           f"{name} is {itype} (running).", region, instance_type=itype))
+        old = itype.split(".")[0] in ("t2", "m4")
+        fs.append(_finding(idx, "ec2_instance_older_generation", arn, "alarm" if old and not fixed() else "ok",
+                           f"{name} uses {itype}.", region, instance_type=itype))
+        cpu = round(rng.choice([3, 7, 12, 18, 25, 41, 63, 78]) + rng.random(), 1)
+        st = "alarm" if cpu < 20 else "info" if cpu < 35 else "ok"
+        if st == "alarm" and fixed():
+            st = "ok"
+        fs.append(_finding(idx, "ec2_instance_low_utilization", arn, st,
+                           f"{name} ({itype}) peaked at {cpu}% CPU over 30 days.", region, instance_type=itype))
+        days = rng.choice([12, 45, 120, 300, 700])
+        fs.append(_finding(idx, "ec2_instance_reservation_candidate", arn, "alarm" if days > 90 else "ok",
+                           f"{name} ({itype}) has been running {days} days.", region, instance_type=itype))
+    for i in range(30):
+        region = rng.choice(REGIONS)
+        vtype = rng.choice(["gp2", "gp2", "gp3", "gp3", "io1", "st1"])
+        size = rng.choice([8, 20, 50, 100, 200, 500, 1000])
+        iops = rng.choice([3000, 6000, 10000]) if vtype == "io1" else None
+        arn = f"arn:aws:ec2:{region}:{ACCOUNT}:volume/vol-{rng.getrandbits(64):016x}"
+        vid = arn.rsplit("/", 1)[1]
+        dims = {"volume_type": vtype, "size_gb": size, **({"iops": iops} if iops else {})}
+        if vtype in ("gp2", "gp3"):
+            fs.append(_finding(idx, "ebs_volume_gp2", arn, "alarm" if vtype == "gp2" and not fixed() else "ok",
+                               f"{vid} is {vtype} ({size} GB).", region, **dims))
+        if vtype == "io1":
+            fs.append(_finding(idx, "ebs_volume_piops_to_gp3", arn, "alarm",
+                               f"{vid} (io1, {size} GB) has {iops} provisioned IOPS.", region, **dims))
+        unattached = rng.random() < 0.2 and not fixed()
+        fs.append(_finding(idx, "ebs_volume_unattached", arn, "alarm" if unattached else "ok",
+                           f"{vid} ({size} GB {vtype}) is not attached to any instance." if unattached
+                           else f"{vid} is attached.", region, **dims))
+    for i in range(18):
+        region = rng.choice(REGIONS)
+        size = rng.choice([8, 30, 100, 250, 500])
+        arn = f"arn:aws:ec2:{region}::snapshot/snap-{rng.getrandbits(64):016x}"
+        old = rng.random() < 0.5 and not fixed()
+        fs.append(_finding(idx, "ebs_snapshot_old", arn, "alarm" if old else "ok",
+                           f"{arn.rsplit('/', 1)[1]} ({size} GB) was created 2025-0{rng.randint(1, 9)}-1{rng.randint(0, 9)}.",
+                           region, size_gb=size))
+    for i, (cls, maz, env) in enumerate([("db.m5.xlarge", True, "dev"), ("db.r5.large", True, "prod"),
+                                          ("db.t3.medium", False, "staging"), ("db.m4.large", True, "test"),
+                                          ("db.t2.medium", False, "dev"), ("db.m5.large", False, "prod")]):
+        region = rng.choice(REGIONS)
+        arn = f"arn:aws:rds:{region}:{ACCOUNT}:db:{rng.choice(TEAMS)}-db-{i}"
+        dims = {"db_class": cls, "multi_az": str(maz).lower()}
+        expected = env == "prod"
+        fs.append(_finding(idx, "rds_instance_multi_az_policy", arn,
+                           "ok" if maz == expected or (week == 1 and i == 0) else "alarm",
+                           f"{arn.rsplit(':', 1)[1]} Multi-AZ is {'enabled' if maz else 'disabled'}; policy for environment {env} is {'enabled' if expected else 'disabled'}.",
+                           region, environment=env, **dims))
+        fs.append(_finding(idx, "rds_instance_class_not_allowed", arn,
+                           "alarm" if cls.split(".")[1] in ("m4", "t2") else "ok", f"{arn.rsplit(':', 1)[1]} uses {cls}.",
+                           region, **dims))
+        conns = 0 if i == 4 else rng.randint(5, 80)
+        fs.append(_finding(idx, "rds_instance_low_connections", arn, "alarm" if conns == 0 else "ok",
+                           f"{arn.rsplit(':', 1)[1]} has had no connections in 30 days." if conns == 0
+                           else f"{arn.rsplit(':', 1)[1]} averages {conns} peak connections/day over 30 days.", region, **dims))
+    for i in range(6):
+        region = rng.choice(REGIONS)
+        lbt = rng.choice(["application", "network", "classic"])
+        unused = i < 2 and not fixed()
+        ctl = {"application": "ec2_application_load_balancer_unused", "network": "ec2_network_load_balancer_unused",
+               "classic": "ec2_classic_load_balancer_unused"}[lbt]
+        fs.append(_finding(idx, ctl, f"arn:aws:elasticloadbalancing:{region}:{ACCOUNT}:loadbalancer/{lbt[:3]}/lb-{i}",
+                           "alarm" if unused else "ok", f"lb-{i} has {0 if unused else rng.randint(1, 6)} registered target(s).",
+                           region, lb_type=lbt))
+    for i in range(5):
+        region = rng.choice(REGIONS)
+        fs.append(_finding(idx, "vpc_eip_unattached", f"arn:aws:ec2:{region}:{ACCOUNT}:eip/eipalloc-{i:04d}",
+                           "alarm" if i < 3 and not fixed() else "ok",
+                           f"52.{i}.10.{i} is not associated." if i < 3 else f"52.{i}.10.{i} is associated.", region))
+    fs.append(_finding(idx, "vpc_nat_gateway_unused", f"arn:aws:ec2:eu-west-2:{ACCOUNT}:natgateway/nat-0legacy",
+                       "alarm" if week == 0 else "ok", "nat-0legacy sent no traffic in the metric window.", "eu-west-2"))
+    fs.append(_finding(idx, "rds_instance_extended_support_version", f"arn:aws:rds:eu-west-1:{ACCOUNT}:db:search-db-legacy",
+                       "alarm", "search-db-legacy runs mysql 5.7.44.", "eu-west-1", db_class="db.m5.large",
+                       engine="mysql", engine_version="5.7.44"))
+    for i in range(8):
+        fs.append(_finding(idx, "secretsmanager_secret_unused",
+                           f"arn:aws:secretsmanager:eu-west-1:{ACCOUNT}:secret:svc-{i}", "alarm" if i < 3 else "ok",
+                           f"svc-{i} has never been accessed (created 2025-03-01)." if i < 3 else f"svc-{i} was last accessed 2026-11-0{i}.",
+                           "eu-west-1"))
+    return apply_estimates(fs, PricingConfig())
+
+
+def demo_finops(store: HistoryStore, rng: random.Random) -> None:
+    for week, day in ((0, 2), (1, 9)):
+        fs = _finops_findings(random.Random(100 + week), week)
+        for feature in ("rightsize", "waste"):
+            store.save_run(feature, [f for f in fs if f.check == feature], account_id=ACCOUNT, caller_arn=CALLER,
+                           meta={"CI_PIPELINE_ID": str(1001 + week), "demo": True},
+                           started_at=datetime(2026, 11, day, 6, 5, tzinfo=UTC))
+
+
+GENERATORS = [demo_tags, demo_finops]
 
 
 def main() -> int:

@@ -29,7 +29,8 @@ class Finding(BaseModel):
 
     control: str
     title: str = ""
-    check: str | None = None  # e.g. tags_mandatory, rightsize_ec2
+    check: str | None = None  # e.g. tags_mandatory, rightsize, waste
+    service: str | None = None  # e.g. ec2, rds
     resource_type: str | None = None  # e.g. s3_bucket
     resource: str
     account_id: str | None = None

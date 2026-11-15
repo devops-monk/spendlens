@@ -49,34 +49,127 @@ class TaggingPolicy(_Strict):
     allowed_values: dict[str, list[str]] = Field(default_factory=dict)
     prohibited: list[str] = Field(default_factory=list)
     tag_limit: int = Field(45, ge=1, le=50)
+    environment_tag: str = "Environment"  # drives environment-aware standards (*_by_env)
 
     _dedupe_lists = field_validator("mandatory", "prohibited")(_dedupe)
 
 
+def _env_map(v: dict[str, Any]) -> dict[str, Any]:
+    """Environment-keyed policy maps: keys are matched case-insensitively against the environment tag;
+    '*' is the fallback for any other/missing environment."""
+    return {str(k).lower(): x for k, x in v.items()}
+
+
 class SizingStandards(_Strict):
+    """Rightsizing / waste thresholds. Field names are identical to the Powerpipe mod variable names."""
+
     # EC2
     ec2_allowed_instance_types: list[str] = Field(
-        default_factory=lambda: ["t3.%", "t4g.%", "m6i.%", "m7g.%", "c6i.%", "r6i.%"]
+        default_factory=lambda: ["t3.%", "t4g.%", "m6i.%", "m7g.%", "c6i.%", "c7g.%", "r6i.%", "r7g.%"]
     )
     ec2_cpu_high: int = Field(35, ge=0, le=100)
     ec2_cpu_low: int = Field(20, ge=0, le=100)
     ec2_running_instance_age_max_days: int = Field(90, ge=1)
+    ec2_stopped_instance_max_days: int = Field(30, ge=1)
+    ec2_reserved_instance_expiration_warning_days: int = Field(30, ge=1)
+    ec2_ami_age_max_days: int = Field(180, ge=1)
     # EBS
     ebs_volume_max_size_gb: int = Field(100, ge=1)
     ebs_volume_max_iops: int = Field(32000, ge=1)
+    ebs_volume_ops_low: int = Field(100, ge=0)
+    ebs_volume_ops_high: int = Field(500, ge=0)
     ebs_snapshot_age_max_days: int = Field(90, ge=1)
-    # RDS (defaults from steampipe-mod-aws-cost-analysis/test.spvars)
-    rds_db_instance_avg_connections: int = Field(2, ge=0)
+    ebs_volume_piops_to_gp3_max_iops: int = Field(16000, ge=0)
+    # RDS (thresholds from steampipe-mod-aws-cost-analysis/test.spvars)
+    rds_allowed_instance_classes: list[str] = Field(
+        default_factory=lambda: ["db.t3.%", "db.t4g.%", "db.m5.%", "db.m6g.%", "db.m6i.%", "db.m7g.%",
+                                 "db.r5.%", "db.r6g.%", "db.r6i.%", "db.r7g.%"]
+    )
+    rds_avg_connections_min: int = Field(2, ge=0)
     rds_cpu_high: int = Field(50, ge=0, le=100)
     rds_cpu_low: int = Field(25, ge=0, le=100)
-    rds_running_db_instance_age_max_days: int = Field(90, ge=1)
-    rds_running_db_instance_age_warning_days: int = Field(30, ge=1)
+    rds_running_age_max_days: int = Field(90, ge=1)
+    rds_running_age_warning_days: int = Field(30, ge=1)
+    rds_multi_az_by_env: dict[str, bool] = Field(default_factory=lambda: {"prod": True, "*": False})
+    rds_performance_insights_by_env: dict[str, bool] = Field(default_factory=lambda: {"prod": True, "*": False})
+    rds_backup_retention_max_days_by_env: dict[str, int] = Field(default_factory=lambda: {"prod": 14, "*": 1})
+    rds_snapshot_orphaned_max_days: int = Field(30, ge=0)
+    # engine -> version prefixes in paid RDS Extended Support. Review against AWS's current calendar.
+    rds_extended_support_versions: dict[str, list[str]] = Field(default_factory=lambda: {
+        "mysql": ["5.7", "8.0"], "postgres": ["11", "12", "13"],
+        "aurora-mysql": ["5.7"], "aurora-postgresql": ["11", "12", "13"]})
     # ECS
-    ecs_desired_tasks: int = Field(1, ge=0)
+    ecs_desired_tasks_by_env: dict[str, int] = Field(default_factory=lambda: {"prod": 3, "*": 1})
     ecs_task_max_vcpu: float = Field(0.25, gt=0)
-    ecs_task_max_memory: float = Field(0.5, gt=0)
+    ecs_task_max_memory_gb: float = Field(0.5, gt=0)
+    ecs_cluster_cpu_low: int = Field(20, ge=0, le=100)
+    ecs_cluster_cpu_high: int = Field(35, ge=0, le=100)
+    # Lambda
+    lambda_error_rate_max_pct: float = Field(10, ge=0, le=100)
+    lambda_timeout_max_multiple: float = Field(3, gt=1)
     # CloudWatch
-    cloudwatch_log_group_retention_period_in_days: int = Field(30, ge=1)
+    cloudwatch_log_group_retention_max_days: int = Field(30, ge=1)
+    cloudwatch_log_group_kms_required: bool = True
+    # Redshift
+    redshift_cpu_low: int = Field(20, ge=0, le=100)
+    redshift_cpu_high: int = Field(35, ge=0, le=100)
+    redshift_running_age_max_days: int = Field(90, ge=1)
+    redshift_running_age_warning_days: int = Field(30, ge=1)
+    # Route 53
+    route53_record_min_ttl: int = Field(3600, ge=0)
+    # ElastiCache
+    elasticache_running_age_max_days: int = Field(90, ge=1)
+    elasticache_running_age_warning_days: int = Field(30, ge=1)
+    # Waste
+    secretsmanager_unused_max_days: int = Field(90, ge=1)
+    dynamodb_stale_max_days: int = Field(90, ge=1)
+    ecr_image_pull_max_days: int = Field(90, ge=1)
+
+    _env_maps = field_validator(
+        "rds_multi_az_by_env", "rds_performance_insights_by_env", "rds_backup_retention_max_days_by_env",
+        "ecs_desired_tasks_by_env",
+    )(_env_map)
+
+
+class PricingConfig(_Strict):
+    """Unit prices for savings estimates. Defaults: approximate us-east-1 on-demand list prices (USD).
+    Override for your region/discounts, e.g. --set pricing.ebs_gb_month.gp3=0.088"""
+
+    currency: str = "USD"
+    hours_per_month: float = 730
+    ebs_gb_month: dict[str, float] = Field(default_factory=lambda: {
+        "gp2": 0.10, "gp3": 0.08, "io1": 0.125, "io2": 0.125, "st1": 0.045, "sc1": 0.015, "standard": 0.05})
+    ebs_piops_month: float = 0.065
+    ebs_snapshot_gb_month: float = 0.05
+    rds_snapshot_gb_month: float = 0.095
+    eip_hour: float = 0.005
+    nat_gateway_hour: float = 0.045
+    load_balancer_hour: dict[str, float] = Field(default_factory=lambda: {
+        "application": 0.0225, "network": 0.0225, "gateway": 0.0125, "classic": 0.025})
+    secret_month: float = 0.40
+    kms_key_month: float = 1.0
+    route53_health_check_month: float = 0.50
+    gp3_included_iops: int = 3000
+    gp3_iops_month: float = 0.005
+    ec2_hourly: dict[str, float] = Field(default_factory=lambda: {
+        "t2.micro": 0.0116, "t2.small": 0.023, "t2.medium": 0.0464, "t2.large": 0.0928,
+        "t3.micro": 0.0104, "t3.small": 0.0208, "t3.medium": 0.0416, "t3.large": 0.0832,
+        "t3.xlarge": 0.1664, "t3.2xlarge": 0.3328,
+        "m4.large": 0.10, "m4.xlarge": 0.20, "m4.2xlarge": 0.40,
+        "m5.large": 0.096, "m5.xlarge": 0.192, "m5.2xlarge": 0.384, "m5.4xlarge": 0.768,
+        "m6i.large": 0.096, "m6i.xlarge": 0.192, "m6i.2xlarge": 0.384,
+        "c5.large": 0.085, "c5.xlarge": 0.17, "c5.2xlarge": 0.34,
+        "r5.large": 0.126, "r5.xlarge": 0.252, "r5.2xlarge": 0.504})
+    rds_hourly: dict[str, float] = Field(default_factory=lambda: {
+        "db.t2.micro": 0.017, "db.t2.small": 0.034, "db.t2.medium": 0.068,
+        "db.t3.micro": 0.017, "db.t3.small": 0.034, "db.t3.medium": 0.068, "db.t3.large": 0.136,
+        "db.m4.large": 0.175, "db.m5.large": 0.171, "db.m5.xlarge": 0.342, "db.m5.2xlarge": 0.684,
+        "db.r5.large": 0.25, "db.r5.xlarge": 0.50})
+    # fraction of the resource price saved by an action
+    downsize_saving_pct: float = Field(0.5, ge=0, le=1)  # one size down
+    reservation_saving_pct: float = Field(0.3, ge=0, le=1)  # 1-yr no-upfront RI / SP
+    graviton_saving_pct: float = Field(0.2, ge=0, le=1)
+    newer_generation_saving_pct: float = Field(0.1, ge=0, le=1)
 
 
 class AnomalyConfig(_Strict):
@@ -145,6 +238,7 @@ class Config(_Strict):
     tagging: TaggingPolicy = Field(default_factory=TaggingPolicy)
     sizing: SizingStandards = Field(default_factory=SizingStandards)
     anomaly: AnomalyConfig = Field(default_factory=AnomalyConfig)
+    pricing: PricingConfig = Field(default_factory=PricingConfig)
     budgets: Budgets = Field(default_factory=Budgets)
     llm: LLMConfig = Field(default_factory=LLMConfig)
     notifications: Notifications = Field(default_factory=Notifications)
@@ -166,33 +260,18 @@ class Config(_Strict):
         return self._param_sources.get(key, "default")
 
     def to_powerpipe_vars(self) -> dict[str, Any]:
-        """Variables passed to the bundled Powerpipe mod via --var."""
-        s = self.sizing
-        mapped = {
+        """Variables passed to the bundled Powerpipe mod (only those the mod declares are sent)."""
+        return {
             "common_dimensions": self.common_dimensions,
             "tag_dimensions": self.tag_dimensions,
             "mandatory_tags": self.tagging.mandatory,
             "prohibited_tags": self.tagging.prohibited,
             "expected_tag_values": self.tagging.allowed_values,
             "tag_limit": self.tagging.tag_limit,
-            "ec2_instance_allowed_types": s.ec2_allowed_instance_types,
-            "ec2_instance_avg_cpu_utilization_high": s.ec2_cpu_high,
-            "ec2_instance_avg_cpu_utilization_low": s.ec2_cpu_low,
-            "ec2_running_instance_age_max_days": s.ec2_running_instance_age_max_days,
-            "ebs_volume_max_size_gb": s.ebs_volume_max_size_gb,
-            "ebs_volume_max_iops": s.ebs_volume_max_iops,
-            "ebs_snapshot_age_max_days": s.ebs_snapshot_age_max_days,
-            "rds_db_instance_avg_connections": s.rds_db_instance_avg_connections,
-            "rds_db_instance_avg_cpu_utilization_high": s.rds_cpu_high,
-            "rds_db_instance_avg_cpu_utilization_low": s.rds_cpu_low,
-            "rds_running_db_instance_age_max_days": s.rds_running_db_instance_age_max_days,
-            "rds_running_db_instance_age_warning_days": s.rds_running_db_instance_age_warning_days,
-            "ecs_desired_tasks": s.ecs_desired_tasks,
-            "ecs_task_max_vcpu": s.ecs_task_max_vcpu,
-            "ecs_task_max_memory": s.ecs_task_max_memory,
-            "cloudwatch_log_group_retention_period_in_days": s.cloudwatch_log_group_retention_period_in_days,
+            "environment_tag": self.tagging.environment_tag,
+            **self.sizing.model_dump(),
+            **self.powerpipe_vars,
         }
-        return {**mapped, **self.powerpipe_vars}
 
 
 # ---------------------------------------------------------------- parameters

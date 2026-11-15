@@ -16,8 +16,12 @@ def compliance_pct(ok: int, alarm: int) -> float | None:
 
 def summarise(findings: Iterable[Finding], by: tuple[str, ...] = ("check", "resource_type")) -> list[dict[str, Any]]:
     groups: dict[tuple, Counter] = defaultdict(Counter)
+    savings: dict[tuple, float] = defaultdict(float)
     for f in findings:
-        groups[tuple(getattr(f, k) or "-" for k in by)][f.status.value] += 1
+        key = tuple(getattr(f, k) or "-" for k in by)
+        groups[key][f.status.value] += 1
+        if f.status is Status.ALARM and f.est_monthly_saving:
+            savings[key] += f.est_monthly_saving
     rows = []
     for key, c in sorted(groups.items()):
         rows.append({
@@ -28,8 +32,9 @@ def summarise(findings: Iterable[Finding], by: tuple[str, ...] = ("check", "reso
             "skip": c[Status.SKIP.value],
             "error": c[Status.ERROR.value],
             "compliance_pct": compliance_pct(c[Status.OK.value], c[Status.ALARM.value]),
+            "est_monthly_saving": round(savings[key], 2) if savings[key] else None,
         })
-    rows.sort(key=lambda r: (-r["alarm"], *(str(r[k]) for k in by)))
+    rows.sort(key=lambda r: (-(r["est_monthly_saving"] or 0), -r["alarm"], *(str(r[k]) for k in by)))
     return rows
 
 
