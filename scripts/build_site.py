@@ -179,6 +179,8 @@ def build() -> list[Path]:
     css = (SITE / "static" / "site.css").read_text() + "\n" + pygments_css()
     (DIST / "static" / "site.css").write_text(css)
     shutil.copy(SITE / "static" / "site.js", DIST / "static" / "site.js")
+    # product screenshots (also referenced by the Docker Hub overview, docker/README.dockerhub.md)
+    shutil.copytree(SITE / "static" / "screens", DIST / "static" / "screens")
     (DIST / "static" / "favicon.svg").write_text(
         '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><defs><linearGradient id="g" x1="0" y1="0" '
         'x2="1" y2="1"><stop offset="0" stop-color="#0071e3"/><stop offset=".55" stop-color="#a259ff"/>'

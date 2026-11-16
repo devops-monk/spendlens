@@ -10,7 +10,7 @@ It finds untagged and non-compliant resources, over-provisioned and wasted spend
 ```bash
 curl -fsSL https://spendlens.devops-monk.com/install.sh | sh      # macOS / Linux, no sudo
 # or run it in a container, with Steampipe, Powerpipe and the AWS plugin included:
-docker build -t spendlens . && docker run --rm spendlens tags --source demo --summary
+docker run --rm abhaypratap/spendlens tags --source demo --summary   # https://hub.docker.com/r/abhaypratap/spendlens
 ```
 
 The installer (`install.sh`) puts pinned Steampipe and Powerpipe in place (Homebrew if present, otherwise `~/.local/bin`), installs the AWS plugin, and installs spendlens in an isolated environment (pipx, `uv tool`, or a private venv). `SPENDLENS_DRY_RUN=1` shows each step without changing anything. See `docs/docker.md` for the image.

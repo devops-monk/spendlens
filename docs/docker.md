@@ -10,7 +10,16 @@ The image contains spendlens with the AI extras, plus pinned versions of Steampi
   - to run on Kubernetes or ECS on a schedule.
 - **Use the [one-line installer](../getting-started/):** for everyday use on your own Mac or Linux machine. Commands start faster because the Steampipe service stays running.
 
-## Build
+## Pull the published image
+
+```bash
+docker pull abhaypratap/spendlens:0.1.0      # or :latest
+docker run --rm --network none abhaypratap/spendlens tags --source demo --summary
+```
+
+Image page and screenshots: [hub.docker.com/r/abhaypratap/spendlens](https://hub.docker.com/r/abhaypratap/spendlens). Releases are built natively for each platform and published by `.github/workflows/docker-publish.yml` when a `v*` tag is pushed.
+
+## Build it yourself
 
 ```bash
 docker build -t spendlens .              # or: make docker-build  (tags spendlens:dev)
