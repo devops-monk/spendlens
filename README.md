@@ -1,196 +1,256 @@
-# spendlens
+<p align="center">
+  <img src="website/static/brand/icon.svg" width="96" height="96" alt="spendlens icon">
+</p>
 
-FinOps lens for AWS, built on [Steampipe](https://steampipe.io) and [Powerpipe](https://powerpipe.io).
-It finds untagged and non-compliant resources, over-provisioned and wasted spend, and month-over-month cost changes, and you can ask an AI about your bill. All of it uses the AWS role you already have assumed in your terminal.
+<h1 align="center">spendlens</h1>
 
-> Status: all 8 build phases are done. Next is the live verification pass with an assumed role (see PLAN.md).
+<p align="center"><b>See every dollar. Act on every insight.</b></p>
+
+<p align="center">
+  Read-only FinOps for AWS, from your terminal. spendlens finds untagged resources, oversized instances, idle waste
+  and unexpected cost spikes, puts a price on each one, and answers your questions in plain English.
+</p>
+
+<p align="center">
+  <a href="https://github.com/devops-monk/spendlens/actions/workflows/ci.yml"><img src="https://github.com/devops-monk/spendlens/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://hub.docker.com/r/abhaypratap/spendlens"><img src="https://img.shields.io/docker/v/abhaypratap/spendlens?sort=semver&label=docker" alt="Docker image"></a>
+  <img src="https://img.shields.io/badge/python-3.11%2B-blue" alt="Python 3.11+">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-green" alt="License: Apache-2.0"></a>
+</p>
+
+<p align="center">
+  <a href="https://spendlens.devops-monk.com"><b>Website</b></a> ·
+  <a href="https://spendlens.devops-monk.com/docs/">Docs</a> ·
+  <a href="https://spendlens.devops-monk.com/architecture/">Architecture</a> ·
+  <a href="https://hub.docker.com/r/abhaypratap/spendlens">Docker Hub</a>
+</p>
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="website/static/shots/hero-dark.webp">
+    <img src="website/static/shots/hero-light.webp" width="100%" alt="The spendlens dashboard: spend this month, flagged cost changes, projected month end, potential saving, tag compliance and anomalies">
+  </picture>
+</p>
+
+<p align="center"><sub>One self-contained HTML report, shown with the bundled demo data.</sub></p>
+
+> [!NOTE]
+> v0.1.0. spendlens is tested end to end through Steampipe against an AWS emulator. Verification against a live
+> account with a read-only role is next (see [PLAN.md](PLAN.md)).
+
+---
 
 ## Install
 
+**macOS or Linux**: one command, no sudo. Installs pinned Steampipe and Powerpipe, the AWS plugin, and spendlens in
+its own isolated environment.
+
 ```bash
-curl -fsSL https://spendlens.devops-monk.com/install.sh | sh      # macOS / Linux, no sudo
-# or run it in a container, with Steampipe, Powerpipe and the AWS plugin included:
-docker run --rm abhaypratap/spendlens tags --source demo --summary   # https://hub.docker.com/r/abhaypratap/spendlens
+curl -fsSL https://spendlens.devops-monk.com/install.sh | sh
 ```
 
-The installer (`install.sh`) puts pinned Steampipe and Powerpipe in place (Homebrew if present, otherwise `~/.local/bin`), installs the AWS plugin, and installs spendlens in an isolated environment (pipx, `uv tool`, or a private venv). `SPENDLENS_DRY_RUN=1` shows each step without changing anything. See `docs/docker.md` for the image.
-
-## Install (development)
+**Docker**: everything included, for amd64 and arm64.
 
 ```bash
-brew install turbot/tap/steampipe turbot/tap/powerpipe
-steampipe plugin install aws && steampipe service start
-
-python3 -m venv .venv && .venv/bin/pip install -e ".[dev]"
-.venv/bin/spendlens init        # writes finops.yaml (your company policy)
-.venv/bin/spendlens doctor      # verifies tools, AWS identity, Cost Explorer access
+docker pull abhaypratap/spendlens
+docker run --rm abhaypratap/spendlens tags --source demo --summary
 ```
 
-## Try it without AWS
+Run `SPENDLENS_DRY_RUN=1 sh install.sh` to see each installer step without changing anything. To run the image against your account, see [docs/docker.md](docs/docker.md).
+
+## Try it in thirty seconds
+
+Every command replays bundled sample data. You need no AWS account and no credentials:
 
 ```bash
-spendlens tags --source demo --summary          # bundled sample account
-spendlens tags --source demo -k mandatory -r s3_bucket -f csv
-spendlens history diff --source demo            # what changed between two pipeline runs
+spendlens tags --source demo --summary
+spendlens waste --source demo --summary --by service
+spendlens report --source demo --out demo-report     # open demo-report/report.html
 ```
 
-## Tag compliance
+Then connect your account:
 
 ```bash
-spendlens tags                                   # all checks, alarms only
-spendlens tags -k mandatory -k prohibited -r ec2_instance --status all
-spendlens tags --summary -f json -o tags.json
-spendlens tags --fail-on-alarm                   # exit 3 on any alarm (CI gate)
-spendlens tags types                             # 70 resource types covered
+spendlens init       # writes finops.yaml: your mandatory tags, allowed instance types, budgets
+spendlens doctor     # checks tools, your AWS identity and Cost Explorer access
 ```
 
-Checks: `mandatory`, `untagged`, `prohibited`, `limit` and `expected_values` (SQL LIKE patterns). They come from `tagging.*` in `finops.yaml`.
+spendlens uses whatever AWS role your terminal already has assumed. It stores no keys.
 
-## Rightsizing and waste
+---
+
+## Know what changed. Before finance asks.
+
+Compare any two months, quarters or date ranges, by service, account, region or any tag. New and removed services
+are always shown, and changes that cross your thresholds are flagged.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="website/static/shots/cost-dark.webp">
+  <img src="website/static/shots/cost-light.webp" width="100%" alt="Biggest cost changes by service between two months">
+</picture>
 
 ```bash
-spendlens rightsize --summary --by service       # 41 controls; company standards come from finops.yaml sizing.*
-spendlens waste --min-saving 20                  # 24 controls; idle/orphaned resources with $/month estimates
-spendlens rightsize -S rds -C rds_instance_multi_az_policy --status all
-spendlens waste controls                         # what is checked
-```
-
-Catalog: [docs/controls.md](docs/controls.md). Mapping from the legacy mods: [docs/control-mapping.md](docs/control-mapping.md).
-
-## Cost analysis
-
-```bash
-spendlens cost diff                              # last full month vs the month before, by service
-spendlens cost diff --mtd -g account             # month to date vs the same days last month
+spendlens cost diff                                   # last full month vs the month before
+spendlens cost diff --mtd -g account                  # month to date vs the same days last month
 spendlens cost diff --from 2026-07..2026-09 --to 2026-10..2026-12 -g tag:Team
-spendlens cost diff --show flagged --fail-on-flag   # CI gate on big changes (cost.change_alarm_*)
-spendlens cost trend -n 6 --include-current      # monthly pivot with month-over-month change
-spendlens cost showback -t Team                  # share per tag value, untagged spend, budget variance
-spendlens cost resources --days 7                # resources whose cost rose/fell (needs CE resource-level data)
+spendlens cost trend -n 6                            # monthly pivot with month-over-month change
+spendlens cost showback -t Team                      # spend per team, untagged share called out
 ```
 
-New and removed services are reported as `new` and `gone`; the legacy mod dropped them. Credits and refunds are excluded by default (`cost.exclude_record_types`).
+## One number. Every dollar explained.
 
-## Anomalies, forecast and savings
+spendlens's own rightsizing and waste findings are merged with AWS Cost Optimization Hub and Savings Plan coverage.
+Each resource counts once, AWS's figure wins where both exist, and every adjustment is listed.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="website/static/shots/savings-dark.webp">
+  <img src="website/static/shots/savings-light.webp" width="100%" alt="Savings summary: one de-duplicated monthly total and its sources">
+</picture>
 
 ```bash
-spendlens anomalies                              # daily spikes per service vs a 30-day robust baseline
-spendlens anomalies -g account --days 7 --fail-on-anomaly
-spendlens forecast                               # month-end projection vs budgets.monthly_total + AWS Budgets
-spendlens savings hub --min-saving 50            # AWS Cost Optimization Hub recommendations
-spendlens savings commitments                    # Savings Plan / RI coverage per service, expiring plans
-spendlens savings summary                        # one de-duplicated total across rightsize, waste, hub, commitments
+spendlens savings summary          # one de-duplicated total
+spendlens savings hub              # AWS Cost Optimization Hub recommendations
+spendlens savings commitments      # Savings Plan and RI coverage, expiring plans
 ```
 
-`savings summary` never double counts:
-- When several actions apply to one resource, it keeps only the largest.
-- When AWS and spendlens both estimate the same resource, AWS's estimate wins.
-- Commitments are counted once.
+## Every dollar, owned.
 
-Required IAM permissions: [docs/permissions.md](docs/permissions.md).
+Mandatory, untagged, prohibited, tag-limit and allowed-value checks run across 70 resource types and show the exact
+tags each resource is missing. Showback by team calls out the untagged share.
 
-## HTML dashboard
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="website/static/shots/tags-dark.webp">
+  <img src="website/static/shots/tags-light.webp" width="100%" alt="Tag compliance by check and by resource type">
+</picture>
 
 ```bash
-spendlens dashboard -o report.html               # from your latest saved runs (no AWS calls)
-spendlens dashboard --source demo -o demo.html   # try it with the bundled sample data
-spendlens waste -f html -o waste.html            # any command can write a branded HTML table
+spendlens tags --summary
+spendlens tags -k mandatory -r s3_bucket -r ec2_instance
+spendlens tags --fail-on-alarm         # exit 3 on any alarm: a CI gate
 ```
 
-The dashboard is a single self-contained file with no network requests, so it works offline, as a CI artifact, and when printed.
-- **Tabs:** Overview, Cost diff & trend, Showback, Anomalies, Forecast, Tags, Rightsizing, Waste and Savings.
-- **Readability:** light and dark mode, hover and keyboard tooltips, and a table view for every chart.
-- **Branding:** `dashboard.*` in `finops.yaml` sets the title, organisation, brand colours and font. Brand colours style chrome only; chart data colours are a fixed palette validated for colour-blind readers.
-- **Layout and style:** live in `src/spendlens/templates/report/` (Jinja2 templates plus `style.css` and `app.js`). Python only builds the view model, which is also embedded in the page as JSON (`#spendlens-data`).
-- **Extending:** plugins add tabs with `registry.add_dashboard_section(id, title, fn)`.
+## Stop paying for nothing.
 
-## Ask the AI assistant
+65 rightsizing and waste controls cover unattached volumes, orphaned snapshots, idle load balancers and NAT gateways,
+gp2 volumes that should be gp3, previous-generation instances, and Multi-AZ outside prod. Each comes with a monthly
+dollar estimate.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="website/static/shots/waste-dark.webp">
+  <img src="website/static/shots/waste-light.webp" width="100%" alt="Idle and orphaned resources with an estimated monthly saving for each">
+</picture>
 
 ```bash
-spendlens ask "What are my top 5 savings opportunities?"
-spendlens ask "Why did EC2 cost go up last month?" --show-tools     # see every query behind the answer
-spendlens ask --live "Which running instances are outside the allowed families?"   # also query live AWS
-spendlens ask -i                                                    # interactive follow-ups
-spendlens ask --source demo "Summarise the waste findings"          # try it on sample data
+spendlens waste --summary --by service
+spendlens rightsize -S ec2 -S rds --min-saving 50
+spendlens rightsize --set sizing.ec2_cpu_low=10        # any threshold, for one run
 ```
 
-The assistant is read-only. It answers from saved history first (offline and free), and queries live AWS through Steampipe only with `--live`.
+The full catalog is in [docs/controls.md](docs/controls.md), and the mapping from the legacy mods is in [docs/control-mapping.md](docs/control-mapping.md).
 
-Every model-written query goes through three safety layers:
-1. A SQL guard that allows one read-only `SELECT`.
-2. A read-only Steampipe connection with a timeout and a row cap.
-3. A read-only SQLite connection with an authorizer that denies anything except reads.
+## Month-end, without surprises.
 
-Providers are set with `llm.*` in `finops.yaml`:
-- **Claude** on the Anthropic API or Amazon Bedrock (official Anthropic SDK). Bedrock uses your assumed AWS role and needs `llm.region` or `AWS_REGION`. Refusal fallbacks are on by default.
-- **OpenAI, Azure OpenAI**, or any **OpenAI-compatible** server such as Ollama or vLLM (official OpenAI SDK).
+Daily spikes are measured against a robust 30-day baseline. The projected month end is checked against your budget
+and against every AWS Budget.
 
-Install with `pip install 'spendlens[ai]'`. `spendlens doctor` checks the AI setup without calling the model.
-
-## Run everything, notify, schedule in CI
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="website/static/shots/forecast-dark.webp">
+  <img src="website/static/shots/forecast-light.webp" width="100%" alt="Month-end forecast against budgets, with a status for each">
+</picture>
 
 ```bash
-spendlens report --out reports                  # every check -> reports/*.json + reports/report.html
-spendlens notify --slack --teams --link <url>   # summary of the latest runs (webhook URLs from env vars)
-spendlens notify --slack --only-if-changes      # stay quiet unless something needs attention
-spendlens notify --teams --dry-run --source demo
-spendlens init --ci gitlab                      # scheduled pipeline (.gitlab-ci.yml); or --ci github
+spendlens anomalies --fail-on-anomaly
+spendlens forecast --fail-on-risk
 ```
 
-`report` keeps going when a step fails (for example a missing permission) and still writes the other outputs and the dashboard.
+## Ask anything. Get answers from your data.
 
-`notify` posts Block Kit to Slack and an Adaptive Card to Teams (Workflows webhook). Webhook URLs come from `$SPENDLENS_SLACK_WEBHOOK` and `$SPENDLENS_TEAMS_WEBHOOK`, must use https, and are never stored in config.
+```text
+$ spendlens ask "Why did our bill go up last month?" --show-tools
+› history_overview · 14 saved runs
+› history_query    · cost_diff run #7 · read-only
 
-The CI templates:
-- assume a read-only AWS role through OIDC, with no stored keys;
-- keep the history DB between runs (S3, or the CI cache as fallback);
-- run the checks as a non-root user (Steampipe refuses root);
-- post the summary.
+Spend rose +$959 (+1.8%) to $55.4K in October.
+  · EC2 grew +$3,698 (+17.6%)
+  · Amazon Bedrock grew +$1,660 (+692%)
+  · Redshift was decommissioned: −$3,710
+Bedrock and Redshift crossed your alert thresholds.
+Source: cost_diff run #7, 2026-11-09
+```
+<sub>An illustrative answer, using the figures in the bundled demo data.</sub>
 
-Setup: [docs/ci.md](docs/ci.md).
+Supported models:
+- **Claude** on Amazon Bedrock with your own AWS role, or on the Anthropic API (official Anthropic SDK).
+- **OpenAI, Azure OpenAI** or any **OpenAI-compatible** server (official OpenAI SDK).
 
-## Data sources and history
+The assistant answers from saved history first, which is offline and free. It queries live AWS only with `--live`.
+Configure it with `llm.*` in `finops.yaml`. See [the AI assistant guide](https://spendlens.devops-monk.com/docs/ai-assistant/).
 
-`--source live` (default) queries AWS and saves the run to the local history DB. `--source last` replays the latest saved run offline. `--source demo` uses the bundled sample data.
+## Scheduled. Notified. Hands-off.
 
 ```bash
-spendlens history list
-spendlens history diff --feature tags           # new alarms / resolved / resource gone
-spendlens history path                          # for CI: restore/save this file between jobs
+spendlens report --out reports                     # every check, plus reports/report.html
+spendlens notify --slack --teams --only-if-changes # a summary, only when something needs attention
+spendlens init --ci gitlab                         # or --ci github: a scheduled pipeline on a read-only OIDC role
 ```
 
-In CI, set `SPENDLENS__HISTORY__PATH=.spendlens/history.db` and restore and save that file (S3 or cache) around the job, so trends work across pipeline runs.
+- **`report`:** if one step fails, for example because of a missing permission, the others still run and write their output.
+- **`notify`:** reads webhook URLs only from `$SPENDLENS_SLACK_WEBHOOK` and `$SPENDLENS_TEAMS_WEBHOOK`.
+- **CI templates:** keep the run history between pipelines.
 
-## Control parameters
+Setup is in [docs/ci.md](docs/ci.md).
 
-Every threshold and policy value can be set in four layers. Later layers win:
+---
+
+## Read-only. By design.
+
+spendlens never creates, changes, tags or deletes anything. Savings are proposals for a person to review. The
+[IAM permissions](docs/permissions.md) page lists the read-only actions each feature needs.
+
+Every query the AI assistant writes goes through three safety layers:
+1. **SQL guard.** The query is parsed with sqlglot, and only a single read-only `SELECT` passes.
+2. **Read-only history.** SQLite opens with `mode=ro` and `query_only`, and an authorizer denies everything except reads.
+3. **Read-only sessions.** With `--live`, Steampipe sessions run with `default_transaction_read_only`, a timeout and a row cap.
+
+## Your standards, in one file
+
+Every threshold and policy is a typed parameter. Later layers override earlier ones:
 
 | Layer | Example |
 |---|---|
-| built-in defaults | n/a |
+| Built-in defaults | n/a |
 | `finops.yaml` | `sizing: {ec2_cpu_low: 15}` |
-| environment | `SPENDLENS__SIZING__EC2_CPU_LOW=12` |
-| command line | `--set sizing.ec2_cpu_low=10` (repeatable; YAML values: `--set 'tagging.mandatory=[Env, Owner]'`) |
+| Environment | `SPENDLENS__SIZING__EC2_CPU_LOW=12` |
+| Command line | `--set sizing.ec2_cpu_low=10`  ·  `--set 'tagging.mandatory=[Env, Owner]'` |
 
-```bash
-spendlens params --filter ec2          # value, source and env-var name of every parameter
-spendlens config --set llm.provider=openai
-spendlens <cmd> --var my_mod_variable=5  # raw Powerpipe variable passthrough
-```
+Run `spendlens params --filter ec2` to see every value, where it came from, and its environment-variable name.
+Unknown keys, typos and out-of-range values are rejected, and the error names the layer they came from.
 
-Unknown keys, typos and out-of-range values are rejected, and the error says which layer they came from.
+## Commands at a glance
 
-## Output
+| Command | What it does |
+|---|---|
+| `tags` | Tag compliance across 70 resource types |
+| `rightsize` · `waste` | 65 controls with $/month estimates |
+| `cost diff` · `trend` · `showback` · `resources` | What changed, where, and who owns it |
+| `anomalies` · `forecast` | Daily spikes; month-end projection against budgets |
+| `savings hub` · `commitments` · `summary` | AWS recommendations, coverage, one de-duplicated total |
+| `dashboard` | A self-contained HTML report with nine tabs |
+| `ask` | Questions in plain English, read-only |
+| `report` · `notify` | Run everything; post Slack or Teams summaries |
+| `history list` · `diff` | Saved runs, and new or resolved alarms between them |
+| `init` · `doctor` · `params` · `config` | Set up, check, and inspect configuration |
 
-Every report command takes `--format table|csv|json|html` and `--out FILE`.
+Every report command accepts:
+- `--format table|csv|json|html` and `--out FILE`;
+- `--source live|last|demo`.
 
-```bash
-spendlens query "select name, region from aws_s3_bucket" -f csv -o buckets.csv
-```
+`--source last` replays your latest saved run offline. The full reference is the [CLI reference](https://spendlens.devops-monk.com/docs/cli/).
 
 ## Extending
 
-Features are plugins. A package can add commands, doctor checks, AI tools and extra Powerpipe mods:
+spendlens's own features are plugins. A package can add commands, Powerpipe controls, savings estimators, AI tools,
+doctor checks and dashboard tabs:
 
 ```toml
 [project.entry-points."spendlens.plugins"]
@@ -199,24 +259,27 @@ acme = "acme_spendlens"
 
 ```python
 def register(reg):
-    reg.add_typer(my_typer_app, "acme")      # spendlens acme ...
+    reg.add_typer(my_typer_app, "acme")        # spendlens acme ...
     reg.add_mod(Path(__file__).parent / "mod")
     reg.add_doctor_check(check_fn)
 ```
 
-Plugin settings go under `plugins.<name>` in `finops.yaml`. Run `spendlens plugins` to see what is loaded. Full API: `src/spendlens/plugins.py`.
+See [Extending](https://spendlens.devops-monk.com/docs/extending/) for the full API.
 
 ## Development
 
 ```bash
+git clone https://github.com/devops-monk/spendlens.git && cd spendlens
+python3 -m venv .venv && .venv/bin/pip install -e ".[dev]"
 make test              # unit + integration (fast, no cloud)
-make test-system       # end-to-end against the Moto AWS emulator via an isolated Steampipe install
+make test-system       # end to end against the Moto AWS emulator through an isolated Steampipe
 make lint
-make generate          # after changing config schema, tag catalog, controls or demo generators
+make generate          # after changing the config schema, tag catalog, controls or demo data
 ```
 
-Tag control SQL is derived from turbot/steampipe-mod-aws-tags (Apache-2.0).
+CI runs on every push: lint, tests on Python 3.11 and 3.13, a website check, and an offline Docker smoke test.
 
 ## License
 
-spendlens is licensed under the [Apache License 2.0](LICENSE). Some controls are adapted from Turbot's Apache-2.0 Powerpipe mods, and the Docker image bundles Steampipe and Powerpipe (AGPL-3.0, unmodified); see [NOTICE](NOTICE).
+spendlens is licensed under the [Apache License 2.0](LICENSE). Some controls are adapted from Turbot's Apache-2.0
+Powerpipe mods. The Docker image includes Steampipe and Powerpipe (AGPL-3.0, unmodified); see [NOTICE](NOTICE).
