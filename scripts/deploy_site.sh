@@ -1,15 +1,20 @@
 #!/usr/bin/env bash
+# Local variables ($WEBROOT, $DOMAIN, ...) are deliberately expanded client-side in the ssh commands.
+# shellcheck disable=SC2029,SC2087
 # Deploy the static site to the shared VPS without touching other sites.
 #
-#   scripts/deploy_site.sh            # build, upload, enable nginx block (first time), reload
-#   scripts/deploy_site.sh --tls      # also run certbot for this domain (first time only)
+#   SPENDLENS_SITE_HOST=user@host scripts/deploy_site.sh          # build, upload, enable nginx block (first time), reload
+#   SPENDLENS_SITE_HOST=user@host scripts/deploy_site.sh --tls    # also run certbot for this domain (first time only)
+#
+# SPENDLENS_SITE_HOST is required (no default, so the server address is not kept in the repo).
+# It can also be an ~/.ssh/config alias, e.g. SPENDLENS_SITE_HOST=spendlens-vps.
 #
 # Safety: content goes to /var/www/spendlens only; the nginx block is a new file matched
 # by server_name; the full nginx config is backed up and `nginx -t` must pass before a
 # graceful reload, otherwise the new block is removed and the backup restored.
 set -euo pipefail
 
-HOST="${SPENDLENS_SITE_HOST:-root@168.231.79.163}"
+HOST="${SPENDLENS_SITE_HOST:?set SPENDLENS_SITE_HOST to the deploy target, e.g. user@host or an ~/.ssh/config alias}"
 DOMAIN="spendlens.devops-monk.com"
 WEBROOT="/var/www/spendlens"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
