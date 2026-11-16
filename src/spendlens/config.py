@@ -246,7 +246,13 @@ class SteampipeConfig(_Strict):
     database: str = "steampipe"
     user: str = "steampipe"
     password_env: str = "STEAMPIPE_DATABASE_PASSWORD"
-    connection: str = "aws"  # steampipe connection / aggregator name used as search_path
+    # "spendlens" (default): a Steampipe connection spendlens manages from aws.regions / aws.profile, written to
+    # <install_dir>/config/spendlens.spc. Any other name (e.g. "aws" or an aggregator "aws_all") uses your own
+    # connection as-is; spendlens then never touches your Steampipe config and aws.regions does not apply.
+    connection: str = Field("spendlens", pattern=r"^[a-z][a-z0-9_]*$")
+    install_dir: str | None = None  # Steampipe install dir; default $STEAMPIPE_INSTALL_DIR or ~/.steampipe
+
+    _aws: Any = PrivateAttr(default=None)  # set by Config: the aws section the managed connection is built from
 
 
 class PowerpipeConfig(_Strict):
@@ -292,9 +298,24 @@ class DashboardConfig(_Strict):
 
 
 class AWSConfig(_Strict):
-    profile: str | None = None
+    # AWS profile for the managed Steampipe connection; null = the credentials Steampipe's service started with
+    profile: str | None = Field(None, pattern=r"^[A-Za-z0-9_.+=,@/-]+$")
     accounts: list[str] = Field(default_factory=list)
-    regions: list[str] = Field(default_factory=list)
+    # Regions the managed connection queries: names ("eu-west-1"), wildcards ("eu-*") or "*" for all regions
+    regions: list[str] = Field(default_factory=lambda: ["eu-west-1"])  # [] (older finops.yaml) = default
+
+    @field_validator("regions")
+    @classmethod
+    def _regions(cls, v: list[str]) -> list[str]:
+        import re
+
+        if not v:
+            return ["eu-west-1"]
+
+        bad = [r for r in v if not re.fullmatch(r"\*|[a-z]{2}(-[a-z]+)*-(\d+|\*)|[a-z]{2}-\*|[a-z]{2}(-[a-z]+)+-\*", r)]
+        if bad:
+            raise ValueError(f"not an AWS region or wildcard: {bad} (e.g. eu-west-1, eu-*, or *)")
+        return list(dict.fromkeys(v))
 
 
 class Config(_Strict):
@@ -319,6 +340,9 @@ class Config(_Strict):
 
     _source: str | None = PrivateAttr(default=None)
     _param_sources: dict[str, str] = PrivateAttr(default_factory=dict)
+
+    def model_post_init(self, context: Any, /) -> None:
+        self.steampipe._aws = self.aws  # the managed Steampipe connection is built from these settings
 
     @property
     def source(self) -> str | None:

@@ -221,6 +221,11 @@ class PowerpipeRunner:
         conn.chmod(0o600)
 
     def run(self, targets: list[str], *, where: str | None = None) -> RunResult:
+        from .steampipe import SteampipeClient, is_managed
+
+        if is_managed(self.cfg.steampipe):  # create/refresh the managed connection (aws.regions) before Powerpipe
+            with SteampipeClient(self.cfg.steampipe, timeout_s=60) as c:
+                c.connect()
         mod = self._mod_name()
         targets = [t if t.startswith(f"{mod}.") else f"{mod}.benchmark.{t}" for t in targets]
         with tempfile.TemporaryDirectory(prefix="spendlens-pp-") as tmp:

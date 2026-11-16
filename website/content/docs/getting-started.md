@@ -74,7 +74,7 @@ aws sso login --profile finops            # or: export AWS_PROFILE=finops, or an
 steampipe service start
 ```
 
-Use `--profile` on any command, or set `aws.profile` in `finops.yaml`. For several accounts, configure a Steampipe [aggregator connection](https://hub.steampipe.io/plugins/turbot/aws#multi-account-connections) and set `steampipe.connection` to its name.
+spendlens queries **eu-west-1** by default. Change it with `aws.regions` in `finops.yaml` (see [Configuration](../configuration/#aws-regions)). Start the Steampipe service *after* assuming your role, because it keeps the credentials it started with. Use `--profile` on any command, or set `aws.profile` in `finops.yaml`. For several accounts, configure a Steampipe [aggregator connection](https://hub.steampipe.io/plugins/turbot/aws#multi-account-connections) and set `steampipe.connection` to its name.
 
 ## 4. Describe your standards
 

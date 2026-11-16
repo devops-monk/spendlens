@@ -122,6 +122,8 @@ connection "aws" {{
             "AWS_SHARED_CREDENTIALS_FILE": str(work / "no-aws-credentials"),
             "SPENDLENS_CONFIG": str(work / "finops.yaml"),
             "SPENDLENS__STEAMPIPE__PORT": str(SP_PORT),
+            # the isolated install's own Moto connection; never the managed one (it would carry no endpoint)
+            "SPENDLENS__STEAMPIPE__CONNECTION": "aws",
             "STEAMPIPE_DATABASE_PASSWORD": SP_PASSWORD,
             "SPENDLENS__HISTORY__PATH": str(work / "history.db"),
         }

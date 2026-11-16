@@ -122,6 +122,22 @@ def check_llm(cfg: Config) -> Check:
     return Check("ai assistant", "ok", detail)
 
 
+def check_regions(cfg: Config) -> Check:
+    """Which Steampipe connection and AWS regions live commands use (local check, no network)."""
+    from .steampipe import is_managed, managed_spc_path
+
+    sp = cfg.steampipe
+    if is_managed(sp):
+        prof = f" · profile {cfg.aws.profile}" if cfg.aws.profile else ""
+        return Check("aws regions", "ok", f"{', '.join(cfg.aws.regions)}{prof} · managed connection "
+                                          f"'{sp.connection}' ({managed_spc_path(sp)})")
+    note = "aws.regions is not applied: the regions come from that connection's own .spc file"
+    if sp.connection == "spendlens":
+        note = "aws.regions is not applied to a remote Steampipe (steampipe.dsn/host): configure regions there"
+    return Check("aws regions", "warn" if cfg.param_source("aws.regions") != "default" else "ok",
+                 f"connection '{sp.connection}' · {note}", "")
+
+
 def run_checks(
     cfg: Config, *, skip_service: bool = False, extra: list[Callable[[Config], list[Check]]] | None = None
 ) -> list[Check]:
@@ -133,6 +149,7 @@ def run_checks(
     ]
     if not skip_service:  # network: STS + Steampipe/Cost Explorer. --offline runs local checks only
         checks.append(check_aws_identity(cfg.aws.profile))
+    checks.append(check_regions(cfg))
     checks.append(check_llm(cfg))
     if not skip_service:
         checks += check_service_and_cost(cfg)

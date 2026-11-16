@@ -13,6 +13,7 @@ import shutil
 import subprocess
 from collections.abc import Iterator
 from contextlib import contextmanager
+from pathlib import Path
 from typing import Any, Self
 from urllib.parse import quote, unquote, urlsplit
 
@@ -21,6 +22,90 @@ from .config import SteampipeConfig
 
 class SteampipeError(RuntimeError):
     pass
+
+
+# ------------------------------------------------------------------ managed connection (aws.regions / aws.profile)
+
+MANAGED_CONNECTION = "spendlens"
+_LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1"}
+
+
+def install_dir(cfg: SteampipeConfig) -> Path:
+    return Path(cfg.install_dir or os.environ.get("STEAMPIPE_INSTALL_DIR") or Path.home() / ".steampipe").expanduser()
+
+
+def managed_spc_path(cfg: SteampipeConfig) -> Path:
+    return install_dir(cfg) / "config" / f"{MANAGED_CONNECTION}.spc"
+
+
+def managed_spc(regions: list[str], profile: str | None) -> str:
+    """The Steampipe connection spendlens manages. Values are validated in config.AWSConfig (no quotes possible)."""
+    lines = ["# Managed by spendlens from finops.yaml (aws.regions, aws.profile). Edits here are overwritten;",
+             "# change the settings in finops.yaml instead, or set steampipe.connection to use your own connection.",
+             f'connection "{MANAGED_CONNECTION}" {{', '  plugin  = "aws"',
+             "  regions = [" + ", ".join(f'"{r}"' for r in regions) + "]"]
+    if profile:
+        lines.append(f'  profile = "{profile}"')
+    return "\n".join([*lines, "}", ""])
+
+
+def is_managed(cfg: SteampipeConfig) -> bool:
+    """spendlens only manages its own connection, on a local Steampipe it can write config for."""
+    return cfg.connection == MANAGED_CONNECTION and not cfg.dsn and cfg.host in _LOCAL_HOSTS
+
+
+def write_managed_connection(cfg: SteampipeConfig) -> bool:
+    """Write <install_dir>/config/spendlens.spc from aws.regions/aws.profile. Returns True if it changed."""
+    aws = cfg._aws
+    regions = list(aws.regions) if aws is not None else ["eu-west-1"]
+    profile = aws.profile if aws is not None else None
+    path = managed_spc_path(cfg)
+    text = managed_spc(regions, profile)
+    if path.exists() and path.read_text() == text:
+        return False
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".spc.tmp")
+    tmp.write_text(text)
+    tmp.replace(path)  # atomic: Steampipe's file watcher never sees a half-written file
+    return True
+
+
+def wait_for_connection(conn: Any, name: str, *, since: float | None, timeout_s: float = 90,
+                        sleep: Any = None) -> None:
+    """Poll steampipe_internal.steampipe_connection until `name` is ready (and, after an edit, reloaded)."""
+    import time
+
+    sleep = sleep or time.sleep
+    deadline = time.monotonic() + timeout_s
+    last = "not loaded yet"
+    while True:
+        with conn.cursor() as cur:
+            cur.execute("select state, error, extract(epoch from connection_mod_time) as mod "
+                        "from steampipe_internal.steampipe_connection where name = %s", (name,))
+            row = cur.fetchone()
+        if row:
+            state, error, mod = row["state"], row["error"], row["mod"]
+            if state == "error":
+                raise SteampipeError(f"Steampipe could not load the '{name}' connection: {error or 'unknown error'}.\n"
+                                     f"Check aws.regions / aws.profile in finops.yaml.")
+            if state == "ready" and (since is None or (mod or 0) >= since - 2):
+                return
+            last = state
+        if time.monotonic() > deadline:
+            raise SteampipeError(
+                f"Steampipe has not loaded the '{name}' connection after {int(timeout_s)}s (state: {last}). "
+                "Try `steampipe service restart`.")
+        sleep(1)
+
+
+def ensure_connection(cfg: SteampipeConfig, conn: Any) -> None:
+    """Make sure the managed connection exists with the configured regions before querying through it."""
+    if not is_managed(cfg):
+        return
+    import time
+
+    changed = write_managed_connection(cfg)
+    wait_for_connection(conn, MANAGED_CONNECTION, since=time.time() if changed else None)
 
 
 def discover_password() -> str | None:
@@ -87,6 +172,7 @@ class SteampipeClient:
                     f"Details: {e}"
                 ) from e
             self._conn.autocommit = True
+            ensure_connection(self.cfg, self._conn)
             with self._conn.cursor() as cur:
                 cur.execute(f"set statement_timeout = {int(self.timeout_s) * 1000}")
                 if self.cfg.connection:

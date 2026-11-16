@@ -54,6 +54,32 @@ spendlens config                    # the merged config plus the Powerpipe varia
 | `aws` | profile, accounts, regions | all live commands |
 | `plugins` | free-form settings per plugin | plugins |
 
+## AWS regions
+
+spendlens queries **eu-west-1** by default. Change it in any layer:
+
+```yaml
+aws:
+  regions: [eu-west-1, eu-west-2]   # or ["eu-*"], or ["*"] for every region
+  profile: null                     # optional: an AWS profile name for the Steampipe connection
+```
+
+```bash
+spendlens rightsize --set 'aws.regions=["us-east-1"]'     # one run
+export SPENDLENS__AWS__REGIONS='["eu-west-1","us-east-1"]' # a shell or CI job
+```
+
+How it works:
+- spendlens keeps its own Steampipe connection, `spendlens`, in `~/.steampipe/config/spendlens.spc`, written from these settings.
+- When a value changes, spendlens rewrites the file and waits until the running Steampipe service has reloaded it. You don't need to restart anything.
+- `spendlens doctor` shows the regions in effect.
+- More regions means more API calls and slower inventory checks.
+- Cost Explorer data is account-wide, whatever regions you choose.
+
+**Credentials:** Steampipe's service uses the credentials it had when it started. Start it *after* assuming your role. If the role expires or you switch roles, run `steampipe service restart`, or pin a profile with `aws.profile`.
+
+**To use your own connection instead**, e.g. a multi-account aggregator, set `steampipe.connection: aws_all`. spendlens then leaves your Steampipe config alone, and the regions come from that connection's own `.spc` file.
+
 ## Environment-aware standards
 
 Some standards differ by environment. `*_by_env` maps are matched (case-insensitive) against the value of the `tagging.environment_tag` tag, and `"*"` covers everything else:

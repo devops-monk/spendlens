@@ -111,7 +111,7 @@ notifications:
 steampipe:
   host: localhost
   port: 9193
-  connection: aws              # or your aggregator, e.g. aws_all
+  connection: spendlens        # managed from aws.regions/aws.profile below; or your own connection, e.g. aws or aws_all
   # dsn: postgresql://steampipe:pw@localhost:9193/steampipe
 
 powerpipe:
@@ -124,6 +124,6 @@ history:
   keep_runs: 200
 
 aws:
-  profile: null                # null = use whatever is assumed in the terminal
+  profile: null                # null = the credentials Steampipe's service started with (your assumed role); or a profile name
   accounts: []
-  regions: []
+  regions: [eu-west-1]         # e.g. [eu-west-1, eu-west-2], ["eu-*"], or ["*"] for all regions
