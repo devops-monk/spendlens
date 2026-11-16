@@ -102,8 +102,8 @@ AWS Cost Optimization Hub, Savings Plan and RI coverage, and spendlens's own fin
 
 | | |
 |---|---|
-| **Tags** | `latest`, `0.1.0` |
-| **Platforms** | `linux/arm64` (Graviton, Apple silicon); `linux/amd64` is added by the release pipeline |
+| **Tags** | `latest`, `0.1.0`, `0.1` (plus `sha-<commit>` per build) |
+| **Platforms** | `linux/amd64` and `linux/arm64` (Graviton, Apple silicon), each built natively and smoke-tested |
 | **User** | `finops` (uid 10001). Steampipe refuses to run as root |
 | **Working directory** | `/work`: put `finops.yaml` here; reports are written here |
 | **Volume** | `/data`: the run history (`/data/spendlens.db`), which keeps trends and "what changed" between runs |

@@ -17,7 +17,7 @@ docker pull abhaypratap/spendlens:0.1.0      # or :latest
 docker run --rm --network none abhaypratap/spendlens tags --source demo --summary
 ```
 
-Image page and screenshots: [hub.docker.com/r/abhaypratap/spendlens](https://hub.docker.com/r/abhaypratap/spendlens). Releases are built natively for each platform and published by `.github/workflows/docker-publish.yml` when a `v*` tag is pushed.
+Image page and screenshots: [hub.docker.com/r/abhaypratap/spendlens](https://hub.docker.com/r/abhaypratap/spendlens). Tags: `latest`, `0.1.0`, `0.1`, for `linux/amd64` and `linux/arm64`. Releases are built natively for each platform and published by `.github/workflows/docker-publish.yml` when a `v*` tag is pushed (or `gh workflow run docker-publish.yml -f version=X.Y.Z`).
 
 ## Build it yourself
 

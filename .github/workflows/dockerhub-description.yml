@@ -1,0 +1,24 @@
+# Keep the Docker Hub overview in sync with docker/README.dockerhub.md without rebuilding the image.
+name: dockerhub-description
+
+on:
+  push:
+    branches: [main]
+    paths: [docker/README.dockerhub.md, .github/workflows/dockerhub-description.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: peter-evans/dockerhub-description@v4
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME || 'abhaypratap' }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          repository: ${{ vars.DOCKERHUB_USERNAME || 'abhaypratap' }}/spendlens
+          readme-filepath: docker/README.dockerhub.md
+          short-description: "Read-only FinOps CLI for AWS: tags, rightsizing, waste, cost diff, anomalies, savings and AI Q&A."
