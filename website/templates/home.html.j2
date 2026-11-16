@@ -79,9 +79,17 @@ decommissioned (<span class="ok">−$3,710</span>). Source: cost_diff run #7, 20
   <div class="wrap">
     <h2 class="h2">Up and running in minutes.</h2>
     <p class="sub">Uses whatever AWS role you already have assumed. No agents, no SaaS, no stored keys.</p>
-    <div class="steps">
-      <div class="step"><h3>Install</h3><p>One command installs spendlens, Steampipe, Powerpipe and the AWS plugin. No sudo. Or use <a href="{{ root }}docs/docker/">Docker</a>.</p>
-        <pre><code>curl -fsSL {{ site_url }}/install.sh | sh</code></pre></div>
+    <div class="steps two" id="install">
+      <div class="step wide"><h3>Install</h3>
+        <div class="install-grid">
+          <div><h4>macOS / Linux</h4><p>One command installs spendlens, Steampipe, Powerpipe and the AWS plugin. No sudo.</p>
+            <pre><code>curl -fsSL {{ site_url }}/install.sh | sh</code></pre>
+            <p class="small"><a href="{{ root }}docs/getting-started/">Installer options and manual install ›</a></p></div>
+          <div><h4>Docker</h4><p>A ready-made image with everything included, for amd64 and arm64.</p>
+            <pre><code>docker pull abhaypratap/spendlens
+docker run --rm abhaypratap/spendlens tags --source demo</code></pre>
+            <p class="small"><a href="{{ root }}docs/docker/">Running against your account ›</a> · <a href="https://hub.docker.com/r/abhaypratap/spendlens">Docker Hub ›</a></p></div>
+        </div></div>
       <div class="step"><h3>Describe your standards</h3><p>Mandatory tags, allowed instance types, budgets.</p>
         <pre><code>spendlens init
 spendlens doctor</code></pre></div>
