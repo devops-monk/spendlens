@@ -116,6 +116,6 @@ def test_templates_are_package_files():
 def test_css_values_not_html_escaped_and_injection_rejected(tmp_path):
     out = tmp_path / "r.html"
     runner.invoke(app, ["dashboard", "--source", "demo", "-o", str(out)])
-    assert '--font:system-ui, -apple-system, "Segoe UI"' in out.read_text()  # real quotes inside <style>
+    assert '--font:-apple-system, BlinkMacSystemFont, "SF Pro Text"' in out.read_text()  # real quotes inside <style>
     for bad in ['dashboard.font_family=x}</style><script>alert(1)</script>', "dashboard.font_family=a;color:red"]:
         assert runner.invoke(app, ["dashboard", "--source", "demo", "--set", bad]).exit_code == 2

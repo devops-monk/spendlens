@@ -80,8 +80,8 @@ dashboard:
   title: spendlens FinOps report
   organisation: ""
   brand_primary: "#E6007E"       # accent (placeholder: confirm against brand guidelines)
-  brand_ink: "#000000"           # header background
-  brand_on_ink: "#FFFFFF"
+  brand_ink: "#000000"           # organisation chip background
+  brand_on_ink: "#FFFFFF"        # organisation chip text
   # font_family: '"Your Brand Sans", system-ui, sans-serif'
 
 budgets:

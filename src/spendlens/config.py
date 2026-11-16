@@ -281,11 +281,11 @@ class DashboardConfig(_Strict):
 
     title: str = "spendlens FinOps report"
     organisation: str = ""  # shown in the header, e.g. "Very Group - Platform"
-    brand_primary: str = Field("#E6007E", pattern=r"^#[0-9a-fA-F]{6}$")  # accent: header rule, active tab, links
-    brand_ink: str = Field("#000000", pattern=r"^#[0-9a-fA-F]{6}$")  # header background
-    brand_on_ink: str = Field("#FFFFFF", pattern=r"^#[0-9a-fA-F]{6}$")  # header text
+    brand_primary: str = Field("#E6007E", pattern=r"^#[0-9a-fA-F]{6}$")  # accent: brand mark, active tab, hero stripe, buttons
+    brand_ink: str = Field("#000000", pattern=r"^#[0-9a-fA-F]{6}$")  # organisation chip background
+    brand_on_ink: str = Field("#FFFFFF", pattern=r"^#[0-9a-fA-F]{6}$")  # organisation chip text
     # CSS font stack only (letters, digits, spaces, quotes, commas, hyphens, dots): emitted raw inside <style>
-    font_family: str = Field('system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
+    font_family: str = Field('-apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", "Segoe UI", Roboto, sans-serif',
                              pattern=r"""^[A-Za-z0-9 ,'"\-.]+$""", max_length=200)
     top_n: int = Field(15, ge=3, le=100)  # rows per chart
     table_rows: int = Field(50, ge=5, le=1000)  # rows per findings table

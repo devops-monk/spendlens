@@ -9,11 +9,12 @@
 <style>:root{--brand:{{ theme.brand_primary|safe }};--brand-ink:{{ theme.brand_ink|safe }};--brand-on-ink:{{ theme.brand_on_ink|safe }};--font:{{ theme.font_family|safe }}}
 {{ assets.css }}</style></head>
 <body>
-<header class="top"><div class="row"><div><h1>{{ title }}</h1>
-<div class="sub">{{ subtitle }}{% if theme.organisation %} · {{ theme.organisation }}{% endif %}</div></div>
+<header class="top"><div class="brandline"><span class="mark" aria-hidden="true"></span>
+{%- if theme.organisation %}<span class="org">{{ theme.organisation }}</span>{% endif %}<span class="kind">spendlens</span></div>
+<div class="row"><div><h1>{{ title }}</h1><div class="sub">{{ subtitle }}</div></div>
 <button class="theme" type="button">Light / dark</button></div></header>
 {%- if tabs %}
-<nav class="tabs" role="tablist">{% for id, name in tabs %}<button role="tab" data-tab="{{ id }}" aria-selected="false">{{ name }}</button>{% endfor %}</nav>
+<nav class="tabs"><div class="seg-ctl" role="tablist">{% for id, name in tabs %}<button role="tab" data-tab="{{ id }}" aria-selected="false">{{ name }}</button>{% endfor %}</div></nav>
 {%- endif %}
 <main>{% block main %}{% endblock %}</main>
 <footer>{{ footer }}</footer>

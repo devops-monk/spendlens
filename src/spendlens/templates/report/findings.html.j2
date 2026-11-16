@@ -1,0 +1,109 @@
+{#- `--format html` for control-based commands (tags, rightsize, waste): summary, filters, one section per check.
+    Context: fm (render.html.findings_model), scope [str], csv_columns [str]. Works without JS (all sections open,
+    filters hidden) and prints with every section expanded. -#}
+{% extends "base.html.j2" %}
+{% block main %}
+<div class="fr">
+
+<section class="fr-summary" aria-label="Summary">
+  <div class="fr-kpis">
+    <div class="fr-kpi fr-kpi-alarm">
+      <div class="k"><span class="sdot alarm" aria-hidden="true"></span>Alarms</div>
+      <div class="v">{{ "{:,}".format(fm.totals.alarm) }}</div>
+      <div class="d">on {{ "{:,}".format(fm.alarm_resources) }} of {{ "{:,}".format(fm.resources) }} resources</div>
+    </div>
+    <div class="fr-kpi">
+      <div class="k">Compliance</div>
+      <div class="v">{{ "%.1f%%"|format(fm.compliance) if fm.compliance is not none else "n/a" }}</div>
+      <div class="d">OK out of OK + alarm results</div>
+    </div>
+    <div class="fr-kpi fr-kpi-saving">
+      <div class="k">Estimated saving</div>
+      <div class="v">{{ fm.saving_text }}<small>/month</small></div>
+      <div class="d">{% if fm.saving_year %}{{ fm.saving_year }} a year · {% endif %}indicative, review before acting</div>
+    </div>
+    <div class="fr-kpi">
+      <div class="k">Checks</div>
+      <div class="v">{{ fm.controls|length }}</div>
+      <div class="d">{{ "{:,}".format(fm.total) }} results{% if fm.services %} · {{ fm.services|join(", ") }}{% endif %}</div>
+    </div>
+  </div>
+
+  {% if fm.segments %}
+  <div class="fr-dist" role="img" aria-label="Results by status: {% for s in fm.segments %}{{ s.label }} {{ s.n }}{{ ', ' if not loop.last }}{% endfor %}">
+    {% for s in fm.segments %}<span class="seg-{{ s.status }}" style="width:{{ s.pct }}%" title="{{ s.label }}: {{ s.n }}"></span>{% endfor %}
+  </div>
+  <ul class="fr-legend">
+    {% for s in fm.segments %}<li><span class="sdot {{ s.status }}" aria-hidden="true"></span>{{ s.label }} <b>{{ "{:,}".format(s.n) }}</b></li>{% endfor %}
+  </ul>
+  {% endif %}
+
+  {% if fm.top %}
+  <div class="fr-top">
+    <h2>Largest savings</h2>
+    <ol>
+      {% for t in fm.top %}
+      <li><span class="amt">{{ t.saving_text }}<small>/mo</small></span>
+        <span class="what"><b title="{{ t.resource }}">{{ t.name }}</b><span>{{ t.control }}</span></span></li>
+      {% endfor %}
+    </ol>
+  </div>
+  {% endif %}
+
+  {% if scope %}<p class="fr-scope">{{ scope|join(" · ") }}</p>{% endif %}
+</section>
+
+<div class="fr-toolbar" role="search" hidden>
+  <input class="fr-q" type="search" placeholder="Search resources, reasons, checks" aria-label="Search findings">
+  <div class="fr-chips" role="group" aria-label="Status">
+    {% for s in fm.segments %}<button type="button" class="chip" data-status="{{ s.status }}" aria-pressed="true"><span class="sdot {{ s.status }}" aria-hidden="true"></span>{{ s.label }} <span class="n">{{ s.n }}</span></button>{% endfor %}
+  </div>
+  {% if fm.services|length > 1 %}
+  <select class="fr-svc" aria-label="Service"><option value="">All services</option>
+    {% for s in fm.services %}<option value="{{ s }}">{{ s }}</option>{% endfor %}</select>
+  {% endif %}
+  <div class="fr-actions">
+    <button type="button" class="fr-expand">Expand all</button>
+    <button type="button" class="fr-collapse">Collapse all</button>
+    <button type="button" class="fr-csv primary">Download CSV</button>
+  </div>
+  <p class="fr-count" aria-live="polite"></p>
+</div>
+
+<section class="fr-checks" aria-label="Checks">
+  {% for c in fm.controls %}
+  <details class="ctl worst-{{ c.worst }}" data-service="{{ c.service }}"{% if c.counts.alarm or c.counts.error %} open{% endif %}>
+    <summary>
+      <span class="sdot {{ c.worst }}" aria-hidden="true"></span>
+      <span class="ctl-title"><b>{{ c.title }}</b><code>{{ c.id }}</code></span>
+      <span class="ctl-meta">
+        {% if c.service %}<span class="pill">{{ c.service }}</span>{% endif %}
+        {% for s in ["alarm", "error", "info", "skip", "ok"] if c.counts[s] %}<span class="cnt {{ s }}">{{ c.counts[s] }} {{ s }}</span>{% endfor %}
+        {% if c.saving_text %}<span class="ctl-saving">{{ c.saving_text }}/mo</span>{% endif %}
+      </span>
+    </summary>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Status</th><th>Resource</th><th>Reason</th><th>Account</th><th>Region</th><th class="num">Saving / month</th></tr></thead>
+      <tbody>
+        {% for r in c.rows %}
+        <tr data-i="{{ r.i }}" data-status="{{ r.status }}" data-q="{{ (r.resource ~ ' ' ~ r.reason ~ ' ' ~ c.title ~ ' ' ~ c.id ~ ' ' ~ r.account ~ ' ' ~ r.region)|lower }}">
+          <td class="nw"><span class="sbadge {{ r.status }}">{{ r.label }}</span></td>
+          <td class="res"><b>{{ r.name }}</b>{% if r.name != r.resource %}<span>{{ r.resource }}</span>{% endif %}</td>
+          <td class="wrap">{{ r.reason }}</td>
+          <td class="nw">{{ r.account }}</td>
+          <td class="nw">{{ r.region }}</td>
+          <td class="num">{{ r.saving_text }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table></div>
+  </details>
+  {% else %}
+  <p class="empty">No findings.</p>
+  {% endfor %}
+  <p class="fr-none empty" hidden>Nothing matches these filters.</p>
+</section>
+
+</div>
+<script type="application/json" id="spendlens-csv-columns">{{ csv_columns|tojson }}</script>
+{% endblock %}

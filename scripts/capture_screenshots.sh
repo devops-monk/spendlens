@@ -35,14 +35,14 @@ while read -r name tab x y w h; do
   done
   echo "  $name"
 done <<'EOF'
-hero overview 0 0 1280 860
-kpis overview 50 138 1180 306
-cost cost 50 138 1180 576
-trend cost 50 698 1180 512
-savings savings 50 138 1180 560
-tags tags 50 138 1180 470
-forecast forecast 50 138 1180 305
-showback showback 50 138 1180 349
-waste waste 50 138 1180 520
+hero overview 0 0 1280 960
+kpis overview 54 231 1172 377
+cost cost 54 231 1172 608
+trend cost 54 819 1172 544
+savings savings 54 231 1172 600
+tags tags 54 231 1172 520
+forecast forecast 54 231 1172 338
+showback showback 54 231 1172 376
+waste waste 54 231 1172 560
 EOF
 echo "Wrote $(find "$OUT" -name "*.webp" | wc -l | tr -d ' ') files to ${OUT#"$ROOT"/}"
