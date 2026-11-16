@@ -6,6 +6,7 @@ import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import pytest
+import typer.main
 import yaml
 from typer.testing import CliRunner
 
@@ -120,6 +121,7 @@ def test_init_ci_writes_valid_yaml(tmp_path, kind, path):
 def test_ci_templates_only_use_real_commands_and_flags(kind):
     """Guards against the templates drifting from the CLI: every `spendlens <cmd> --flag` must exist."""
     text = ci_template_text(kind)
+    root = typer.main.get_command(app)
     found = 0
     for line in text.splitlines():
         if line.lstrip().startswith("#") or "spendlens" not in line or "spendlens[" in line:
@@ -127,12 +129,15 @@ def test_ci_templates_only_use_real_commands_and_flags(kind):
         # the command, not a path like ".spendlens" or "spendlens-history"
         for m in re.finditer(r"(?<![\w./-])spendlens\s+([a-z][a-z-]*(?:\s+[a-z][a-z-]*)?)([^;|&\n]*)", line):
             words = m.group(1).split()
-            # second word is a subcommand only for command groups
-            group_help = runner.invoke(app, [words[0], "--help"])
-            cmd = words if len(words) == 2 and words[1] in group_help.output else words[:1]
-            help_out = runner.invoke(app, [*cmd, "--help"], env={"COLUMNS": "200"})
-            assert help_out.exit_code == 0, (kind, cmd)
+            # resolve against the real command tree, not --help text (Rich colours help output on CI,
+            # and ANSI codes split flags like "--out")
+            cmd = root.commands.get(words[0])
+            assert cmd is not None, (kind, words[0])
+            subs = getattr(cmd, "commands", None) or {}
+            if len(words) == 2 and words[1] in subs:
+                cmd = subs[words[1]]
+            flags = {o for prm in cmd.params for o in (*getattr(prm, "opts", ()), *getattr(prm, "secondary_opts", ()))}
             for flag in re.findall(r"(--[a-z][a-z-]*)", m.group(2)):
-                assert flag in help_out.output, (kind, cmd, flag)
+                assert flag in flags, (kind, words, flag)
             found += 1
     assert found >= 3
