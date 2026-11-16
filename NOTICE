@@ -1,0 +1,32 @@
+spendlens
+Copyright 2026 Abhay Pratap Singh
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+-------------------------------------------------------------------------------
+Third-party material included in this repository
+-------------------------------------------------------------------------------
+
+Several controls in src/spendlens/mod/ are adapted from the following Powerpipe
+mods (Apache License 2.0, Copyright Turbot HQ, Inc.). Each adapted file names
+its source in a header comment.
+
+  - turbot/steampipe-mod-aws-thrifty   https://github.com/turbot/steampipe-mod-aws-thrifty
+  - turbot/steampipe-mod-aws-tags      https://github.com/turbot/steampipe-mod-aws-tags
+
+-------------------------------------------------------------------------------
+Third-party software in the Docker image (abhaypratap/spendlens)
+-------------------------------------------------------------------------------
+
+The container image also contains the following programs, unmodified, under
+their own licenses. spendlens runs them as separate programs; it does not link
+to them. Their source code is available at the URLs below, at the version tags
+named in the Dockerfile (STEAMPIPE_VERSION, POWERPIPE_VERSION, AWS_PLUGIN_VERSION).
+
+  - Steampipe              GNU AGPL-3.0   https://github.com/turbot/steampipe
+  - Powerpipe              GNU AGPL-3.0   https://github.com/turbot/powerpipe
+  - Steampipe AWS plugin   Apache-2.0     https://github.com/turbot/steampipe-plugin-aws
+  - Steampipe's embedded PostgreSQL       PostgreSQL License  https://www.postgresql.org
+
+Python dependencies installed in the image keep their own licenses, which are
+recorded in each package's metadata under site-packages.

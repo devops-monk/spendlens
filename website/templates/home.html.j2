@@ -143,7 +143,7 @@ spendlens init --ci gitlab</code></pre></div>
           review, and the <a href="{{ root }}docs/permissions/">IAM policy</a> we document grants read-only access.
           The AI assistant's SQL has to pass a parser and then runs on connections that cannot write.</p></details>
       <details><summary>What does it cost to run?</summary>
-        <p>spendlens has no subscription and nothing to host. On the AWS side, Cost Explorer API requests cost $0.01
+        <p>spendlens is free and open source under the Apache-2.0 licence, with no subscription and nothing to host. On the AWS side, Cost Explorer API requests cost $0.01
           each. spendlens bounds every query to the periods it needs (typically one request per period), so a full
           <code>spendlens report</code> costs cents. CloudWatch metric reads for rightsizing fall under normal CloudWatch API pricing, which includes a free
           tier. If you use the AI assistant, your LLM provider bills you as usual.</p></details>

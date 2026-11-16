@@ -1,0 +1,76 @@
+# Lint, offline tests (incl. control-SQL verification with Powerpipe) and an offline Docker smoke test
+# on every push and pull request. Never touches AWS: tests force dummy credentials and a dead endpoint,
+# and the container runs with --network none on demo data.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  POWERPIPE_VERSION: "1.6.0"
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.13"]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install Powerpipe (pinned) for the control-SQL tests
+        run: |
+          mkdir -p /tmp/pp
+          curl -fsSL "https://github.com/turbot/powerpipe/releases/download/v${POWERPIPE_VERSION}/powerpipe.linux.amd64.tar.gz" \
+            | tar -xz -C /tmp/pp
+          sudo install -m 0755 "$(find /tmp/pp -type f -name powerpipe | head -1)" /usr/local/bin/powerpipe
+          powerpipe --version
+
+      - name: Install spendlens with dev extras
+        run: python -m pip install -e ".[dev]"
+
+      - name: Lint
+        run: python -m ruff check src tests scripts
+
+      - name: Unit and integration tests (offline)
+        run: python -m pytest
+
+      - name: Website builds and every internal link resolves
+        if: matrix.python == '3.13'
+        run: python scripts/build_site.py --check
+
+  docker:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build the image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: spendlens:ci
+          cache-from: type=gha,scope=ci
+          cache-to: type=gha,mode=max,scope=ci
+      - name: Smoke test (offline, demo data, no credentials)
+        run: |
+          docker run --rm --network none spendlens:ci tags --source demo --summary | tail -1
+          docker run --rm --network none -e SPENDLENS_STEAMPIPE_SERVICE=on spendlens:ci doctor --offline
+          docker run --rm --network none --entrypoint cat spendlens:ci /usr/share/doc/spendlens/NOTICE > /dev/null
+          test "$(docker image inspect spendlens:ci --format '{{index .Config.Labels "org.opencontainers.image.licenses"}}')" = "Apache-2.0"

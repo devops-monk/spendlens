@@ -1,5 +1,5 @@
 [build-system]
-requires = ["hatchling>=1.24"]
+requires = ["hatchling>=1.27"]
 build-backend = "hatchling.build"
 
 [project]
@@ -7,6 +7,8 @@ name = "spendlens"
 version = "0.1.0"
 description = "FinOps CLI for AWS on Steampipe/Powerpipe: tag compliance, rightsizing, cost diff, savings and AI Q&A."
 readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
 requires-python = ">=3.11"
 dependencies = [
   "typer>=0.12",

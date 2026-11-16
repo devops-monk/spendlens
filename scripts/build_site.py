@@ -101,20 +101,20 @@ CASES = [
 # Home-page gallery: (file in website/static/screens, tab label, title, caption). All from the bundled demo data.
 SCREENS = [
     ("dashboard-overview.png", "Overview", "The dashboard, at a glance",
-     "Spend and its change, flagged cost changes, the projected month end against budget, potential savings, tag "
-     "compliance and anomalies, in one self-contained HTML file."),
+     ("Spend and its change, flagged cost changes, the projected month end against budget, potential savings, tag "
+     "compliance and anomalies, in one self-contained HTML file.")),
     ("dashboard-cost.png", "Cost changes", "What changed, and where",
-     "Every service's change between two months, largest first, with a monthly trend below. New and removed "
-     "services are always included."),
+     ("Every service's change between two months, largest first, with a monthly trend below. New and removed "
+     "services are always included.")),
     ("dashboard-savings.png", "Savings", "One savings number you can defend",
-     "spendlens findings and AWS Cost Optimization Hub merged, one action per resource, with every adjustment "
-     "explained."),
+     ("spendlens findings and AWS Cost Optimization Hub merged, one action per resource, with every adjustment "
+     "explained.")),
     ("dashboard-tags.png", "Tags", "Tag compliance by check and resource type",
-     "Mandatory, untagged, allowed-value, limit and prohibited checks, with the exact missing tags for each "
-     "resource."),
+     ("Mandatory, untagged, allowed-value, limit and prohibited checks, with the exact missing tags for each "
+     "resource.")),
     ("cli-cost-diff.png", "Terminal: cost diff", "spendlens cost diff",
-     "Month over month by service, with the changes that cross your thresholds flagged. Group by account, region or "
-     "any tag."),
+     ("Month over month by service, with the changes that cross your thresholds flagged. Group by account, region or "
+     "any tag.")),
     ("cli-waste.png", "Terminal: waste", "spendlens waste --summary",
      "Idle and orphaned resources by service, with an estimated monthly saving for each."),
     ("cli-rightsize.png", "Terminal: rightsizing", "spendlens rightsize --summary",

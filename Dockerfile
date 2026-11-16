@@ -12,7 +12,7 @@ ARG PYTHON_VERSION=3.13
 # ---------------------------------------------------------------- build the wheels
 FROM python:${PYTHON_VERSION}-slim AS wheels
 WORKDIR /src
-COPY pyproject.toml README.md ./
+COPY pyproject.toml README.md LICENSE NOTICE ./
 COPY src ./src
 RUN pip wheel --no-cache-dir --wheel-dir /wheels ".[ai]"
 
@@ -27,7 +27,8 @@ ARG TARGETARCH
 LABEL org.opencontainers.image.title="spendlens" \
       org.opencontainers.image.description="Read-only FinOps CLI for AWS on Steampipe and Powerpipe" \
       org.opencontainers.image.source="https://github.com/devops-monk/spendlens" \
-      org.opencontainers.image.url="https://spendlens.devops-monk.com"
+      org.opencontainers.image.url="https://spendlens.devops-monk.com" \
+      org.opencontainers.image.licenses="Apache-2.0"
 
 # tini reaps the Steampipe/Postgres child processes; no compilers or shells beyond bash needed at runtime.
 RUN apt-get update \
@@ -68,6 +69,8 @@ RUN steampipe plugin install "aws@${AWS_PLUGIN_VERSION}" \
  && rm -rf "$HOME/.steampipe/logs/"*
 
 COPY --chown=finops:finops --chmod=0755 docker/entrypoint.sh /usr/local/bin/spendlens-entrypoint
+# licence texts and third-party notices (Steampipe/Powerpipe are AGPL-3.0, shipped unmodified)
+COPY LICENSE NOTICE /usr/share/doc/spendlens/
 
 WORKDIR /work
 VOLUME ["/data"]

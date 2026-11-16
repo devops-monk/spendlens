@@ -216,3 +216,7 @@ make generate          # after changing config schema, tag catalog, controls or 
 ```
 
 Tag control SQL is derived from turbot/steampipe-mod-aws-tags (Apache-2.0).
+
+## License
+
+spendlens is licensed under the [Apache License 2.0](LICENSE). Some controls are adapted from Turbot's Apache-2.0 Powerpipe mods, and the Docker image bundles Steampipe and Powerpipe (AGPL-3.0, unmodified); see [NOTICE](NOTICE).
