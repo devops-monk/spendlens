@@ -23,4 +23,27 @@
     });
     pre.appendChild(b);
   });
+  // screenshot gallery: tabs with arrow-key navigation (all screenshots stay visible without JS)
+  document.querySelectorAll(".gallery").forEach((g) => {
+    const tabs = [...g.querySelectorAll('[role="tab"]')];
+    const select = (t, focus) => {
+      tabs.forEach((x) => {
+        const on = x === t;
+        x.setAttribute("aria-selected", String(on));
+        x.tabIndex = on ? 0 : -1;
+        const panel = document.getElementById(x.getAttribute("aria-controls"));
+        if (panel) panel.toggleAttribute("data-hidden", !on);
+      });
+      if (focus) t.focus();
+    };
+    tabs.forEach((t, i) => {
+      t.addEventListener("click", () => select(t, false));
+      t.addEventListener("keydown", (e) => {
+        const k = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
+        if (k) { e.preventDefault(); select(tabs[(i + k + tabs.length) % tabs.length], true); }
+        if (e.key === "Home") { e.preventDefault(); select(tabs[0], true); }
+        if (e.key === "End") { e.preventDefault(); select(tabs[tabs.length - 1], true); }
+      });
+    });
+  });
 })();

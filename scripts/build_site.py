@@ -98,6 +98,49 @@ CASES = [
 ]
 
 
+# Home-page gallery: (file in website/static/screens, tab label, title, caption). All from the bundled demo data.
+SCREENS = [
+    ("dashboard-overview.png", "Overview", "The dashboard, at a glance",
+     "Spend and its change, flagged cost changes, the projected month end against budget, potential savings, tag "
+     "compliance and anomalies, in one self-contained HTML file."),
+    ("dashboard-cost.png", "Cost changes", "What changed, and where",
+     "Every service's change between two months, largest first, with a monthly trend below. New and removed "
+     "services are always included."),
+    ("dashboard-savings.png", "Savings", "One savings number you can defend",
+     "spendlens findings and AWS Cost Optimization Hub merged, one action per resource, with every adjustment "
+     "explained."),
+    ("dashboard-tags.png", "Tags", "Tag compliance by check and resource type",
+     "Mandatory, untagged, allowed-value, limit and prohibited checks, with the exact missing tags for each "
+     "resource."),
+    ("cli-cost-diff.png", "Terminal: cost diff", "spendlens cost diff",
+     "Month over month by service, with the changes that cross your thresholds flagged. Group by account, region or "
+     "any tag."),
+    ("cli-waste.png", "Terminal: waste", "spendlens waste --summary",
+     "Idle and orphaned resources by service, with an estimated monthly saving for each."),
+    ("cli-rightsize.png", "Terminal: rightsizing", "spendlens rightsize --summary",
+     "Resources that are oversized or don't match your company standards, grouped by service."),
+    ("cli-forecast.png", "Terminal: forecast", "spendlens forecast",
+     "The projected month end against your budget and every AWS Budget, with a status for each."),
+]
+
+
+def png_size(path: Path) -> tuple[int, int]:
+    """Width and height from a PNG's IHDR chunk (no imaging library needed)."""
+    head = path.read_bytes()[:24]
+    if head[:8] != b"\x89PNG\r\n\x1a\n":
+        raise ValueError(f"{path} is not a PNG")
+    return int.from_bytes(head[16:20], "big"), int.from_bytes(head[20:24], "big")
+
+
+def screens() -> list[dict]:
+    out = []
+    for i, (fname, tab, title, caption) in enumerate(SCREENS):
+        w, h = png_size(SITE / "static" / "screens" / fname)
+        out.append({"id": f"shot-{i}", "src": f"static/screens/{fname}", "tab": tab, "title": title,
+                    "caption": caption, "w": w, "h": h})
+    return out
+
+
 def stats() -> dict:
     from spendlens.features.tags_catalog import TAGGABLE_RESOURCES
     from spendlens.powerpipe import bundled_mod_dir, mod_controls
@@ -205,7 +248,7 @@ def build() -> list[Path]:
     write("", "home.html.j2", title="spendlens: FinOps for AWS, from your terminal", section="home",
           description="Read-only FinOps CLI for AWS: tag compliance, rightsizing, waste, cost diff, anomalies, "
                       "forecast, savings and an AI assistant.",
-          stats=stats(), features=[{"icon": ICONS[i], "title": t, "body": b, "cmd": c, "doc": d}
+          stats=stats(), screens=screens(), features=[{"icon": ICONS[i], "title": t, "body": b, "cmd": c, "doc": d}
                                    for i, t, b, c, d in FEATURES],
           cases=[{"who": w, "title": t, "body": b, "cmd": c} for w, t, b, c in CASES])
     write("architecture", "architecture.html.j2", title="Architecture · spendlens", section="architecture",

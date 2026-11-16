@@ -1,6 +1,7 @@
 {% extends "base.html.j2" %}
 {% block main %}
 <section class="hero">
+  <a class="pill" href="#install"><b>New</b> v{{ version }} · one-line install and Docker image ›</a>
   <p class="eyebrow">FinOps for AWS, from your terminal</p>
   <h1>See every dollar.<br><span class="grad">Act on every insight.</span></h1>
   <p class="lede">spendlens finds untagged resources, oversized instances, idle waste and unexpected cost spikes, puts a
@@ -57,7 +58,29 @@ decommissioned (<span class="ok">−$3,710</span>). Source: cost_diff run #7, 20
   </div>
 </section>
 
-<section class="section alt" id="use-cases">
+<section class="section alt" id="screenshots">
+  <div class="wrap">
+    <h2 class="h2">See it in action.</h2>
+    <p class="sub">A dashboard you can share, and a terminal that answers the question in front of you. Every screenshot
+      below comes from the bundled demo data, so you can reproduce it with <code>--source demo</code>.</p>
+    <div class="gallery">
+      <div class="seg" role="tablist" aria-label="Screenshots">
+        {% for s in screens %}<button type="button" role="tab" id="{{ s.id }}-tab" aria-controls="{{ s.id }}"
+          aria-selected="{{ 'true' if loop.first else 'false' }}" tabindex="{{ 0 if loop.first else -1 }}">{{ s.tab }}</button>{% endfor %}
+      </div>
+      {% for s in screens %}
+      <figure class="shot" id="{{ s.id }}" role="tabpanel" aria-labelledby="{{ s.id }}-tab"{% if not loop.first %} data-hidden{% endif %}>
+        <a href="{{ root }}{{ s.src }}" class="frame" aria-label="Open full-size screenshot: {{ s.title }}">
+          <img src="{{ root }}{{ s.src }}" width="{{ s.w }}" height="{{ s.h }}" alt="{{ s.title }}: {{ s.caption }}"
+               loading="{{ 'eager' if loop.first else 'lazy' }}" decoding="async"></a>
+        <figcaption><b>{{ s.title }}.</b> {{ s.caption }}</figcaption>
+      </figure>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<section class="section" id="use-cases">
   <div class="wrap">
     <h2 class="h2">Built for the questions<br>teams actually ask.</h2>
     <p class="sub">From the weekly platform review to the month-end forecast, spendlens fits how engineering and finance
@@ -75,7 +98,7 @@ decommissioned (<span class="ok">−$3,710</span>). Source: cost_diff run #7, 20
   </div>
 </section>
 
-<section class="section">
+<section class="section alt">
   <div class="wrap">
     <h2 class="h2">Up and running in minutes.</h2>
     <p class="sub">Uses whatever AWS role you already have assumed. No agents, no SaaS, no stored keys.</p>
@@ -100,7 +123,7 @@ spendlens init --ci gitlab</code></pre></div>
   </div>
 </section>
 
-<section class="section alt">
+<section class="section">
   <div class="wrap narrow" style="text-align:center">
     <h2 class="h2">Read-only. By design.</h2>
     <p class="sub" style="margin-bottom:28px">spendlens never creates, changes, tags or deletes anything. Savings are
@@ -108,6 +131,63 @@ spendlens init --ci gitlab</code></pre></div>
       assistant can only run SQL that passes a parser and then executes on connections that cannot write.</p>
     <div class="ctas"><a class="btn primary" href="{{ root }}architecture/">See the architecture</a>
       <a class="btn ghost" href="{{ root }}docs/permissions/">IAM permissions ›</a></div>
+  </div>
+</section>
+
+<section class="section alt" id="faq">
+  <div class="wrap narrow">
+    <h2 class="h2">Questions, answered.</h2>
+    <div class="faq">
+      <details><summary>Can spendlens change anything in my AWS account?</summary>
+        <p>No. It only makes read API calls, through Steampipe. Findings and savings are recommendations for a person to
+          review, and the <a href="{{ root }}docs/permissions/">IAM policy</a> we document grants read-only access.
+          The AI assistant's SQL has to pass a parser and then runs on connections that cannot write.</p></details>
+      <details><summary>What does it cost to run?</summary>
+        <p>spendlens has no subscription and nothing to host. On the AWS side, Cost Explorer API requests cost $0.01
+          each. spendlens bounds every query to the periods it needs (typically one request per period), so a full
+          <code>spendlens report</code> costs cents. CloudWatch metric reads for rightsizing fall under normal CloudWatch API pricing, which includes a free
+          tier. If you use the AI assistant, your LLM provider bills you as usual.</p></details>
+      <details><summary>Does my data leave my machine?</summary>
+        <div class="a"><p>spendlens itself sends no telemetry. Data goes only where you send it:</p>
+          <ul>
+            <li>AWS, for the read calls;</li>
+            <li>the LLM provider you configure, and only when you run <code>ask</code>;</li>
+            <li>Slack or Teams, and only when you run <code>notify</code>.</li>
+          </ul>
+          <p>With Amazon Bedrock, the assistant's requests go to Bedrock under your own AWS account.</p></div></details>
+      <details><summary>Which permissions does it need?</summary>
+        <p>A read-only role. The <a href="{{ root }}docs/permissions/">IAM permissions</a> page lists every action
+          by feature, so you can grant only what you use. In CI it assumes that role through OIDC, so no access keys are
+          stored.</p></details>
+      <details><summary>Does it work across multiple AWS accounts?</summary>
+        <p>Yes. Point Steampipe at an aggregator connection that spans your accounts and set
+          <code>steampipe.connection</code> in <code>finops.yaml</code>. Findings carry their account ID, and
+          <code>cost diff -g account</code> breaks spend down by account.</p></details>
+      <details><summary>How accurate are the savings estimates?</summary>
+        <p>spendlens's own estimates come from unit prices in <code>finops.yaml</code>. The defaults are us-east-1
+          list prices; override them for your region or discounts. Use the estimates to rank work, then review. AWS
+          Cost Optimization Hub's usage-based figures take priority wherever both exist, and
+          <code>savings summary</code> counts each resource once.</p></details>
+      <details><summary>Can I run it on Windows?</summary>
+        <p>Yes, with the <a href="{{ root }}docs/docker/">Docker image</a>
+          (<code>docker pull abhaypratap/spendlens</code>) or inside WSL. The one-line installer supports macOS and
+          Linux.</p></details>
+      <details><summary>Can I add my own checks?</summary>
+        <p>Yes. Rules are SQL controls in a Powerpipe mod, and thresholds are parameters. Plugins can add controls,
+          commands, savings estimators, AI tools and dashboard tabs without forking. See
+          <a href="{{ root }}docs/extending/">Extending</a>.</p></details>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="wrap narrow" style="text-align:center">
+    <h2 class="h2">Find your first saving<br>in five minutes.</h2>
+    <p class="sub" style="margin-bottom:24px">Try it on sample data first; nothing to connect.</p>
+    <pre class="cta-code"><code>curl -fsSL {{ site_url }}/install.sh | sh
+spendlens report --source demo --out demo-report</code></pre>
+    <div class="ctas"><a class="btn primary" href="{{ root }}docs/getting-started/">Read the guide</a>
+      <a class="btn ghost" href="{{ repo_url }}">View on GitHub ›</a></div>
   </div>
 </section>
 {% endblock %}
