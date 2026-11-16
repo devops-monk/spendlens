@@ -295,13 +295,13 @@ def render_md(text: str) -> tuple[str, str, str, str]:
     lead = ""
     if title:
         html = html[: title.start()] + html[title.end():]
-        first = re.match(r"\s*<p>(.*?)</p>\s*", html, re.S)
+        first = re.match(r"\s*<p>(.*?)</p>\s*", html, re.DOTALL)
         if first:
             lead, html = first.group(1), html[first.end():]
     toc = md.toc if "<li>" in md.toc else ""
     # drop the page title from the on-page TOC (it is the header now)
     toc = re.sub(r'^<div class="toc">\s*<ul>\s*<li><a[^>]*>[^<]*</a>\s*(<ul>.*</ul>)\s*</li>\s*</ul>\s*</div>\s*$',
-                 r'<div class="toc">\1</div>', toc, flags=re.S)
+                 r'<div class="toc">\1</div>', toc, flags=re.DOTALL)
     return html, h1, toc, lead
 
 
