@@ -14,14 +14,18 @@
 <meta name="twitter:card" content="summary_large_image">
 <meta property="og:url" content="{{ site_url }}{{ path }}">
 <link rel="canonical" href="{{ site_url }}{{ path }}">
-<link rel="icon" href="{{ root }}static/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="{{ root }}static/brand/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="{{ root }}static/brand/favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="{{ root }}static/brand/apple-touch-icon.png">
+<link rel="manifest" href="{{ root }}manifest.json">
+<meta name="theme-color" content="#0a84ff">
 <link rel="stylesheet" href="{{ root }}static/site.css?v={{ version }}">
 <script>document.documentElement.classList.add("js");try{var t=localStorage.getItem("spendlens-site-theme");if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
 </head>
 <body>
 <header class="nav">
   <div class="nav-inner">
-    <a class="brand" href="{{ root }}"><i aria-hidden="true"></i>spendlens</a>
+    <a class="brand" href="{{ root }}"><img src="{{ root }}static/brand/icon.svg" width="24" height="24" alt="" aria-hidden="true">spendlens</a>
     <button class="menu-btn" aria-label="Menu" aria-expanded="false">&#9776;</button>
     <nav class="nav-links" aria-label="Main">
       <a href="{{ root }}#features"{% if section == "home" %} aria-current="page"{% endif %}>Features</a>

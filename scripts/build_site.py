@@ -10,6 +10,7 @@ Docs = website/content/docs/*.md + the repo's docs/{permissions,ci,controls,cont
 
 from __future__ import annotations
 
+import json
 import re
 import shutil
 import sys
@@ -132,6 +133,34 @@ def png_size(path: Path) -> tuple[int, int]:
     return int.from_bytes(head[16:20], "big"), int.from_bytes(head[20:24], "big")
 
 
+def webp_size(path: Path) -> tuple[int, int]:
+    """Width and height of a WebP file (lossy VP8, lossless VP8L or extended VP8X)."""
+    b = path.read_bytes()[:30]
+    if b[:4] != b"RIFF" or b[8:12] != b"WEBP":
+        raise ValueError(f"{path} is not a WebP")
+    kind = b[12:16]
+    if kind == b"VP8 ":
+        return int.from_bytes(b[26:28], "little") & 0x3FFF, int.from_bytes(b[28:30], "little") & 0x3FFF
+    if kind == b"VP8L":
+        v = int.from_bytes(b[21:25], "little")
+        return (v & 0x3FFF) + 1, ((v >> 14) & 0x3FFF) + 1
+    if kind == b"VP8X":
+        return int.from_bytes(b[24:27], "little") + 1, int.from_bytes(b[27:30], "little") + 1
+    raise ValueError(f"{path}: unknown WebP chunk {kind!r}")
+
+
+def shots() -> dict[str, dict]:
+    """Home-page dashboard close-ups: <name>-light.webp / <name>-dark.webp of identical size."""
+    out = {}
+    for f in sorted((SITE / "static" / "shots").glob("*-light.webp")):
+        name = f.name.removesuffix("-light.webp")
+        w, h = webp_size(f)
+        if webp_size(f.with_name(f"{name}-dark.webp")) != (w, h):
+            raise SystemExit(f"{name}: light and dark screenshots differ in size")
+        out[name] = {"w": w, "h": h}
+    return out
+
+
 def screens() -> list[dict]:
     out = []
     for i, (fname, tab, title, caption) in enumerate(SCREENS):
@@ -224,12 +253,21 @@ def build() -> list[Path]:
     shutil.copy(SITE / "static" / "site.js", DIST / "static" / "site.js")
     # product screenshots (also referenced by the Docker Hub overview, docker/README.dockerhub.md)
     shutil.copytree(SITE / "static" / "screens", DIST / "static" / "screens")
-    (DIST / "static" / "favicon.svg").write_text(
-        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><defs><linearGradient id="g" x1="0" y1="0" '
-        'x2="1" y2="1"><stop offset="0" stop-color="#0071e3"/><stop offset=".55" stop-color="#a259ff"/>'
-        '<stop offset="1" stop-color="#ff375f"/></linearGradient></defs><rect width="32" height="32" rx="8" '
-        'fill="url(#g)"/><circle cx="14" cy="14" r="6" fill="none" stroke="#fff" stroke-width="3"/>'
-        '<path d="M18.5 18.5L24 24" stroke="#fff" stroke-width="3" stroke-linecap="round"/></svg>')
+    # dashboard close-ups (light + dark, 2x WebP) for the home page
+    shutil.copytree(SITE / "static" / "shots", DIST / "static" / "shots")
+    # brand: icon, tab favicon, touch/app icons; browsers also request /favicon.ico and /apple-touch-icon.png
+    shutil.copytree(SITE / "static" / "brand", DIST / "static" / "brand")
+    shutil.copy(SITE / "static" / "brand" / "favicon.ico", DIST / "favicon.ico")
+    shutil.copy(SITE / "static" / "brand" / "apple-touch-icon.png", DIST / "apple-touch-icon.png")
+    (DIST / "manifest.json").write_text(json.dumps({
+        "name": "spendlens", "short_name": "spendlens", "description": "Read-only FinOps for AWS",
+        "start_url": "/", "display": "standalone", "background_color": "#000000", "theme_color": "#0a84ff",
+        "icons": [
+            {"src": "/static/brand/icon-192.png", "sizes": "192x192", "type": "image/png"},
+            {"src": "/static/brand/icon-512.png", "sizes": "512x512", "type": "image/png"},
+            {"src": "/static/brand/icon-maskable-512.png", "sizes": "512x512", "type": "image/png",
+             "purpose": "maskable"},
+        ]}, indent=2) + "\n")
 
     env = Environment(loader=FileSystemLoader(SITE / "templates"), autoescape=True, undefined=StrictUndefined,
                       trim_blocks=True, lstrip_blocks=True)
@@ -248,7 +286,7 @@ def build() -> list[Path]:
     write("", "home.html.j2", title="spendlens: FinOps for AWS, from your terminal", section="home",
           description="Read-only FinOps CLI for AWS: tag compliance, rightsizing, waste, cost diff, anomalies, "
                       "forecast, savings and an AI assistant.",
-          stats=stats(), screens=screens(), features=[{"icon": ICONS[i], "title": t, "body": b, "cmd": c, "doc": d}
+          stats=stats(), screens=screens(), shots=shots(), features=[{"icon": ICONS[i], "title": t, "body": b, "cmd": c, "doc": d}
                                    for i, t, b, c, d in FEATURES],
           cases=[{"who": w, "title": t, "body": b, "cmd": c} for w, t, b, c in CASES])
     write("architecture", "architecture.html.j2", title="Architecture · spendlens", section="architecture",

@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- simplified spendlens mark for 16-32 px (browser tabs): heavier lens, two bold bars -->
+  <defs>
+    <linearGradient id="sf-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0a84ff"/>
+      <stop offset=".55" stop-color="#7d5cff"/>
+      <stop offset="1" stop-color="#ff375f"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14.5" fill="url(#sf-bg)"/>
+  <circle cx="27" cy="27" r="15" fill="#fff" fill-opacity=".16" stroke="#fff" stroke-width="7"/>
+  <rect x="18.5" y="19" width="7" height="16" rx="2" fill="#fff"/>
+  <rect x="28.5" y="26" width="7" height="9" rx="2" fill="#fff"/>
+  <path d="M39.5 39.5 51 51" stroke="#fff" stroke-width="9.5" stroke-linecap="round"/>
+</svg>

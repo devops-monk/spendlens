@@ -1,49 +1,180 @@
 {% extends "base.html.j2" %}
+{% macro shot(n, alt, eager=false, cls="") -%}
+{%- set d = shots[n] -%}
+<img class="th-light {{ cls }}" src="{{ root }}static/shots/{{ n }}-light.webp" width="{{ d.w }}" height="{{ d.h }}" alt="{{ alt }}" loading="{{ 'eager' if eager else 'lazy' }}"{% if eager %} fetchpriority="high"{% endif %}>
+<img class="th-dark {{ cls }}" src="{{ root }}static/shots/{{ n }}-dark.webp" width="{{ d.w }}" height="{{ d.h }}" alt="{{ alt }}" loading="lazy">
+{%- endmacro %}
 {% block main %}
-<section class="hero">
+<section class="hero hero-xl">
   <a class="pill" href="#install"><b>New</b> v{{ version }} · one-line install and Docker image ›</a>
   <p class="eyebrow">FinOps for AWS, from your terminal</p>
   <h1>See every dollar.<br><span class="grad">Act on every insight.</span></h1>
   <p class="lede">spendlens finds untagged resources, oversized instances, idle waste and unexpected cost spikes, puts a
     price on each one, and answers your questions in plain English. Read-only, by design.</p>
   <div class="ctas">
-    <a class="btn primary" href="{{ root }}docs/getting-started/">Get started</a>
-    <a class="btn ghost" href="{{ root }}architecture/">How it works ›</a>
+    <a class="btn primary" href="#install">Install</a>
+    <a class="btn ghost" href="#screenshots">Take the tour ›</a>
   </div>
-  <div class="terminal" role="img" aria-label="Example terminal session running spendlens waste and spendlens ask">
-    <div class="bar"><i></i><i></i><i></i></div>
-<pre><span class="p">$</span> spendlens waste --summary --by service
-<span class="dim">service      total  alarm  compliance  est. saving/mo</span>
-ebs             48      7      85.4%          <span class="hl">$507.75</span>
-rds              6      1      83.3%           <span class="hl">$49.64</span>
-elb              6      2      66.7%           <span class="hl">$32.86</span>
-<span class="bad">14 alarm(s)</span> on 14 resources · est. saving <span class="ok">USD 595.10/month</span>
-
-<span class="p">$</span> spendlens ask "Why did our bill go up last month?"
-<span class="dim">› history_query · 2 queries · read-only</span>
-Spend rose <span class="hl">+$959 (+1.8%)</span> to $55.4K in October. EC2 grew <span class="hl">+$3,698</span> and
-Amazon Bedrock is new (<span class="hl">+$1,660</span>), partly offset by Redshift being
-decommissioned (<span class="ok">−$3,710</span>). Source: cost_diff run #7, 2026-11-09.</pre>
-  </div>
-  <p class="terminal-note">Sample output from the bundled demo data (<code>--source demo</code>).</p>
+  <figure class="product">
+    <div class="window">
+      <div class="window-bar"><i></i><i></i><i></i><span>report.html · spendlens dashboard</span></div>
+      {{ shot("hero", "The spendlens dashboard: spend this month, flagged cost changes, projected month end, potential saving, tag compliance and anomalies", eager=true) }}
+    </div>
+    <figcaption>One self-contained HTML report. Works offline, in CI artifacts, and in print. Shown with demo data.</figcaption>
+  </figure>
 </section>
 
-<section class="section alt">
+<section class="section alt" id="features">
   <div class="wrap">
-    <div class="stats">
-      <div class="stat"><b>{{ stats.controls }}</b><span>built-in controls</span></div>
-      <div class="stat"><b>{{ stats.resource_types }}</b><span>taggable resource types</span></div>
-      <div class="stat"><b>{{ stats.providers }}</b><span>AI providers</span></div>
-      <div class="stat"><b>0</b><span>writes to your AWS account</span></div>
+    <h2 class="h2">The highlights.</h2>
+    <p class="sub">Your whole AWS estate, checked against your company's standards and priced, from a single
+      <code>finops.yaml</code>.</p>
+    <div class="bento">
+      <article class="tile t-wide">
+        <p class="t-eyebrow">Overview</p>
+        <h3>Everything that matters, on one page.</h3>
+        <p>Spend and its change, flagged cost changes, the projected month end, potential savings, tag compliance and
+          anomalies.</p>
+        <div class="t-shot">{{ shot("kpis", "Dashboard headline tiles: spend $55.4K, 2 flagged changes, $59.1K projected month end, $4,613 a month potential saving, 92.2% tag compliance, 3 anomalies") }}</div>
+      </article>
+      <article class="tile t-num">
+        <p class="t-eyebrow">Controls</p>
+        <b class="big grad">{{ stats.controls }}</b>
+        <p>built-in checks for tags, rightsizing and waste, across {{ stats.resource_types }} resource types.</p>
+      </article>
+      <article class="tile t-num">
+        <p class="t-eyebrow">Safety</p>
+        <b class="big">0</b>
+        <p>writes to your AWS account. Read-only APIs, read-only role, read-only SQL.</p>
+      </article>
+      <article class="tile t-wide">
+        <p class="t-eyebrow">Forecast</p>
+        <h3>Month-end, without surprises.</h3>
+        <p>Projected spend against your budget and every AWS Budget, with a clear status for each.</p>
+        <div class="t-shot">{{ shot("forecast", "Month-end forecast against budgets: account forecast over budget, platform-monthly at risk, data-monthly on track") }}</div>
+      </article>
+      <article class="tile t-num">
+        <p class="t-eyebrow">AI providers</p>
+        <b class="big">{{ stats.providers }}</b>
+        <p>Amazon Bedrock, Anthropic, OpenAI, Azure OpenAI, or any OpenAI-compatible model.</p>
+      </article>
+      <article class="tile t-num">
+        <p class="t-eyebrow">Formats</p>
+        <b class="big">4</b>
+        <p>table, CSV, JSON and HTML from every command, plus Slack and Teams summaries.</p>
+      </article>
     </div>
   </div>
 </section>
 
-<section class="section" id="features">
+<section class="section showcase">
+  <div class="wrap sc stack">
+    <div class="sc-text">
+      <div class="sc-title">
+      <p class="t-eyebrow">Cost diff &amp; trend</p>
+      <h2>Know what changed.<br>Before finance asks.</h2>
+      </div>
+      <div class="sc-copy">
+      <p>Compare any two months, quarters or date ranges, by service, account, region or any tag. New and removed
+        services are always shown, and changes that cross your thresholds are flagged.</p>
+      <ul class="chips"><li>Month over month</li><li>Month to date</li><li>Quarter vs quarter</li><li>By tag</li><li>CI gate</li></ul>
+      <a class="more" href="{{ root }}docs/cost/">Cost analysis ›</a>
+      </div>
+    </div>
+    <div class="sc-media">{{ shot("cost", "Biggest cost changes by service: Redshift down $3,710, EC2 up $3,698, Bedrock up $1,660") }}</div>
+  </div>
+</section>
+
+<section class="section showcase alt">
+  <div class="wrap sc stack">
+    <div class="sc-text">
+      <div class="sc-title">
+      <p class="t-eyebrow">Savings</p>
+      <h2>One number.<br>Every dollar explained.</h2>
+      </div>
+      <div class="sc-copy">
+      <p>spendlens's own rightsizing and waste findings, merged with AWS Cost Optimization Hub and Savings Plan
+        coverage. Each resource counts once, AWS's figures win where both exist, and every adjustment is listed.</p>
+      <ul class="chips"><li>De-duplicated</li><li>AWS figures preferred</li><li>Per resource</li><li>Review before acting</li></ul>
+      <a class="more" href="{{ root }}docs/savings/">Savings ›</a>
+      </div>
+    </div>
+    <div class="sc-media">{{ shot("savings", "Savings summary: $4,613 a month potential saving, 65% from spendlens findings and 35% from AWS Cost Optimization Hub") }}</div>
+  </div>
+</section>
+
+<section class="section showcase">
+  <div class="wrap sc stack">
+    <div class="sc-text">
+      <div class="sc-title">
+      <p class="t-eyebrow">Tags &amp; showback</p>
+      <h2>Every dollar,<br>owned.</h2>
+      </div>
+      <div class="sc-copy">
+      <p>Mandatory, untagged, prohibited, tag-limit and allowed-value checks across {{ stats.resource_types }}
+        resource types, with the exact tags each resource is missing. Showback by team and environment calls out the
+        untagged share, so it gets fixed at the source.</p>
+      <ul class="chips"><li>{{ stats.resource_types }} resource types</li><li>5 checks</li><li>Showback by tag</li><li>Budgets per team</li></ul>
+      <a class="more" href="{{ root }}docs/tags/">Tag compliance ›</a>
+      </div>
+    </div>
+    <div class="sc-media">{{ shot("tags", "Tag compliance by check: mandatory 78.4%, untagged 86.5%, expected values 96.8%, limit and prohibited 100%") }}</div>
+  </div>
+</section>
+
+<section class="section showcase alt">
+  <div class="wrap sc stack">
+    <div class="sc-text">
+      <div class="sc-title">
+      <p class="t-eyebrow">Waste &amp; rightsizing</p>
+      <h2>Stop paying<br>for nothing.</h2>
+      </div>
+      <div class="sc-copy">
+      <p>Unattached volumes, orphaned snapshots, idle load balancers and NAT gateways, gp2 that should be gp3,
+        previous-generation instances, Multi-AZ outside prod. {{ stats.controls - 350 }} rightsizing and waste
+        controls, each with a monthly dollar estimate.</p>
+      <ul class="chips"><li>EC2 · EBS · RDS · ECS</li><li>Lambda · S3 · ELB</li><li>Graviton</li><li>Extended Support</li></ul>
+      <a class="more" href="{{ root }}docs/rightsize-waste/">Rightsizing &amp; waste ›</a>
+      </div>
+    </div>
+    <div class="sc-media">{{ shot("waste", "Idle and orphaned resources with an estimated monthly saving for each") }}</div>
+  </div>
+</section>
+
+<section class="section showcase ai">
+  <div class="wrap sc side">
+    <div class="sc-text">
+      <p class="t-eyebrow">AI assistant</p>
+      <h2>Ask anything.<br>Get answers from your data.</h2>
+      <p>Claude on Amazon Bedrock with your own AWS role, or Anthropic, OpenAI, Azure OpenAI or any OpenAI-compatible
+        model. Answers cite the run they came from. Every query passes three read-only safety layers, so the assistant
+        can look things up but never change anything.</p>
+      <ul class="chips"><li>Cites its sources</li><li>Read-only SQL</li><li>Offline from history</li><li>--live when needed</li></ul>
+      <a class="more" href="{{ root }}docs/ai-assistant/">AI assistant ›</a>
+    </div>
+    <div class="sc-media">
+      <div class="terminal" role="img" aria-label="Example: spendlens ask explains why the bill went up last month">
+        <div class="bar"><i></i><i></i><i></i></div>
+<pre><span class="p">$</span> spendlens ask "Why did our bill go up last month?" --show-tools
+<span class="dim">› history_overview · 14 saved runs</span>
+<span class="dim">› history_query    · cost_diff run #7 · read-only</span>
+
+Spend rose <span class="hi">+$959 (+1.8%)</span> to $55.4K in October.
+  · EC2 grew <span class="hi">+$3,698</span> (+17.6%)
+  · Amazon Bedrock grew <span class="hi">+$1,660</span> (+692%)
+  · Redshift was decommissioned: <span class="ok">−$3,710</span>
+Bedrock and Redshift crossed your alert thresholds.
+<span class="dim">Source: cost_diff run #7, 2026-11-09</span></pre>
+      </div>
+      <p class="terminal-note">Illustrative answer, using the figures in the bundled demo data.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section">
   <div class="wrap">
-    <h2 class="h2">Everything FinOps needs.<br>In one command line.</h2>
-    <p class="sub">Every check runs against your real AWS estate through Steampipe, with your company's own standards
-      from a single <code>finops.yaml</code>.</p>
+    <h2 class="h2">And so much more.</h2>
+    <p class="sub">Every feature is a command. Every command speaks table, CSV, JSON and HTML.</p>
     <div class="grid">
       {% for f in features %}
       <article class="card">
@@ -60,7 +191,7 @@ decommissioned (<span class="ok">−$3,710</span>). Source: cost_diff run #7, 20
 
 <section class="section alt" id="screenshots">
   <div class="wrap">
-    <h2 class="h2">See it in action.</h2>
+    <h2 class="h2">Take the tour.</h2>
     <p class="sub">A dashboard you can share, and a terminal that answers the question in front of you. Every screenshot
       below comes from the bundled demo data, so you can reproduce it with <code>--source demo</code>.</p>
     <div class="gallery">
@@ -72,7 +203,7 @@ decommissioned (<span class="ok">−$3,710</span>). Source: cost_diff run #7, 20
       <figure class="shot" id="{{ s.id }}" role="tabpanel" aria-labelledby="{{ s.id }}-tab"{% if not loop.first %} data-hidden{% endif %}>
         <a href="{{ root }}{{ s.src }}" class="frame" aria-label="Open full-size screenshot: {{ s.title }}">
           <img src="{{ root }}{{ s.src }}" width="{{ s.w }}" height="{{ s.h }}" alt="{{ s.title }}: {{ s.caption }}"
-               loading="{{ 'eager' if loop.first else 'lazy' }}" decoding="async"></a>
+               loading="{{ 'eager' if loop.first else 'lazy' }}"></a>
         <figcaption><b>{{ s.title }}.</b> {{ s.caption }}</figcaption>
       </figure>
       {% endfor %}
