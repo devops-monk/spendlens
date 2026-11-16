@@ -1,7 +1,8 @@
 # Build the spendlens image natively on amd64 and arm64 runners (no QEMU: Steampipe crashes under
 # emulation), smoke-test each offline, then publish one multi-arch tag to Docker Hub.
 #
-# Triggers: a version tag (git tag v0.1.0 && git push origin v0.1.0) or a manual run.
+# Triggers: a version tag (git tag v0.1.0 && git push origin v0.1.0), or a manual run:
+#   gh workflow run docker-publish.yml -f version=0.1.0   (publishes 0.1.0, 0.1 and latest from the chosen branch)
 # Needs: repository secret DOCKERHUB_TOKEN (Docker Hub access token, Read & Write).
 #        optional repository variable DOCKERHUB_USERNAME (default abhaypratap).
 name: docker-publish
@@ -10,6 +11,11 @@ on:
   push:
     tags: ["v*"]
   workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to publish, e.g. 0.1.0 (also tags major.minor and latest). Empty: only a sha- tag."
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -22,9 +28,22 @@ env:
   IMAGE: ${{ vars.DOCKERHUB_USERNAME || 'abhaypratap' }}/spendlens
 
 jobs:
+  preflight:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check the Docker Hub token is configured
+        env:
+          TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          if [ -z "$TOKEN" ]; then
+            echo "::error::Repository secret DOCKERHUB_TOKEN is not set (Settings > Secrets and variables > Actions)"
+            exit 1
+          fi
+
   build:
+    needs: preflight
     strategy:
-      fail-fast: true
+      fail-fast: false
       matrix:
         include:
           - platform: linux/amd64
@@ -104,10 +123,11 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.IMAGE }}
+          # semver value = the manual-run input; empty on tag pushes, where the git tag is used instead
           tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+            type=semver,pattern={{version}},value=${{ inputs.version }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ inputs.version }}
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') || inputs.version != '' }}
             type=sha,prefix=sha-
 
       - name: Create the multi-arch manifest
