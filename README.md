@@ -3,9 +3,19 @@
 FinOps lens for AWS, built on [Steampipe](https://steampipe.io) and [Powerpipe](https://powerpipe.io).
 It finds untagged and non-compliant resources, over-provisioned and wasted spend, and month-over-month cost changes, and you can ask an AI about your bill. All of it uses the AWS role you already have assumed in your terminal.
 
-> Status: phases 1–7 are done (tags, rightsizing/waste, cost analysis, anomalies, forecast, savings, HTML dashboard, AI assistant). See [PLAN.md](PLAN.md).
+> Status: all 8 build phases are done. Next is the live verification pass with an assumed role (see PLAN.md).
 
-## Install (dev)
+## Install
+
+```bash
+curl -fsSL https://spendlens.devops-monk.com/install.sh | sh      # macOS / Linux, no sudo
+# or run it in a container, with Steampipe, Powerpipe and the AWS plugin included:
+docker build -t spendlens . && docker run --rm spendlens tags --source demo --summary
+```
+
+The installer (`install.sh`) puts pinned Steampipe and Powerpipe in place (Homebrew if present, otherwise `~/.local/bin`), installs the AWS plugin, and installs spendlens in an isolated environment (pipx, `uv tool`, or a private venv). `SPENDLENS_DRY_RUN=1` shows each step without changing anything. See `docs/docker.md` for the image.
+
+## Install (development)
 
 ```bash
 brew install turbot/tap/steampipe turbot/tap/powerpipe
@@ -116,6 +126,28 @@ Providers are set with `llm.*` in `finops.yaml`:
 - **OpenAI, Azure OpenAI**, or any **OpenAI-compatible** server such as Ollama or vLLM (official OpenAI SDK).
 
 Install with `pip install 'spendlens[ai]'`. `spendlens doctor` checks the AI setup without calling the model.
+
+## Run everything, notify, schedule in CI
+
+```bash
+spendlens report --out reports                  # every check -> reports/*.json + reports/report.html
+spendlens notify --slack --teams --link <url>   # summary of the latest runs (webhook URLs from env vars)
+spendlens notify --slack --only-if-changes      # stay quiet unless something needs attention
+spendlens notify --teams --dry-run --source demo
+spendlens init --ci gitlab                      # scheduled pipeline (.gitlab-ci.yml); or --ci github
+```
+
+`report` keeps going when a step fails (for example a missing permission) and still writes the other outputs and the dashboard.
+
+`notify` posts Block Kit to Slack and an Adaptive Card to Teams (Workflows webhook). Webhook URLs come from `$SPENDLENS_SLACK_WEBHOOK` and `$SPENDLENS_TEAMS_WEBHOOK`, must use https, and are never stored in config.
+
+The CI templates:
+- assume a read-only AWS role through OIDC, with no stored keys;
+- keep the history DB between runs (S3, or the CI cache as fallback);
+- run the checks as a non-root user (Steampipe refuses root);
+- post the summary.
+
+Setup: [docs/ci.md](docs/ci.md).
 
 ## Data sources and history
 

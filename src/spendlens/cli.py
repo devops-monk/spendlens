@@ -54,17 +54,37 @@ def main(
 # ----------------------------------------------------------- core commands
 
 
+CI_TEMPLATES = {"gitlab": ("gitlab-ci.yml", Path(".gitlab-ci.yml")),
+                "github": ("github-actions.yml", Path(".github/workflows/spendlens.yml"))}
+
+
+def ci_template_text(kind: str) -> str:
+    from importlib import resources
+
+    return resources.files("spendlens.templates").joinpath("ci", CI_TEMPLATES[kind][0]).read_text()
+
+
 @app.command()
 def init(
-    path: Annotated[Path, typer.Argument(help="Where to write the policy file.")] = Path("finops.yaml"),
+    path: Annotated[Path | None, typer.Argument(help="Where to write (default: finops.yaml, or the CI file).")] = None,
+    ci: Annotated[str | None, typer.Option("--ci", help="Write a scheduled CI pipeline instead: gitlab | github.")] = None,
     force: Annotated[bool, typer.Option("--force", help="Overwrite an existing file.")] = False,
 ) -> None:
-    """Create a starter [bold]finops.yaml[/] with your company FinOps policy."""
-    if path.exists() and not force:
-        err.print(f"[yellow]{path} already exists[/] (use --force to overwrite)")
+    """Create a starter [bold]finops.yaml[/] (or, with --ci, a scheduled GitLab/GitHub pipeline)."""
+    if ci is not None and ci not in CI_TEMPLATES:
+        raise typer.BadParameter(f"Use one of: {', '.join(CI_TEMPLATES)}", param_hint="--ci")
+    target = path or (CI_TEMPLATES[ci][1] if ci else Path("finops.yaml"))
+    if target.exists() and not force:
+        err.print(f"[yellow]{target} already exists[/] (use --force to overwrite)")
         raise typer.Exit(1)
-    path.write_text(template_text())
-    console.print(f"[green]Created[/] {path}. Edit tagging/sizing/budgets/llm, then run [bold]spendlens doctor[/].")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    if ci:
+        target.write_text(ci_template_text(ci))
+        console.print(f"[green]Created[/] {target}. Set the CI variables listed at its top (OIDC role, region, "
+                      "optional S3 history and webhooks) and add a schedule. Guide: docs/ci.md")
+        return
+    target.write_text(template_text())
+    console.print(f"[green]Created[/] {target}. Edit tagging/sizing/budgets/llm, then run [bold]spendlens doctor[/].")
 
 
 @app.command()

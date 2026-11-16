@@ -1,4 +1,4 @@
-.PHONY: test test-unit test-integration test-system lint generate
+.PHONY: test test-unit test-integration test-system lint generate docker-build docker-smoke
 
 PY ?= .venv/bin/python
 
@@ -22,3 +22,14 @@ generate:          ## regenerate mod variables, tag controls, control docs and t
 	$(PY) scripts/gen_tag_controls.py
 	$(PY) scripts/gen_control_docs.py
 	$(PY) scripts/build_demo_db.py
+
+IMAGE ?= spendlens:dev
+
+docker-build:      ## build the container image (Steampipe, Powerpipe and the AWS plugin baked in)
+	docker build -t $(IMAGE) .
+
+docker-smoke:      ## offline smoke test of the image: demo data only, no AWS credentials, no network
+	docker run --rm --network none $(IMAGE) --help > /dev/null
+	docker run --rm --network none $(IMAGE) tags --source demo --summary
+	docker run --rm --network none $(IMAGE) waste --source demo --summary --by service
+	docker run --rm --network none -e SPENDLENS_STEAMPIPE_SERVICE=on $(IMAGE) doctor --offline

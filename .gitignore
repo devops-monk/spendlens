@@ -11,3 +11,4 @@ build/
 /out/
 /*.html
 /.e2e/
+/website/dist/

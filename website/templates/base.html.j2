@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ title }}</title>
+<meta name="description" content="{{ description }}">
+<meta property="og:title" content="{{ title }}">
+<meta property="og:description" content="{{ description }}">
+<meta property="og:type" content="website">
+<meta property="og:url" content="{{ site_url }}{{ path }}">
+<link rel="canonical" href="{{ site_url }}{{ path }}">
+<link rel="icon" href="{{ root }}static/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="{{ root }}static/site.css?v={{ version }}">
+<script>try{var t=localStorage.getItem("spendlens-site-theme");if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body>
+<header class="nav">
+  <div class="nav-inner">
+    <a class="brand" href="{{ root }}"><i aria-hidden="true"></i>spendlens</a>
+    <button class="menu-btn" aria-label="Menu" aria-expanded="false">&#9776;</button>
+    <nav class="nav-links" aria-label="Main">
+      <a href="{{ root }}#features"{% if section == "home" %} aria-current="page"{% endif %}>Features</a>
+      <a href="{{ root }}#use-cases">Use cases</a>
+      <a href="{{ root }}architecture/"{% if section == "architecture" %} aria-current="page"{% endif %}>Architecture</a>
+      <a href="{{ root }}docs/"{% if section == "docs" %} aria-current="page"{% endif %}>Docs</a>
+      <a href="{{ repo_url }}">GitHub</a>
+      <button class="theme-btn" type="button" aria-label="Toggle light or dark">Light / Dark</button>
+      <a class="nav-cta" href="{{ root }}docs/getting-started/">Get started</a>
+    </nav>
+  </div>
+</header>
+<main>
+{% block main %}{% endblock %}
+</main>
+<footer class="site">
+  <div class="wrap">
+    <span>spendlens {{ version }} · read-only FinOps for AWS · built on Steampipe and Powerpipe</span>
+    <span><a href="{{ root }}docs/">Docs</a> · <a href="{{ root }}architecture/">Architecture</a> · <a href="{{ repo_url }}">Source</a></span>
+  </div>
+</footer>
+<script src="{{ root }}static/site.js?v={{ version }}" defer></script>
+</body>
+</html>

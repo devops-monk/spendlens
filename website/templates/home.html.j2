@@ -1,0 +1,105 @@
+{% extends "base.html.j2" %}
+{% block main %}
+<section class="hero">
+  <p class="eyebrow">FinOps for AWS, from your terminal</p>
+  <h1>See every dollar.<br><span class="grad">Act on every insight.</span></h1>
+  <p class="lede">spendlens finds untagged resources, oversized instances, idle waste and unexpected cost spikes, puts a
+    price on each one, and answers your questions in plain English. Read-only, by design.</p>
+  <div class="ctas">
+    <a class="btn primary" href="{{ root }}docs/getting-started/">Get started</a>
+    <a class="btn ghost" href="{{ root }}architecture/">How it works ›</a>
+  </div>
+  <div class="terminal" role="img" aria-label="Example terminal session running spendlens waste and spendlens ask">
+    <div class="bar"><i></i><i></i><i></i></div>
+<pre><span class="p">$</span> spendlens waste --summary --by service
+<span class="dim">service      total  alarm  compliance  est. saving/mo</span>
+ebs             48      7      85.4%          <span class="hl">$507.75</span>
+rds              6      1      83.3%           <span class="hl">$49.64</span>
+elb              6      2      66.7%           <span class="hl">$32.86</span>
+<span class="bad">14 alarm(s)</span> on 14 resources · est. saving <span class="ok">USD 595.10/month</span>
+
+<span class="p">$</span> spendlens ask "Why did our bill go up last month?"
+<span class="dim">› history_query · 2 queries · read-only</span>
+Spend rose <span class="hl">+$959 (+1.8%)</span> to $55.4K in October. EC2 grew <span class="hl">+$3,698</span> and
+Amazon Bedrock is new (<span class="hl">+$1,660</span>), partly offset by Redshift being
+decommissioned (<span class="ok">−$3,710</span>). Source: cost_diff run #7, 2026-11-09.</pre>
+  </div>
+  <p class="terminal-note">Sample output from the bundled demo data (<code>--source demo</code>).</p>
+</section>
+
+<section class="section alt">
+  <div class="wrap">
+    <div class="stats">
+      <div class="stat"><b>{{ stats.controls }}</b><span>built-in controls</span></div>
+      <div class="stat"><b>{{ stats.resource_types }}</b><span>taggable resource types</span></div>
+      <div class="stat"><b>{{ stats.providers }}</b><span>AI providers</span></div>
+      <div class="stat"><b>0</b><span>writes to your AWS account</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="features">
+  <div class="wrap">
+    <h2 class="h2">Everything FinOps needs.<br>In one command line.</h2>
+    <p class="sub">Every check runs against your real AWS estate through Steampipe, with your company's own standards
+      from a single <code>finops.yaml</code>.</p>
+    <div class="grid">
+      {% for f in features %}
+      <article class="card">
+        <div class="icon" aria-hidden="true">{{ f.icon|safe }}</div>
+        <h3>{{ f.title }}</h3>
+        <p>{{ f.body }}</p>
+        <p><code>{{ f.cmd }}</code></p>
+        <a class="more" href="{{ root }}docs/{{ f.doc }}/">Learn more ›</a>
+      </article>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<section class="section alt" id="use-cases">
+  <div class="wrap">
+    <h2 class="h2">Built for the questions<br>teams actually ask.</h2>
+    <p class="sub">From the weekly platform review to the month-end forecast, spendlens fits how engineering and finance
+      already work.</p>
+    <div class="cases">
+      {% for c in cases %}
+      <article class="case">
+        <div class="who">{{ c.who }}</div>
+        <h3>{{ c.title }}</h3>
+        <p>{{ c.body }}</p>
+        <pre><code>{{ c.cmd }}</code></pre>
+      </article>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="wrap">
+    <h2 class="h2">Up and running in minutes.</h2>
+    <p class="sub">Uses whatever AWS role you already have assumed. No agents, no SaaS, no stored keys.</p>
+    <div class="steps">
+      <div class="step"><h3>Install</h3><p>One command installs spendlens, Steampipe, Powerpipe and the AWS plugin. No sudo. Or use <a href="{{ root }}docs/docker/">Docker</a>.</p>
+        <pre><code>curl -fsSL {{ site_url }}/install.sh | sh</code></pre></div>
+      <div class="step"><h3>Describe your standards</h3><p>Mandatory tags, allowed instance types, budgets.</p>
+        <pre><code>spendlens init
+spendlens doctor</code></pre></div>
+      <div class="step"><h3>Run, review, schedule</h3><p>Try it on sample data first, then point it at your account.</p>
+        <pre><code>spendlens report --source demo
+spendlens init --ci gitlab</code></pre></div>
+    </div>
+  </div>
+</section>
+
+<section class="section alt">
+  <div class="wrap narrow" style="text-align:center">
+    <h2 class="h2">Read-only. By design.</h2>
+    <p class="sub" style="margin-bottom:28px">spendlens never creates, changes, tags or deletes anything. Savings are
+      proposals for a human to review. In CI it assumes a read-only role through OIDC, so no AWS keys are stored. Its AI
+      assistant can only run SQL that passes a parser and then executes on connections that cannot write.</p>
+    <div class="ctas"><a class="btn primary" href="{{ root }}architecture/">See the architecture</a>
+      <a class="btn ghost" href="{{ root }}docs/permissions/">IAM permissions ›</a></div>
+  </div>
+</section>
+{% endblock %}

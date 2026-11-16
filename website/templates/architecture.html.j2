@@ -1,0 +1,60 @@
+{% extends "base.html.j2" %}
+{% block main %}
+<section class="hero" style="padding-bottom:40px">
+  <p class="eyebrow">Architecture</p>
+  <h1>Simple parts.<br><span class="grad">Clear boundaries.</span></h1>
+  <p class="lede">spendlens is a Python CLI that turns AWS APIs into SQL with Steampipe, runs company-specific controls
+    with Powerpipe, and keeps every result in a local history that reports, notifications and the AI assistant read.</p>
+</section>
+
+<section class="section" style="padding-top:20px">
+  <div class="wrap">
+    <h2 class="h2" style="text-align:left;font-size:40px">System context</h2>
+    <p class="sub" style="text-align:left;margin:14px 0 0">Who uses spendlens, and what it talks to.</p>
+    <figure class="diagram"><div class="canvas">{{ d.c4_context[0]|safe }}</div><figcaption>{{ d.c4_context[1] }}</figcaption></figure>
+
+    <h2 class="h2" style="text-align:left;font-size:40px">Containers</h2>
+    <p class="sub" style="text-align:left;margin:14px 0 0">What runs inside spendlens, and how data moves between the
+      parts.</p>
+    <figure class="diagram"><div class="canvas">{{ d.c4_container[0]|safe }}</div><figcaption>{{ d.c4_container[1] }}</figcaption></figure>
+
+    <div class="grid" style="margin-bottom:80px;grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr))">
+      <article class="card"><h3>Controls via Powerpipe</h3><p>Tag, rightsizing and waste rules are SQL controls in a
+        bundled mod. Thresholds come from <code>finops.yaml</code> and are passed as mod variables, so one file holds
+        your company standards.</p></article>
+      <article class="card"><h3>Cost via direct SQL</h3><p>Cost diff, trend, showback, anomalies and forecast query
+        Steampipe's Cost Explorer tables directly. Each period is one bounded API call, because exactly one
+        <code>period_start</code>/<code>period_end</code> pair is sent.</p></article>
+      <article class="card"><h3>History as the hub</h3><p>Every run is saved to SQLite: findings, cost rows, the
+        parameters used and CI metadata. The dashboard, <code>notify</code>, <code>history diff</code> and
+        <code>ask</code> read it offline.</p></article>
+      <article class="card"><h3>Plugins everywhere</h3><p>Built-in features use the same registry as third-party
+        plugins: commands, Powerpipe mods, savings estimators, AI tools and dashboard tabs.</p></article>
+    </div>
+
+    <h2 class="h2" style="text-align:left;font-size:40px">A scheduled report run</h2>
+    <p class="sub" style="text-align:left;margin:14px 0 0">What happens when the pipeline fires.</p>
+    <figure class="diagram"><div class="canvas">{{ d.seq_report[0]|safe }}</div><figcaption>{{ d.seq_report[1] }}</figcaption></figure>
+
+    <h2 class="h2" style="text-align:left;font-size:40px">Asking the AI assistant</h2>
+    <p class="sub" style="text-align:left;margin:14px 0 0">How a question becomes an answer, and why it can't change
+      anything.</p>
+    <figure class="diagram"><div class="canvas">{{ d.seq_ask[0]|safe }}</div><figcaption>{{ d.seq_ask[1] }}</figcaption></figure>
+
+    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr))">
+      <article class="card"><h3>Credentials</h3><p>Steampipe's AWS plugin uses the standard credential chain: the role
+        assumed in your terminal, <code>AWS_PROFILE</code>, SSO, or OIDC web identity in CI. spendlens stores no AWS
+        keys.</p></article>
+      <article class="card"><h3>Three read-only layers</h3><p>1: a sqlglot parser allows one <code>SELECT</code>. 2: the
+        history DB opens read-only with a SQLite authorizer. 3: Steampipe sessions run with
+        <code>default_transaction_read_only</code>, a timeout and a row cap.</p></article>
+      <article class="card"><h3>Any LLM, native SDKs</h3><p>Claude goes through the official Anthropic SDK (Anthropic
+        API or Bedrock with your AWS role). OpenAI, Azure OpenAI and OpenAI-compatible servers go through the official
+        OpenAI SDK.</p></article>
+      <article class="card"><h3>Tested at three layers</h3><p>Unit tests; integration tests driving real SDKs and
+        Powerpipe; and system tests that run the CLI end to end through Steampipe against an AWS emulator (Moto). An
+        offline checker validates every control's SQL against the plugin schema.</p></article>
+    </div>
+  </div>
+</section>
+{% endblock %}

@@ -255,7 +255,18 @@ PLAN.md
    - **Commands:** `-i` interactive, `--show-tools` audit trail, `--json` output, `doctor` AI check.
    - **Bedrock region is never guessed.** This followed one accidental Bedrock request during development; AWS rejected it.
    - **Tests:** unit tests; integration tests driving the real SDKs against a localhost stub LLM (`tests/stubllm.py`); and a system test running `ask --live` → stub LLM → Steampipe → Moto.
-8. `notify` (Slack/Teams) and the GitLab CI schedule template.
+8. ✅ `notify`, `report` and the CI templates:
+   - **`notify`:** Slack Block Kit and a Teams Adaptive Card (Workflows webhook). The summary reuses the dashboard view model plus the alarm changes since the previous run. `--only-if-changes` and `--dry-run` supported. Webhooks come from env vars only, must be https (http allowed only for loopback, no embedded credentials), and are redacted in logs.
+   - **`report`:** runs every check in its own process, writes JSON, the savings summary and the dashboard, continues past failed steps and exits 1 if any failed.
+   - **`init --ci gitlab|github`:** OIDC role, S3 or cache history, non-root user for Steampipe, artifacts and notify. A test checks every `spendlens` command and flag in the templates exists.
+   - **Docs:** `docs/ci.md` covers trust policies, variables and the schedule.
+   - **Tests:** a system test runs `report` live against Moto; only the Cost Optimization Hub step fails, because Moto lacks that API.
+
+## Next: live verification (with the user, assumed read-only role)
+- `steampipe service start` (retry; the first FDW download failed), then `spendlens doctor` all green
+- `spendlens report --out reports` against the real account; review each step's output and the dashboard
+- Check what Moto could not: Cost Optimization Hub, Cost Explorer forecasts, resource-level cost data, real CloudWatch metric shapes
+- `spendlens ask` with the chosen provider (Bedrock region set), then the CI pipeline on a schedule
 
 ## Test strategy
 | Layer | Scope | How |
