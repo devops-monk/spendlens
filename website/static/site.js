@@ -81,4 +81,16 @@
     }, { rootMargin: "-60px 0px -65% 0px" });
     heads.forEach((h) => io.observe(h));
   }
+  // architecture local nav: highlight the section in view
+  const lnLinks = [...document.querySelectorAll('.localnav-links a[href^="#"]')];
+  const lnSecs = lnLinks.map((a) => document.getElementById(a.hash.slice(1))).filter(Boolean);
+  if (lnSecs.length && "IntersectionObserver" in window) {
+    const seen = new Set();
+    const io2 = new IntersectionObserver((entries) => {
+      entries.forEach((e) => (e.isIntersecting ? seen.add(e.target.id) : seen.delete(e.target.id)));
+      const cur = lnSecs.find((s) => seen.has(s.id));
+      lnLinks.forEach((a) => a.classList.toggle("active", !!cur && a.hash.slice(1) === cur.id));
+    }, { rootMargin: "-110px 0px -55% 0px" });
+    lnSecs.forEach((s) => io2.observe(s));
+  }
 })();

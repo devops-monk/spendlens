@@ -380,7 +380,7 @@ def build() -> list[Path]:
           cases=[{"who": w, "title": t, "body": b, "cmd": c} for w, t, b, c in CASES])
     write("architecture", "architecture.html.j2", title="Architecture · spendlens", section="architecture",
           description="How spendlens works: C4 context and container diagrams and sequence diagrams.",
-          d={k: fn() for k, fn in diagrams.ALL.items()})
+          d={k: fn() for k, fn in diagrams.ALL.items()}, icons=ICONS, stats=stats())
 
     sources: dict[str, str] = {}
     for slug, fname in REPO_DOCS.items():
