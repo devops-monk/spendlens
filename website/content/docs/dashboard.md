@@ -16,6 +16,8 @@ spendlens dashboard -o report.html               # from your latest saved runs
 spendlens dashboard --source demo -o demo.html   # sample data
 ```
 
+[[shot:hero|The Overview tab of the dashboard, from the bundled demo data.]]
+
 One self-contained HTML file. It has no network requests, so it works offline, as a CI artifact, and printed. It has nine tabs:
 - **Overview:** the headline spend and its change, plus tiles for flagged changes, projected month end, potential saving, tag compliance and anomalies.
 - **Cost diff & trend**

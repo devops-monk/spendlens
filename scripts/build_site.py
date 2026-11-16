@@ -83,6 +83,45 @@ FEATURES = [
      "Plugins add controls, commands and AI tools."), "spendlens params", "configuration"),
 ]
 
+_G = 'viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"'
+ICONS.update({
+    "book": f'<svg {_G}><path d="M4 5a2 2 0 012-2h13v16H6a2 2 0 00-2 2zM4 5v16M8 7h7"/></svg>',
+    "play": f'<svg {_G}><circle cx="12" cy="12" r="9"/><path d="M10 8.5l5 3.5-5 3.5z"/></svg>',
+    "key": f'<svg {_G}><circle cx="8" cy="15" r="4"/><path d="M11 12l8-8M16 7l2 2M14 9l2 2"/></svg>',
+    "box": f'<svg {_G}><path d="M3 7.5L12 3l9 4.5v9L12 21l-9-4.5zM3 7.5l9 4.5 9-4.5M12 12v9"/></svg>',
+    "clock": f'<svg {_G}><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+    "terminal": f'<svg {_G}><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M7 9l3 3-3 3M13 15h4"/></svg>',
+    "list": f'<svg {_G}><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1"/><circle cx="4.5" cy="12" r="1"/><circle cx="4.5" cy="18" r="1"/></svg>',
+    "map": f'<svg {_G}><path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2zM9 4v14M15 6v14"/></svg>',
+    "puzzle": f'<svg {_G}><path d="M10 4a2 2 0 014 0v2h4v4h-2a2 2 0 000 4h2v4h-4v-2a2 2 0 00-4 0v2H6v-4h2a2 2 0 000-4H6V6h4z"/></svg>',
+    "flask": f'<svg {_G}><path d="M9 3h6M10 3v6L4.5 18.5A1.7 1.7 0 006 21h12a1.7 1.7 0 001.5-2.5L14 9V3M7 15h10"/></svg>',
+    "flow": f'<svg {_G}><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.5 6H14a4 4 0 014 4v5.5M6 8.5V14a4 4 0 004 4h5.5"/></svg>',
+})
+
+# docs: slug -> (icon, one-line description) for page headers and the docs home topic grid
+DOC_INFO = {
+    "": ("book", "What spendlens does and the principles behind it."),
+    "getting-started": ("play", "Install with one command, try the demo data, connect your account."),
+    "configuration": ("sliders", "Every threshold and policy as a typed parameter in finops.yaml."),
+    "permissions": ("key", "The read-only IAM actions each feature needs."),
+    "docker": ("box", "Run the ready-made image, locally or in CI."),
+    "tags": ("tag", "Five tag checks across 70 resource types."),
+    "rightsize-waste": ("resize", "Oversized, non-standard and idle resources, each priced."),
+    "cost": ("chart", "What changed, where, and who owns the spend."),
+    "anomalies-forecast": ("pulse", "Daily spikes and the month-end projection against budgets."),
+    "savings": ("coins", "One de-duplicated savings number you can defend."),
+    "dashboard": ("layout", "The self-contained HTML dashboard and every output format."),
+    "history": ("clock", "Saved runs, replays and what changed between them."),
+    "ai-assistant": ("spark", "Plain-English answers from your data, with read-only safety."),
+    "report-notify": ("bell", "One-command reports and Slack and Teams summaries."),
+    "ci": ("flow", "Scheduled pipelines on a read-only OIDC role."),
+    "cli": ("terminal", "Every command and option, generated from the CLI."),
+    "controls": ("list", "The full catalog of built-in controls."),
+    "control-mapping": ("map", "How spendlens controls map to their sources."),
+    "extending": ("puzzle", "Plugins: commands, controls, estimators, AI tools, dashboard tabs."),
+    "development": ("flask", "Build, test and contribute."),
+}
+
 CASES = [
     ("Platform team", "The weekly cost review", ("Start the meeting with what changed and what's flagged, then drill "
      "into the services behind it."), "spendlens cost diff --show flagged\nspendlens waste --summary --by service"),
@@ -218,17 +257,67 @@ def cli_reference_md() -> str:
 # ------------------------------------------------------------------ markdown
 
 
-def render_md(text: str) -> tuple[str, str, str]:
+def gfm_lists(text: str) -> str:
+    """GitHub-style lists -> Python-Markdown: a blank line before a list that follows a paragraph line,
+    and 2-space nesting widened to 4 spaces. Fenced code blocks are left untouched."""
+    out: list[str] = []
+    fence = False
+    item = re.compile(r"^(\s*)([-*+]|\d+\.)\s")
+    for line in text.split("\n"):
+        if line.lstrip().startswith(("```", "~~~")):
+            fence = not fence
+            out.append(line)
+            continue
+        if fence:
+            out.append(line)
+            continue
+        m = item.match(line)
+        if m:
+            indent = len(m.group(1))
+            line = " " * (indent * 2) + line.lstrip() if indent else line
+            prev = out[-1] if out else ""
+            if prev.strip() and not item.match(prev) and not prev.startswith(("    ", "|", ">", "#")):
+                out.append("")
+        out.append(line)
+    return "\n".join(out)
+
+
+def render_md(text: str) -> tuple[str, str, str, str]:
     md = markdown.Markdown(extensions=["tables", "fenced_code", "codehilite", "toc", "sane_lists", "attr_list"],
                            extension_configs={"codehilite": {"css_class": "hl", "guess_lang": False},
                                               "toc": {"toc_depth": "2-3"}})
-    html = md.convert(text)
+    html = md.convert(gfm_lists(text))
     # repo docs link to each other as foo.md -> ../foo/
     html = re.sub(r'href="([a-z0-9-]+)\.md(#[^"]*)?"', lambda m: f'href="../{m.group(1)}/{m.group(2) or ""}"', html)
     html = re.sub(r'href="\.\./\.\./(src|scripts|tests)/', f'href="{REPO_URL}/tree/main/\\1/', html)
-    title = re.search(r"<h1[^>]*>(.*?)</h1>", html)
+    title = re.search(r"<h1[^>]*>(.*?)</h1>\s*", html)
+    h1 = re.sub(r"<[^>]+>", "", title.group(1)) if title else ""
+    lead = ""
+    if title:
+        html = html[: title.start()] + html[title.end():]
+        first = re.match(r"\s*<p>(.*?)</p>\s*", html, re.S)
+        if first:
+            lead, html = first.group(1), html[first.end():]
     toc = md.toc if "<li>" in md.toc else ""
-    return html, re.sub(r"<[^>]+>", "", title.group(1)) if title else "", toc
+    # drop the page title from the on-page TOC (it is the header now)
+    toc = re.sub(r'^<div class="toc">\s*<ul>\s*<li><a[^>]*>[^<]*</a>\s*(<ul>.*</ul>)\s*</li>\s*</ul>\s*</div>\s*$',
+                 r'<div class="toc">\1</div>', toc, flags=re.S)
+    return html, h1, toc, lead
+
+
+def doc_shots(html: str, root: str) -> str:
+    """[[shot:name|caption]] in a docs page -> theme-aware dashboard close-up (light/dark WebP)."""
+    sizes = shots()
+
+    def fig(m: re.Match) -> str:
+        name, caption = m.group(1), m.group(2)
+        d = sizes[name]
+        imgs = "".join(
+            f'<img class="th-{t}" src="{root}static/shots/{name}-{t}.webp" width="{d["w"]}" height="{d["h"]}" '
+            f'alt="{caption}" loading="lazy">' for t in ("light", "dark"))
+        return f'<figure class="doc-shot">{imgs}<figcaption>{caption}</figcaption></figure>'
+
+    return re.sub(r"<p>\[\[shot:([a-z]+)\|(.*?)\]\]</p>", fig, html)
 
 
 def pygments_css() -> str:
@@ -304,14 +393,26 @@ def build() -> list[Path]:
     missing = [s for s, _ in flat if s not in sources]
     if missing:
         raise SystemExit(f"docs pages missing: {missing}")
-    nav = [(g, [{"slug": s, "title": t} for s, t in items]) for g, items in NAV]
+    group_of = {slug: g for g, items in NAV for slug, _ in items}
+    nav = [(g, [{"slug": s, "title": t, "icon": ICONS[DOC_INFO[s][0]]} for s, t in items]) for g, items in NAV]
+    topics = [(g, [{"slug": s, "title": t, "icon": ICONS[DOC_INFO[s][0]], "desc": DOC_INFO[s][1]}
+                   for s, t in items if s]) for g, items in NAV]
     for i, (slug, title) in enumerate(flat):
-        html, h1, toc = render_md(sources[slug])
-        page = {"slug": slug, "title": title, "html": html, "toc": toc}
+        html, h1, toc, lead = render_md(sources[slug])
+        depth_root = "../../" if slug else "../"
+        html = doc_shots(html, depth_root)
+        if slug in REPO_DOCS:
+            edit = f"{REPO_URL}/edit/main/docs/{REPO_DOCS[slug]}"
+        elif slug == "cli":
+            edit = None
+        else:
+            edit = f"{REPO_URL}/edit/main/website/content/docs/{slug or 'index'}.md"
+        page = {"slug": slug, "title": title, "html": html, "toc": toc, "h1": h1 or title, "lead": lead,
+                "group": group_of[slug], "icon": ICONS[DOC_INFO[slug][0]], "edit": edit}
         prev = {"slug": flat[i - 1][0], "title": flat[i - 1][1]} if i > 0 else None
         nxt = {"slug": flat[i + 1][0], "title": flat[i + 1][1]} if i + 1 < len(flat) else None
         write(f"docs/{slug}".rstrip("/"), "doc.html.j2", title=f"{h1 or title} · spendlens docs", section="docs",
-              description=f"spendlens documentation: {title}.", page=page, nav=nav, prev=prev, next=nxt)
+              description=DOC_INFO[slug][1], page=page, nav=nav, topics=topics, prev=prev, next=nxt)
 
     urls = [SITE_URL + "/" + str(p.relative_to(DIST).parent).replace(".", "").strip("/") for p in written]
     now = datetime.now(UTC).date().isoformat()

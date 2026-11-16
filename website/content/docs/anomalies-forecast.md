@@ -31,6 +31,8 @@ spendlens forecast
 spendlens forecast --set budgets.monthly_total=55000 --fail-on-risk
 ```
 
+[[shot:forecast|Month-end forecast against your budget and each AWS Budget.]]
+
 - **Projection.** Spend so far this month plus Cost Explorer's forecast for the remaining days. When the forecast API can't answer (for example with too little history), it falls back to a linear run-rate projection and says so.
 - **Your budget.** The projection is checked against `budgets.monthly_total`.
 - **AWS Budgets.** Every monthly cost budget in AWS Budgets is listed, using AWS's own forecasted spend for it.

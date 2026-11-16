@@ -21,6 +21,8 @@ Two control sets with dollar estimates:
 - Unused secrets, idle EMR clusters, unused Route 53 health checks, redundant CloudTrail trails, disabled KMS keys.
 - S3 buckets without lifecycle rules (or without noncurrent-version expiry), ECR repositories without lifecycle rules.
 
+[[shot:waste|Idle and orphaned resources with a monthly saving for each.]]
+
 The full catalog, with parameters, is on the [controls](../controls/) page.
 
 ## Usage

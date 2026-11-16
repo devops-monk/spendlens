@@ -32,6 +32,8 @@ spendlens savings summary --by service
 spendlens savings summary --by none --top 50
 ```
 
+[[shot:savings|The savings summary in the dashboard: one de-duplicated total with its sources.]]
+
 Merges the latest `rightsize`, `waste`, `savings hub` and `savings commitments` runs:
 - **One action per resource.** When several actions apply to the same resource, only the largest saving counts (downsizing and reserving the same instance aren't additive).
 - **AWS wins on overlap.** When AWS Cost Optimization Hub and spendlens both estimate the same resource, AWS's figure is used.

@@ -20,6 +20,8 @@ tagging:
   prohibited: [Password, Secret]
 ```
 
+[[shot:tags|Tag compliance by check and resource type, with the exact missing tags per resource.]]
+
 ## Usage
 
 ```bash

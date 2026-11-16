@@ -12,6 +12,8 @@ spendlens cost diff --from 2026-07..2026-09 --to 2026-10..2026-12 -g tag:Team   
 spendlens cost diff --show flagged --fail-on-flag     # CI gate on big changes
 ```
 
+[[shot:cost|The biggest cost changes between two months, as shown in the dashboard.]]
+
 Each row shows the base and compare amounts, the change and change %, and a status:
 - `increase` or `decrease`;
 - `new` (a service you didn't use before);
@@ -42,6 +44,8 @@ New and removed groups only need the absolute threshold. When the two periods di
 spendlens cost trend -n 6 --include-current --top 10
 ```
 
+[[shot:trend|Monthly trend of the top services.]]
+
 A pivot with one row per service (or other group), one column per month, and the latest month-over-month change.
 
 ## cost showback: who owns the spend
@@ -49,6 +53,8 @@ A pivot with one row per service (or other group), one column per month, and the
 ```bash
 spendlens cost showback -t Team -t Environment --month 2026-10
 ```
+
+[[shot:showback|Showback by Service Owner and Environment, with the untagged share called out.]]
 
 For each tag value: the amount, its share of the total, the **untagged** share, and the variance against `budgets.per_tag`. Untagged spend is reported explicitly, because it's the spend nobody owns.
 

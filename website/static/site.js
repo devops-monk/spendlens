@@ -46,4 +46,39 @@
       });
     });
   });
+  // docs sidebar: filter as you type
+  const filter = document.querySelector(".doc-filter input");
+  if (filter) filter.addEventListener("input", () => {
+    const q = filter.value.trim().toLowerCase();
+    let shown = 0;
+    document.querySelectorAll(".docgroup").forEach((g) => {
+      let any = false;
+      g.querySelectorAll("li").forEach((li) => {
+        const hit = !q || li.textContent.toLowerCase().includes(q) || g.querySelector("h4").textContent.toLowerCase().includes(q);
+        li.hidden = !hit; if (hit) { any = true; shown++; }
+      });
+      g.hidden = !any;
+    });
+    const empty = document.querySelector(".doc-empty");
+    if (empty) empty.hidden = shown > 0;
+  });
+  // docs sidebar on phones: collapsed behind "Browse docs"
+  const dt = document.querySelector(".docnav-toggle");
+  if (dt) dt.addEventListener("click", () => {
+    const open = dt.closest(".sidebar").classList.toggle("open");
+    dt.setAttribute("aria-expanded", String(open));
+  });
+  // "On this page": highlight the section being read
+  const tocLinks = [...document.querySelectorAll('.toc a[href^="#"]:not(.toc-top)')];
+  const heads = tocLinks.map((a) => document.getElementById(decodeURIComponent(a.hash.slice(1)))).filter(Boolean);
+  if (heads.length && "IntersectionObserver" in window) {
+    const mark = (id) => tocLinks.forEach((a) => a.classList.toggle("active", a.hash.slice(1) === id));
+    const visible = new Set();
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach((e) => (e.isIntersecting ? visible.add(e.target.id) : visible.delete(e.target.id)));
+      const first = heads.find((h) => visible.has(h.id));
+      if (first) mark(first.id);
+    }, { rootMargin: "-60px 0px -65% 0px" });
+    heads.forEach((h) => io.observe(h));
+  }
 })();
