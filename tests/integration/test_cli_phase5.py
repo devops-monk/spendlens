@@ -44,7 +44,7 @@ def test_savings_summary_demo_dedupes():
 
 
 def test_savings_summary_needs_runs():
-    assert runner.invoke(app, ["savings", "summary"]).exit_code == 1
+    assert runner.invoke(app, ["savings", "summary", "--source", "last"]).exit_code == 1
 
 
 # ------------------------------------------------------------------ live paths (fake Steampipe)
@@ -120,7 +120,7 @@ def test_savings_hub_and_commitments_live(monkeypatch):
     cov = j(r)["rows"]
     assert cov[0]["coverage_pct"] == 0 and cov[0]["est_monthly_saving"] == 210.0  # 70% of 1000 * 0.3
     assert "Expiring" in r.output
-    r = runner.invoke(app, ["savings", "summary", "-f", "json"])
+    r = runner.invoke(app, ["savings", "summary", "--source", "last", "-f", "json"])
     # --min-saving only filters the display; the saved run keeps every recommendation (incl. the 0.40 one)
     assert j(r)["meta"]["extra"]["est_monthly_saving_total"] == round(88.5 + 210.0 + 0.4, 2)
 
@@ -149,9 +149,52 @@ def test_savings_summary_says_what_is_missing_and_names_the_biggest_item(tmp_pat
         c.execute("delete from findings where run_id in (select id from runs where feature != 'rightsize')")
         c.execute("delete from runs where feature != 'rightsize'")
     monkeypatch.setenv("SPENDLENS__HISTORY__PATH", str(db))
-    r = runner.invoke(app, ["savings", "summary", "--by", "service", "-f", "json"])
+    r = runner.invoke(app, ["savings", "summary", "--by", "service", "--source", "last", "-f", "json"])
     doc = j(r)
     assert doc["meta"]["extra"]["not_run"] == ["waste", "savings_hub", "savings_commitments"]
     assert "Not included yet" in r.output and "spendlens waste" in r.output and "spendlens savings hub" in r.output
     top = doc["rows"][0]
     assert top["biggest_item"] and 0 < top["biggest_saving"] <= top["est_monthly_saving"]
+
+
+def test_savings_summary_reuses_todays_runs_and_refreshes_the_rest(tmp_path, monkeypatch):
+    import shutil
+    import sqlite3
+    from datetime import UTC, datetime
+
+    from spendlens.features import savings_cmd
+    from spendlens.history import demo_db_path
+
+    db = tmp_path / "h.db"
+    shutil.copy(demo_db_path(), db)
+    now = datetime.now(UTC).isoformat(timespec="seconds")
+    with sqlite3.connect(db) as c:  # rightsize was checked today; the other sources are older
+        c.execute("update runs set started_at = ? where id = (select max(id) from runs where feature = 'rightsize')",
+                  (now,))
+    monkeypatch.setenv("SPENDLENS__HISTORY__PATH", str(db))
+    calls: list[str] = []
+
+    def fake(feat, config, profile, step):  # no AWS: pretend the live run worked (its older saved run is used)
+        calls.append(feat)
+        return {"result": "ok", "detail": ""}
+
+    monkeypatch.setattr(savings_cmd, "_refresh_source", fake)
+    r = runner.invoke(app, ["savings", "summary", "-f", "json"])
+    assert j(r)["meta"]["extra"]["not_run"] == []
+    assert calls == ["waste", "savings_hub", "savings_commitments"]  # rightsize reused, not re-run
+    calls.clear()
+    j(runner.invoke(app, ["savings", "summary", "--refresh", "-f", "json"]))
+    assert calls == ["rightsize", "waste", "savings_hub", "savings_commitments"]
+    calls.clear()
+    j(runner.invoke(app, ["savings", "summary", "--source", "last", "-f", "json"]))
+    assert calls == []  # never calls AWS
+
+
+def test_savings_summary_reports_a_source_that_failed(tmp_path, monkeypatch):
+    from spendlens.features import savings_cmd
+
+    monkeypatch.setenv("SPENDLENS__HISTORY__PATH", str(tmp_path / "none.db"))
+    monkeypatch.setattr(savings_cmd, "_refresh_source",
+                        lambda feat, *a, **k: {"result": "failed", "detail": "Steampipe not running"})
+    r = runner.invoke(app, ["savings", "summary"])
+    assert r.exit_code == 1 and "could not run" in r.output and "Steampipe not running" in r.output

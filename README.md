@@ -109,7 +109,7 @@ Each resource counts once, AWS's figure wins where both exist, and every adjustm
 </picture>
 
 ```bash
-spendlens savings summary          # one de-duplicated total
+spendlens savings summary          # one de-duplicated total (reuses today's checks, runs the rest)
 spendlens savings hub              # AWS Cost Optimization Hub recommendations
 spendlens savings commitments      # Savings Plan and RI coverage, expiring plans
 ```

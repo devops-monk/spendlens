@@ -158,7 +158,10 @@ RECIPES: dict[str, list[tuple[str, str]]] = {
     "savings commitments": [("Savings Plan and RI coverage per compute service, expiring plans",
                              "spendlens savings commitments")],
     "savings summary": [
-        ("One de-duplicated total across rightsize, waste, hub and commitments", "spendlens savings summary"),
+        ("One de-duplicated total across rightsize, waste, hub and commitments (reuses today's runs, runs the rest)",
+         "spendlens savings summary"),
+        ("Re-check all four sources now", "spendlens savings summary --refresh"),
+        ("Saved runs only, no AWS calls", "spendlens savings summary --source last"),
         ("Per service", "spendlens savings summary --by service"),
         ("The 50 largest individual items", "spendlens savings summary --by none --top 50"),
         ("HTML report", "spendlens savings summary -f html -o savings.html"),

@@ -28,9 +28,19 @@ It also warns about active Savings Plans that end within `savings.savings_plan_e
 
 ```bash
 spendlens savings summary                 # by source
-spendlens savings summary --by service
+spendlens savings summary --by service    # with the biggest item per service
 spendlens savings summary --by none --top 50
+spendlens savings summary --refresh       # re-check all four sources now
+spendlens savings summary --source last   # saved runs only, no AWS calls
 ```
+
+**Every total covers all four sources, and is at most a day old:**
+- A source already checked **today** (UTC) is read from your history: no AWS calls for it.
+- Any other source is **run live first**: read-only calls, plus Cost Explorer for commitments. It's saved, so the next summary today reuses it.
+- `--refresh` re-checks all four now.
+- `--source last` never calls AWS. It lists any source with no saved run, with the command to run it.
+
+If a source can't run (e.g. Steampipe isn't started), the summary says so and uses that source's last saved run.
 
 [[shot:savings|The savings summary in the dashboard: one de-duplicated total with its sources.]]
 
@@ -39,4 +49,4 @@ Merges the latest `rightsize`, `waste`, `savings hub` and `savings commitments` 
 - **AWS wins on overlap.** When AWS Cost Optimization Hub and spendlens both estimate the same resource, AWS's figure is used.
 - **Commitments count once.** AWS purchase recommendations replace spendlens's coverage-gap estimate, and per-instance reservation candidates fold into the service-level number.
 
-Each adjustment is printed, so the total is explainable. `savings summary` reads saved runs only and makes no AWS calls.
+Each adjustment is printed, so the total is explainable, and the last line says which run each source came from ("run now" or "saved 2026-11-17").

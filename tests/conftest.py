@@ -54,6 +54,11 @@ def _isolate(request, tmp_path, monkeypatch):
     monkeypatch.setenv("AWS_EC2_METADATA_DISABLED", "true")
     # any accidental AWS SDK/CLI call goes to a dead local port, never to real AWS
     monkeypatch.setenv("AWS_ENDPOINT_URL", "http://127.0.0.1:9")
+    # Steampipe runs with the user's own credentials, so it must be unreachable too -- including from child
+    # processes (`spendlens report` steps, `savings summary` refreshes), which never see in-process fakes.
+    monkeypatch.setenv("SPENDLENS__STEAMPIPE__DSN", "postgresql://steampipe:testing@127.0.0.1:9/steampipe")
+    monkeypatch.setenv("STEAMPIPE_DATABASE_PASSWORD", "testing")
+    monkeypatch.delenv("STEAMPIPE_INSTALL_DIR", raising=False)
     monkeypatch.setattr("spendlens.common.caller_identity", lambda: {"Account": "999", "Arn": "arn:test"})
 
 

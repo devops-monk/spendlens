@@ -115,7 +115,7 @@ spendlens rightsize --source last -f csv -o r.csv     # same results, different 
 spendlens report --source demo --out demo-report      # the whole product on sample data
 ```
 
-Some commands work only from saved runs and never call AWS: `dashboard`, `savings summary`, `notify`, `history …` and `ask` (without `--live`).
+Some commands work only from saved runs and never call AWS: `dashboard`, `notify`, `history …` and `ask` (without `--live`). `savings summary` reuses runs from today and runs any other source live; add `--source last` to keep it offline.
 
 ## 4. Choose the output: `--format` and `--out`
 
