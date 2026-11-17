@@ -54,14 +54,15 @@ def is_managed(cfg: SteampipeConfig) -> bool:
     return cfg.connection == MANAGED_CONNECTION and not cfg.dsn and cfg.host in _LOCAL_HOSTS
 
 
-def write_managed_connection(cfg: SteampipeConfig) -> bool:
-    """Write <install_dir>/config/spendlens.spc from aws.regions/aws.profile. Returns True if it changed."""
+def write_managed_connection(cfg: SteampipeConfig, *, force: bool = False) -> bool:
+    """Write <install_dir>/config/spendlens.spc from aws.regions/aws.profile. Returns True if written.
+    force=True rewrites unchanged content: the write event makes Steampipe reload the connection."""
     aws = cfg._aws
     regions = list(aws.regions) if aws is not None else ["eu-west-1"]
     profile = aws.profile if aws is not None else None
     path = managed_spc_path(cfg)
     text = managed_spc(regions, profile)
-    if path.exists() and path.read_text() == text:
+    if not force and path.exists() and path.read_text() == text:
         return False
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".spc.tmp")
@@ -85,12 +86,12 @@ def wait_for_connection(conn: Any, name: str, *, since: float | None, timeout_s:
             row = cur.fetchone()
         if row:
             state, error, mod = row["state"], row["error"], row["mod"]
-            if state == "error":
-                raise SteampipeError(f"Steampipe could not load the '{name}' connection: {error or 'unknown error'}.\n"
-                                     f"Check aws.regions / aws.profile in finops.yaml.")
-            if state == "ready" and (since is None or (mod or 0) >= since - 2):
+            current = since is None or (mod or 0) >= since - 2  # this state reflects our latest write
+            if state == "error" and current:
+                raise ConnectionLoadError(name, error or "unknown error")
+            if state == "ready" and current:
                 return
-            last = state
+            last = state if current else f"{state}, reloading"
         if time.monotonic() > deadline:
             raise SteampipeError(
                 f"Steampipe has not loaded the '{name}' connection after {int(timeout_s)}s (state: {last}). "
@@ -98,14 +99,44 @@ def wait_for_connection(conn: Any, name: str, *, since: float | None, timeout_s:
         sleep(1)
 
 
-def ensure_connection(cfg: SteampipeConfig, conn: Any) -> None:
-    """Make sure the managed connection exists with the configured regions before querying through it."""
+class ConnectionLoadError(SteampipeError):
+    """Steampipe reported the connection in `error` state."""
+
+    def __init__(self, name: str, error: str):
+        self.name, self.error = name, error
+        super().__init__(f"Steampipe could not load the '{name}' connection: {error}")
+
+    @property
+    def transient(self) -> bool:
+        """Postgres deadlock / lock timeout while Steampipe imports the schema: a reload usually succeeds."""
+        e = self.error.lower()
+        return any(k in e for k in ("deadlock", "40p01", "55p03", "could not obtain lock", "lock timeout"))
+
+
+def ensure_connection(cfg: SteampipeConfig, conn: Any, *, attempts: int = 3, sleep: Any = None) -> None:
+    """Make sure the managed connection exists with the configured regions before querying through it.
+    A transient Steampipe load error (e.g. a Postgres deadlock while it imports the schema) is retried by
+    rewriting the file, which makes Steampipe reload the connection."""
     if not is_managed(cfg):
         return
     import time
 
     changed = write_managed_connection(cfg)
-    wait_for_connection(conn, MANAGED_CONNECTION, since=time.time() if changed else None)
+    since = time.time() if changed else None
+    for attempt in range(1, attempts + 1):
+        try:
+            wait_for_connection(conn, MANAGED_CONNECTION, since=since, sleep=sleep)
+            return
+        except ConnectionLoadError as e:
+            if not e.transient or attempt == attempts:
+                hint = ("This is a temporary Steampipe error: run `steampipe service restart` and try again."
+                        if e.transient else "Check aws.regions / aws.profile in finops.yaml, then run "
+                        "`steampipe service restart`.")
+                raise SteampipeError(f"{e}\n{hint}\nOr use your own connection for now: "
+                                     "--set steampipe.connection=aws") from e
+            (sleep or time.sleep)(2 * attempt)
+            write_managed_connection(cfg, force=True)  # write event -> Steampipe reloads the connection
+            since = time.time()
 
 
 def discover_password() -> str | None:

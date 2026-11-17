@@ -126,3 +126,39 @@ def test_empty_regions_from_older_finops_yaml_mean_default(tmp_path):
 def test_unsafe_values_rejected(tmp_path, bad):
     with pytest.raises(Exception):  # noqa: B017 - any validation error is fine
         _cfg(tmp_path, bad)
+
+
+DEADLOCK = "ERROR: deadlock detected (SQLSTATE 40P01)"
+NOW = 4_000_000_000.0  # "after any write" for connection_mod_time
+
+
+def test_transient_deadlock_is_retried_after_a_reload(tmp_path):
+    cfg = _cfg(tmp_path)
+    path = managed_spc_path(cfg.steampipe)
+    conn = _Conn({"state": "error", "error": DEADLOCK, "mod": NOW},       # first load hits the deadlock
+                 {"state": "error", "error": DEADLOCK, "mod": 1.0},       # stale row: Steampipe not reloaded yet
+                 {"state": "ready", "error": None, "mod": NOW})           # reloaded after our rewrite
+    sleeps = []
+    ensure_connection(cfg.steampipe, conn, sleep=sleeps.append)        # no exception: recovered by itself
+    assert path.exists() and '"eu-west-1"' in path.read_text()
+    assert sleeps and sleeps[0] == 2                                    # backed off before forcing the reload
+
+
+def test_non_transient_error_fails_fast_with_hint(tmp_path):
+    cfg = _cfg(tmp_path)
+    conn = _Conn({"state": "error", "error": "invalid region 'eu-west-9'", "mod": NOW})
+    with pytest.raises(SteampipeError, match="Check aws.regions") as e:
+        ensure_connection(cfg.steampipe, conn, sleep=lambda s: None)
+    assert "--set steampipe.connection=aws" in str(e.value)
+
+
+def test_persistent_deadlock_ends_with_restart_advice(tmp_path):
+    cfg = _cfg(tmp_path)
+    conn = _Conn({"state": "error", "error": DEADLOCK, "mod": NOW})
+    with pytest.raises(SteampipeError, match="temporary Steampipe error: run `steampipe service restart`"):
+        ensure_connection(cfg.steampipe, conn, attempts=2, sleep=lambda s: None)
+
+
+def test_stale_error_before_reload_is_not_reported():
+    conn = _Conn({"state": "error", "error": DEADLOCK, "mod": 1.0}, {"state": "ready", "error": None, "mod": NOW})
+    wait_for_connection(conn, "spendlens", since=NOW - 1, sleep=lambda s: None)  # no exception: waited for reload
