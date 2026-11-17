@@ -77,6 +77,31 @@ How the charts behave:
 
 `spendlens report` runs every check and then builds the dashboard from those runs (`--source last`), writing each check's JSON as well.
 
+## spendlens brief: one page for managers
+
+```bash
+spendlens brief -o brief.html                        # AI summary; reuses today's runs, runs the rest live
+spendlens brief --source last -o brief.html          # saved runs only, no AWS calls
+spendlens brief --source last --no-ai -o brief.html  # nothing sent to an AI provider
+spendlens brief --source demo -o brief.html          # sample data
+```
+
+The dashboard has every detail; the brief is the page you send to a manager. One printable, self-contained HTML file:
+- **Analyst summary:** a headline and a short summary of what happened to spend, why, and what needs attention, written by the FinOps AI profile (your `llm.*` provider).
+- **Five numbers:** last month's spend and its change, this month's forecast against the budget, savings to review, anomalies and tag compliance, each coloured good, warning or bad.
+- **Key insights:** up to six, ranked by impact and labelled cost, forecast, anomaly, savings or governance.
+- **Charts:** monthly spend as columns with this month's forecast and a budget line, what changed (increases and decreases), the trend of the top services, where the money goes and spend by owner tag.
+- **Anomalies:** each spike with its usual level and extra spend, plus the likely cause when the AI wrote the summary.
+- **Savings for review:** the total by source and by service, recommended next steps, and a **review checklist** of the 12 largest proposals. Tick an item once someone has reviewed it; the tick is saved in that browser.
+- **Budget and governance:** forecast and tag-compliance meters, and risks to watch.
+- **About this report:** which saved run each section used, and when.
+
+[[shot:brief|The top of the executive brief, from the bundled demo data (rule-based summary).]]
+
+**Every number is computed by spendlens.** The AI receives those figures, may run a few read-only queries on your saved history (never live AWS), and writes only the words. A saving it states that is larger than every saving found put together is dropped. If the AI isn't configured, fails, or doesn't return the expected answer, the brief is still written with the built-in rule-based summary and says so. `--no-ai` always uses the rule-based summary.
+
+`spendlens report` also writes `brief.html` (rule-based; add `--ai` for the AI summary).
+
 ## Branding
 
 ```yaml

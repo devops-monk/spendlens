@@ -137,7 +137,12 @@ SECTIONS: list[tuple[str, str, str, list[tuple[str, str, str]]]] = [
          "spendlens report --only cost_diff --only cost_trend --only anomalies --only forecast", "ce"),
     ]),
     ("share", "Reports and sharing", "Turn runs into something you can send.", [
+        ("One page for managers, with an AI-written summary", "spendlens brief -o brief.html", "ai"),
+        ("…from saved runs only, rule-based, nothing leaves your machine",
+         "spendlens brief --source last --no-ai -o brief.html", "offline"),
+        ("The manager brief on sample data", "spendlens brief --source demo --no-ai -o demo-brief.html", "offline"),
         ("Run every check and build the dashboard", "spendlens report --out reports", "ce"),
+        ("…plus brief.html with an AI-written summary", "spendlens report --out reports --ai", "ai"),
         ("Any result as CSV for a spreadsheet", "spendlens waste -f csv -o waste.csv", "aws"),
         ("Preview the Slack / Teams summary", "spendlens notify --slack --teams --dry-run --source demo", "offline"),
         ("Waste over $100/month, straight from JSON",
@@ -170,6 +175,7 @@ SECTIONS: list[tuple[str, str, str, list[tuple[str, str, str]]]] = [
         ("A conversation with follow-ups", "spendlens ask -i", "ai"),
         ("Let it query AWS live (read-only)", "spendlens ask --live \"Which EBS volumes are unattached?\"", "ai"),
         ("Explain a spike", "spendlens ask \"What drove the cost spike last Tuesday?\"", "ai"),
+        ("An AI-written executive brief from your saved runs", "spendlens brief --source last -o brief.html", "ai"),
     ]),
     ("scope", "Scope and settings", "Change what's checked without editing files.", [
         ("Query two regions for one run",

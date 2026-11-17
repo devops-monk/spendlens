@@ -20,6 +20,14 @@ spendlens ask --source demo "Summarise the waste findings"
 | `--max-steps` | Tool-call limit per question (default `llm.max_steps`, 12) |
 | `--json` | The answer plus the full audit trail, machine-readable |
 
+## The executive brief
+
+`spendlens brief` uses the same FinOps analyst profile to write a one-page summary for managers: a headline, key insights, recommended next steps, risks, and a likely cause for each anomaly. spendlens computes every figure first; the AI only writes the words, using the same read-only history tools (never live AWS). See [spendlens brief](../dashboard/#spendlens-brief-one-page-for-managers).
+
+```bash
+spendlens brief -o brief.html
+```
+
 ## How it answers
 
 1. It reads `history_overview` to see which saved runs exist.

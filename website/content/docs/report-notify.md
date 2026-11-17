@@ -15,13 +15,14 @@ Runs these steps:
 - anomalies, forecast;
 - savings hub, savings commitments.
 
-Then it builds the savings summary and the dashboard. Output in `reports/`:
+Then it builds the savings summary, the dashboard and the executive brief. Output in `reports/`:
 
 | File | Content |
 |---|---|
 | `<step>.json` | Each step's findings or cost data |
 | `savings_summary.json` | De-duplicated savings across sources |
 | `report.html` | The dashboard |
+| `brief.html` | The [executive brief](../dashboard/#spendlens-brief-one-page-for-managers) for managers: rule-based summary, or AI-written with `spendlens report --ai` |
 | `report-steps.json` | Each step's result, duration and last message |
 
 Each step runs in its own process. If one step fails (for example, missing permission for Cost Optimization Hub), the others still run and every output that can be written is written. The command then exits 1. Alarms are findings, not failures (step exit code 3 counts as success).

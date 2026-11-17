@@ -57,6 +57,7 @@ BUILTIN_FEATURES: tuple[str, ...] = (
     "spendlens.features.forecast",
     "spendlens.features.savings_cmd",
     "spendlens.features.dashboard",
+    "spendlens.features.brief",
     "spendlens.features.ask",
     "spendlens.features.notify",
     "spendlens.features.report",

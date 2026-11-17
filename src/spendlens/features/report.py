@@ -45,15 +45,18 @@ def report(
     profile: ProfileOpt = None,
     sets: SetOpt = None,
     timeout: Annotated[int, typer.Option("--step-timeout", help="Seconds per step.")] = 1800,
+    ai: Annotated[bool, typer.Option("--ai", help="Write brief.html's summary with your AI provider (llm.*); "
+                                                  "default: the rule-based summary, nothing sent to an AI.")] = False,
 ) -> None:
-    """Run all checks, write <out>/*.json, the savings summary and <out>/report.html.
+    """Run all checks, write <out>/*.json, the savings summary, <out>/report.html and the executive <out>/brief.html.
 
     Steps: tags, rightsize, waste, cost_diff, cost_trend, cost_showback, anomalies, forecast, savings_hub,
-    savings_commitments (then dashboard + savings summary from the saved runs).
+    savings_commitments (then savings summary, dashboard and brief from the saved runs).
     Examples:
       spendlens report --out reports
       spendlens report --skip savings_hub --skip cost_showback
       spendlens report --source demo --out /tmp/demo-report
+      spendlens report --ai          # brief.html with an AI-written summary
     """
     names = [n for n, _ in STEPS]
     for opt, vals in (("--only", only or []), ("--skip", skip or [])):
@@ -70,7 +73,7 @@ def report(
         common += ["--set", s]
     selected = [(n, a) for n, a in STEPS if (not only or n in only) and n not in (skip or [])]
     results = []
-    total = len(selected) + 2  # + savings summary + dashboard
+    total = len(selected) + 3  # + savings summary + dashboard + brief
     for i, (name, args) in enumerate(selected, 1):
         cmd = [sys.executable, "-m", "spendlens", *args, *common, "--source", source.value, "-f", "json",
                "-o", str(out / f"{name}.json")]
@@ -83,9 +86,13 @@ def report(
     results.append(_run("savings_summary", [sys.executable, "-m", "spendlens", "savings", "summary", "--by", "none",
                                             "--top", "500", "--source", hist, *cfg_args, "-f", "json",
                                             "-o", str(out / "savings_summary.json")], timeout,
-                        step=f"{total - 1}/{total}"))
+                        step=f"{total - 2}/{total}"))
     results.append(_run("dashboard", [sys.executable, "-m", "spendlens", "dashboard", "--source", hist, *cfg_args,
-                                      "-o", str(out / "report.html")], timeout, step=f"{total}/{total}"))
+                                      "-o", str(out / "report.html")], timeout, step=f"{total - 1}/{total}"))
+    set_args = [a for s in sets or [] for a in ("--set", s)]
+    results.append(_run("brief", [sys.executable, "-m", "spendlens", "brief", "--source", hist, *cfg_args, *set_args,
+                                  "--ai" if ai else "--no-ai", "-o", str(out / "brief.html")], timeout,
+                        step=f"{total}/{total}"))
     (out / "report-steps.json").write_text(json.dumps(results, indent=2))
 
     t = Table(title=f"spendlens report → {out}", header_style=f"bold {BRAND}")

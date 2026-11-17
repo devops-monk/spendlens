@@ -23,7 +23,7 @@ LABEL_W = 230  # left label column
 VALUE_W = 92  # space reserved for value labels at the bar tip
 
 
-__all__ = ["Markup", "diverging_hbars", "esc", "hbars", "legend", "lines", "meter", "money", "segmented"]
+__all__ = ["Markup", "columns", "diverging_hbars", "esc", "hbars", "legend", "lines", "meter", "money", "segmented"]
 
 
 def esc(v: Any) -> str:
@@ -198,6 +198,61 @@ def lines(series: list[dict[str, Any]], x_labels: list[str], *, label: str, widt
         x0 = X(i) - band / 2
         parts.append(f'<rect class="hit band" tabindex="0" x="{max(x0, left - 4):.1f}" y="{top}" '
                      f'width="{band:.1f}" height="{ph}" data-tip="{esc(tip)}" aria-label="{esc(tip)}"/>')
+    return (f'<svg class="chart" style="max-width:{width}px" viewBox="0 0 {width} {height}" role="img" aria-label="{esc(label)}">'
+            f'{"".join(parts)}</svg>')
+
+
+def columns(items: list[dict[str, Any]], *, label: str, width: int = 760, height: int = 300, cur: str = "USD",
+            budget: float | None = None) -> str:
+    """Vertical columns, one per period (e.g. monthly spend). items: {label, value, tip?, kind?}; kind "forecast"
+    draws a hatched projection column, "latest" the highlighted last actual. Optional dashed budget line."""
+    if not items:
+        return '<p class="empty">No data.</p>'
+    left, right, top, bottom = 56, 16, 40, 34
+    pw, ph = width - left - right, height - top - bottom
+    vmax = max([i["value"] for i in items] + [budget or 0]) or 1
+    ticks = _nice_ticks(vmax)
+    ymax = ticks[-1]
+    n = len(items)
+    slot = pw / n
+    bw = min(56.0, slot * 0.62)
+
+    def Y(v: float) -> float:
+        return top + ph - ph * v / ymax
+
+    parts = [('<defs><pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" '
+              'patternTransform="rotate(45)"><rect width="6" height="6" fill="var(--series-1)" fill-opacity=".18"/>'
+              '<line x1="0" y1="0" x2="0" y2="6" stroke="var(--series-1)" stroke-width="2.5"/></pattern></defs>')]
+    for t in ticks:
+        parts.append(f'<line class="grid" x1="{left}" x2="{left + pw}" y1="{Y(t):.1f}" y2="{Y(t):.1f}"/>'
+                     f'<text class="tick" x="{left - 8}" y="{Y(t) + 4:.1f}" text-anchor="end">{_tick(t)}</text>')
+    for i, it in enumerate(items):
+        cx = left + slot * i + slot / 2
+        x0, y0 = cx - bw / 2, Y(it["value"])
+        h = max(Y(0) - y0, 0)
+        kind = it.get("kind", "")
+        fill = "url(#hatch)" if kind == "forecast" else "var(--series-1)"
+        op = "" if kind in ("latest", "forecast") else ' fill-opacity=".45"'
+        r = min(4, h / 2, bw / 2)
+        path = (f"M{x0:.1f},{Y(0):.1f} V{y0 + r:.1f} Q{x0:.1f},{y0:.1f} {x0 + r:.1f},{y0:.1f} H{x0 + bw - r:.1f} "
+                f"Q{x0 + bw:.1f},{y0:.1f} {x0 + bw:.1f},{y0 + r:.1f} V{Y(0):.1f} Z")
+        tip = it.get("tip") or f"{it['label']}: {money(it['value'], cur)}"
+        parts.append(f'<g class="mark" tabindex="0" data-tip="{esc(tip)}" aria-label="{esc(tip)}">'
+                     f'<rect class="hit" x="{left + slot * i:.1f}" y="{top}" width="{slot:.1f}" height="{ph}"/>'
+                     f'<path d="{path}" fill="{fill}"{op}/>'
+                     f'<text class="val" x="{cx:.1f}" y="{y0 - 6:.1f}" text-anchor="middle">{esc(money(it["value"], cur))}</text>'
+                     f'<text class="tick" x="{cx:.1f}" y="{height - 10}" text-anchor="middle">{esc(it["label"])}</text></g>')
+    parts.append(f'<line class="axis" x1="{left}" x2="{left + pw}" y1="{Y(0):.1f}" y2="{Y(0):.1f}"/>')
+    if budget:
+        yb = Y(budget)
+        parts.append(f'<line class="budget" x1="{left}" x2="{left + pw}" y1="{yb:.1f}" y2="{yb:.1f}"/>')
+    parts.append(f'<g class="col-key" transform="translate({left},{8})">'
+                 f'<rect width="10" height="10" y="-8" rx="2" fill="var(--series-1)"/>'
+                 f'<text class="tick" x="15" y="1">actual</text>'
+                 + ('<rect x="70" width="10" height="10" y="-8" rx="2" fill="url(#hatch)"/><text class="tick" x="85" y="1">'
+                    'forecast</text>' if any(i.get("kind") == "forecast" for i in items) else "")
+                 + (f'<line class="budget" x1="150" x2="170" y1="-3" y2="-3"/><text class="tick" x="175" y="1">'
+                    f'budget {esc(money(budget, cur))}</text>' if budget else "") + '</g>')
     return (f'<svg class="chart" style="max-width:{width}px" viewBox="0 0 {width} {height}" role="img" aria-label="{esc(label)}">'
             f'{"".join(parts)}</svg>')
 

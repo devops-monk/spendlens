@@ -181,6 +181,20 @@ spendlens anomalies --fail-on-anomaly
 spendlens forecast --fail-on-risk
 ```
 
+## One page for managers.
+
+```bash
+spendlens brief -o brief.html
+```
+
+The dashboard has every detail. The brief is the page you send to a manager: an analyst summary written by the FinOps AI profile, five headline numbers, key insights ranked by impact, monthly spend against the budget, what changed, anomalies with their likely cause, and a checklist of the largest savings to review. One printable HTML file.
+
+<img src="website/static/shots/brief-light.webp" width="100%" alt="The executive brief: a summary of spend and forecast, five headline numbers and key insights">
+
+- **Numbers you can trust:** spendlens computes every figure; the AI only writes the words, from those figures and read-only queries on your saved history.
+- **No AI? Still a brief:** `--no-ai` (or an AI that's not set up) uses a built-in rule-based summary, and nothing is sent anywhere.
+- **In CI:** `spendlens report` writes `reports/brief.html` too; add `--ai` for the AI summary.
+
 ## Ask anything. Get answers from your data.
 
 ```text
@@ -277,6 +291,7 @@ Unknown keys, typos and out-of-range values are rejected, and the error names th
 | `anomalies` · `forecast` | Daily spikes; month-end projection against budgets |
 | `savings hub` · `commitments` · `summary` | AWS recommendations, coverage, one de-duplicated total (`summary --refresh`: re-check now) |
 | `dashboard` | A self-contained HTML report with nine tabs, always covering every check (`--refresh`: re-run all now) |
+| `brief` | One page for managers: AI summary, key numbers, charts and a savings review checklist |
 | `ask` | Questions in plain English, read-only |
 | `report` · `notify` | Run everything; post Slack or Teams summaries (`notify --refresh`: re-check first) |
 | `history list` · `diff` | Saved runs, and new or resolved alarms between them |

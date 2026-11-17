@@ -18,16 +18,20 @@ command -v cwebp >/dev/null || { echo "cwebp is required (brew install webp)" >&
 [ -x "$CHROME" ] || { echo "Chrome not found; set CHROME=/path/to/chrome" >&2; exit 1; }
 
 "$ROOT/.venv/bin/spendlens" dashboard --source demo -o "$WORK/dash.html" >/dev/null
+# the executive brief with its rule-based summary (--no-ai: nothing invented, nothing sent to an AI provider)
+SPENDLENS_NO_PROGRESS=1 "$ROOT/.venv/bin/spendlens" brief --source demo --no-ai -o "$WORK/brief.html" >/dev/null 2>&1
 for theme in light dark; do
   sed "s/<html lang=\"en\">/<html lang=\"en\" data-theme=\"$theme\">/" "$WORK/dash.html" > "$WORK/dash-$theme.html"
+  sed "s/<html lang=\"en\">/<html lang=\"en\" data-theme=\"$theme\">/" "$WORK/brief.html" > "$WORK/brief-$theme.html"
 done
 mkdir -p "$OUT"
 
 while read -r name tab x y w h; do
   [ -z "$name" ] && continue
+  page=dash; [ "$tab" = "brief" ] && page=brief
   for theme in light dark; do
-    printf '<html><body style="margin:0;overflow:hidden"><iframe src="dash-%s.html#%s" style="position:absolute;left:-%spx;top:-%spx;width:1280px;height:3400px;border:0"></iframe></body></html>' \
-      "$theme" "$tab" "$x" "$y" > "$WORK/crop.html"
+    printf '<html><body style="margin:0;overflow:hidden"><iframe src="%s-%s.html#%s" style="position:absolute;left:-%spx;top:-%spx;width:1280px;height:3400px;border:0"></iframe></body></html>' \
+      "$page" "$theme" "$tab" "$x" "$y" > "$WORK/crop.html"
     "$CHROME" --headless=new --disable-gpu --hide-scrollbars --allow-file-access-from-files \
       --user-data-dir="$WORK/profile" --force-device-scale-factor=2 --window-size="$w,$h" \
       --virtual-time-budget=3000 --screenshot="$WORK/$name-$theme.png" "file://$WORK/crop.html" >/dev/null 2>&1
@@ -44,5 +48,6 @@ tags tags 54 231 1172 560
 forecast forecast 54 231 1172 391
 showback showback 54 231 1172 429
 waste waste 54 231 1172 600
+brief brief 54 170 1172 840
 EOF
 echo "Wrote $(find "$OUT" -name "*.webp" | wc -l | tr -d ' ') files to ${OUT#"$ROOT"/}"

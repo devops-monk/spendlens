@@ -123,6 +123,7 @@ def vm_cost_diff(d: Data, cfg: Config, cur: str) -> dict[str, Any] | None:
                           f"({ch.signed_money(r['change'], cur)}, {r['status']}{', flagged' if r['flagged'] else ''})"}
                   for r in [x for x in diff if x["status"] != "flat"][: cfg.dashboard.top_n]],
         "table": table_model(diff, ["group", "base", "compare", "change", "change_pct", "status", "flagged"]),
+        "rows": diff,
     }
 
 
@@ -243,7 +244,8 @@ def vm_findings(d: Data, feature: str, cfg: Config, cur: str) -> dict[str, Any] 
     }
 
 
-def vm_savings(d: Data, cfg: Config, cur: str) -> dict[str, Any] | None:
+def merged_savings(d: Data) -> tuple[list[dict[str, Any]], list[str]] | None:
+    """Every saving across rightsize, waste, Cost Optimization Hub and commitments, de-duplicated (largest first)."""
     sources = [f for f in ("rightsize", "waste", "savings_hub", "savings_commitments") if d.has(f)]
     if not sources:
         return None
@@ -254,13 +256,22 @@ def vm_savings(d: Data, cfg: Config, cur: str) -> dict[str, Any] | None:
                 row = {"resource": f.resource, "control": f.control, "service": f.service or "-",
                        "est_monthly_saving": f.est_monthly_saving, "reason": f.reason}
                 (hub_rows if feat == "savings_hub" else spendlens_rows).append(row)
-    merged, notes = sv.merge_savings(spendlens_rows, hub_rows)
+    return sv.merge_savings(spendlens_rows, hub_rows)
+
+
+def savings_category(r: dict[str, Any]) -> str:
+    return ("AWS Cost Optimization Hub" if r["source"] == "cost_optimization_hub" else
+            "Commitments" if r["control"] == "commitment_coverage" else "spendlens rightsizing & waste")
+
+
+def vm_savings(d: Data, cfg: Config, cur: str) -> dict[str, Any] | None:
+    if (m := merged_savings(d)) is None:
+        return None
+    merged, notes = m
     total = round(sum(r["est_monthly_saving"] for r in merged), 2)
     by_cat: dict[str, float] = defaultdict(float)
     for r in merged:
-        cat = ("AWS Cost Optimization Hub" if r["source"] == "cost_optimization_hub" else
-               "Commitments" if r["control"] == "commitment_coverage" else "spendlens rightsizing & waste")
-        by_cat[cat] += r["est_monthly_saving"]
+        by_cat[savings_category(r)] += r["est_monthly_saving"]
     order = ["spendlens rightsizing & waste", "AWS Cost Optimization Hub", "Commitments"]
     return {
         "amount": total, "total": ch.money(total, cur), "yearly": ch.money(total * 12, cur), "count": len(merged),

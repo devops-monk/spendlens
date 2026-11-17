@@ -117,4 +117,8 @@
   const g=document.getElementById('grp-'+a.dataset.i);if(g){g.classList.remove('bd-hide');g.open=true;g.scrollIntoView({behavior:'smooth',block:'start'});}});
  addEventListener('beforeprint',()=>groups.forEach(g=>g.open=true));
  apply();
+ document.querySelectorAll('input[data-review]').forEach(cb=>{const k='spendlens-review:'+cb.dataset.review;
+  const mark=()=>cb.closest('tr')&&cb.closest('tr').classList.toggle('reviewed',cb.checked);
+  try{cb.checked=localStorage.getItem(k)==='1';}catch(e){}mark();
+  cb.addEventListener('change',()=>{mark();try{cb.checked?localStorage.setItem(k,'1'):localStorage.removeItem(k);}catch(e){}});});
 })();

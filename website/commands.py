@@ -19,7 +19,7 @@ CATEGORIES: list[tuple[str, str, list[str]]] = [
     ("Savings", "AWS's own recommendations, commitment coverage, and one de-duplicated savings total.",
      ["savings hub", "savings commitments", "savings summary"]),
     ("Reports, dashboard and notifications", "Run everything at once, build the branded dashboard, post summaries.",
-     ["report", "dashboard", "notify"]),
+     ["report", "dashboard", "brief", "notify"]),
     ("AI assistant", "Ask questions in plain English; answers come from your saved runs (and, with --live, read-only "
      "Steampipe queries).", ["ask"]),
     ("History", "Every live run is saved locally, so you can compare runs and re-render reports without AWS calls.",
@@ -43,6 +43,7 @@ TASKS: list[tuple[str, str]] = [
     ("Get one savings number I can defend", "savings summary"),
     ("Check Savings Plan and RI coverage", "savings commitments"),
     ("Produce one shareable HTML report", "dashboard"),
+    ("Give managers a one-page summary with AI insights", "brief"),
     ("Run everything on a schedule in CI", "init"),
     ("Post a summary to Slack or Teams", "notify"),
     ("Ask a question about my costs", "ask"),
@@ -172,6 +173,13 @@ RECIPES: dict[str, list[tuple[str, str]]] = {
         ("Skip steps (e.g. no Cost Optimization Hub opt-in)", "spendlens report --skip savings_hub --out reports"),
         ("Everything on sample data: no AWS account needed", "spendlens report --source demo --out demo-report"),
         ("Longer timeout per step for large accounts", "spendlens report --out reports --step-timeout 3600"),
+    ],
+    "brief": [
+        ("One page for managers, with an AI-written summary", "spendlens brief -o brief.html"),
+        ("From saved runs only, no AWS calls", "spendlens brief --source last -o brief.html"),
+        ("Rule-based summary: nothing sent to an AI provider", "spendlens brief --source last --no-ai -o brief.html"),
+        ("Re-run every section now, then write the brief", "spendlens brief --refresh -o brief.html"),
+        ("The brief on sample data", "spendlens brief --source demo -o demo-brief.html"),
     ],
     "dashboard": [
         ("Branded HTML dashboard: reuses checks run today, runs the rest live", "spendlens dashboard -o report.html"),
