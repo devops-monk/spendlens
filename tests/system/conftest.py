@@ -103,7 +103,8 @@ connection "aws" {{
         if not list((SP_DIR / "plugins").rglob("steampipe-plugin-aws.plugin")):
             r = _steampipe("plugin", "install", "aws", "--progress=false", env=sp_env)
             assert r.returncode == 0, r.stderr
-        _steampipe("service", "stop", "--force", env=sp_env, timeout=120)
+        # never --force: it shuts down *every* Steampipe service on the machine, including the user's own
+        _steampipe("service", "stop", env=sp_env, timeout=120)
         r = _steampipe("service", "start", "--database-port", str(SP_PORT), "--database-listen", "local",
                        "--database-password", SP_PASSWORD, env=sp_env)
         assert r.returncode == 0, r.stdout + r.stderr
@@ -129,7 +130,8 @@ connection "aws" {{
         }
         yield {"endpoint": endpoint, "ids": ids, "env": cli_env, "work": work, "sp_env": sp_env}
     finally:
-        _steampipe("service", "stop", "--force", env=sp_env, timeout=120)
+        # never --force: it shuts down *every* Steampipe service on the machine, including the user's own
+        _steampipe("service", "stop", env=sp_env, timeout=120)
         moto_proc.terminate()
         moto_proc.wait(timeout=30)
         moto_log.close()
