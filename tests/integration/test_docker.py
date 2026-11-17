@@ -54,6 +54,9 @@ def run(fakebin: Path, *args: str, **env: str) -> tuple[int, list[str]]:
     ["report", "--out", "reports"],
     ["ask", "--live", "which instances are idle?"],
     ["tags", "--source", "live"],
+    ["dashboard", "-o", "r.html"],          # reuses today's runs, runs the rest live
+    ["notify", "--slack", "--dry-run"],
+    ["savings", "summary"],
 ])
 def test_live_commands_start_and_stop_steampipe(fakebin: Path, args: list[str]) -> None:
     code, calls = run(fakebin, *args)
@@ -70,8 +73,9 @@ def test_live_commands_start_and_stop_steampipe(fakebin: Path, args: list[str]) 
     ["tags", "--source", "demo"],
     ["waste", "--source=last"],
     ["ask", "summarise waste"],
-    ["dashboard", "-o", "r.html"],
-    ["notify", "--slack", "--dry-run"],
+    ["dashboard", "--source", "last", "-o", "r.html"],
+    ["notify", "--slack", "--dry-run", "--source", "last"],
+    ["savings", "summary", "--source=last"],
     ["history", "list"],
     ["params"],
     ["init"],

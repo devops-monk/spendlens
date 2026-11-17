@@ -52,8 +52,8 @@ finops:
         spendlens report --out reports || status=$?
         if [ -n "${SPENDLENS_HISTORY_S3:-}" ]; then aws s3 cp "$SPENDLENS__HISTORY__PATH" "$SPENDLENS_HISTORY_S3"; fi
         link="$CI_JOB_URL/artifacts/file/reports/report.html"
-        [ -n "${SPENDLENS_SLACK_WEBHOOK:-}" ] && spendlens notify --slack --link "$link" || true
-        [ -n "${SPENDLENS_TEAMS_WEBHOOK:-}" ] && spendlens notify --teams --link "$link" || true
+        [ -n "${SPENDLENS_SLACK_WEBHOOK:-}" ] && spendlens notify --slack --source last --link "$link" || true
+        [ -n "${SPENDLENS_TEAMS_WEBHOOK:-}" ] && spendlens notify --teams --source last --link "$link" || true
         steampipe service stop
         exit $status
       '

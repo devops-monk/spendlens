@@ -16,7 +16,7 @@ from typing import Annotated, Any
 
 import typer
 
-from ..common import ConfigOpt, Source, err, history_path, load
+from ..common import ConfigOpt, ProfileOpt, Source, err, history_path, load
 from ..config import Config
 from ..engines import cost as ce
 from ..engines import savings as sv
@@ -362,16 +362,29 @@ def write_report(html: str, out: Path | None) -> None:
 def dashboard(
     out: Annotated[Path, typer.Option("--out", "-o", help="Output HTML file.")] = Path("spendlens-report.html"),
     config: ConfigOpt = None,
-    source: Annotated[Source, typer.Option("--source", help="last = your history DB; demo = bundled sample DB.")] = Source.last,
+    profile: ProfileOpt = None,
+    source: Annotated[Source, typer.Option(
+        "--source", help="live = reuse today's saved runs and run every other section now; last = saved runs only, "
+                         "no AWS calls; demo = bundled sample DB.")] = Source.live,
+    refresh: Annotated[bool, typer.Option("--refresh", help="Re-run every section live now, even ones run today.")] = False,
 ) -> None:
-    """Build a self-contained HTML dashboard from the latest saved runs (no AWS calls).
+    """Build a self-contained HTML dashboard covering every section, at most a day old.
 
-    Run the features first (or in CI), then: spendlens dashboard -o report.html
+    A section already run today is read from your history; the others are run live first (read-only AWS calls
+    and Cost Explorer). --refresh re-runs them all; --source last never calls AWS.
+    Examples:
+      spendlens dashboard -o report.html
+      spendlens dashboard --refresh -o report.html
+      spendlens dashboard --source last -o report.html
     """
     cfg = load(config)
-    if source is Source.live:
-        raise typer.BadParameter("The dashboard reads saved runs: use --source last or demo.", param_hint="--source")
     path = demo_db_path() if source is Source.demo else history_path(cfg)
+    if source is Source.live:
+        from .. import refresh as rf
+
+        rf.ensure_fresh(path, FEATURES, config=config, profile=profile, refresh=refresh)
+    elif refresh:
+        raise typer.BadParameter("--refresh runs sections live: drop --source last/demo.", param_hint="--refresh")
     try:
         store = HistoryStore(path, read_only=True)
     except FileNotFoundError as e:
@@ -379,7 +392,7 @@ def dashboard(
         raise typer.Exit(1) from e
     with store:
         data = Data(store)
-    html = build(data, cfg, source)
+    html = build(data, cfg, Source.last if source is Source.live else source)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(html)
     err.print(f"[green]Wrote[/] {out} ({len(html) // 1024} KiB, {len(data.runs)} section source(s))")

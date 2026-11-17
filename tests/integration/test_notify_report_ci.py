@@ -38,7 +38,7 @@ def test_notify_only_if_changes_stays_quiet(tmp_path):
     with HistoryStore(tmp_path / "history.db") as s:
         for _ in range(2):
             s.save_run("tags", [Finding(control="c", resource="r", status=Status.OK)])
-    r = runner.invoke(app, ["notify", "--slack", "--only-if-changes"])
+    r = runner.invoke(app, ["notify", "--slack", "--only-if-changes", "--source", "last"])
     assert r.exit_code == 0 and "no message sent" in r.output
 
 

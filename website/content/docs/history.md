@@ -1,6 +1,6 @@
 # History & data sources
 
-Every live run is saved locally. That's what makes offline reports, "what changed", dashboards, notifications and the AI assistant possible without calling AWS again.
+Every live run is saved locally. That's what makes offline reports, "what changed" and the AI assistant possible without calling AWS again, and lets the dashboard, notifications and savings summary reuse anything already checked today.
 
 ## Sources
 

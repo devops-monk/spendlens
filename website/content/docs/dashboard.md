@@ -36,9 +36,19 @@ spendlens rightsize -S rds -S ecs -S cloudwatch --status all -f html -o checks.h
 ## spendlens dashboard
 
 ```bash
-spendlens dashboard -o report.html               # from your latest saved runs
-spendlens dashboard --source demo -o demo.html   # sample data
+spendlens dashboard -o report.html                 # reuses today's runs, runs the rest live
+spendlens dashboard --refresh -o report.html       # re-run every section now
+spendlens dashboard --source last -o report.html   # saved runs only, no AWS calls
+spendlens dashboard --source demo -o demo.html     # sample data
 ```
+
+**Every section is covered, and at most a day old:**
+- A section already run **today** (UTC) is read from your history: no AWS calls for it.
+- Every other section is **run live first**: read-only AWS calls, plus Cost Explorer (about $0.01 per request) for the cost sections. Each run is saved, so the next run today reuses it.
+- `--refresh` re-runs everything now.
+- `--source last` never calls AWS; sections with no saved run say which command fills them.
+
+If a section can't run (e.g. no Cost Explorer permission), the output says why and uses its last saved run.
 
 [[shot:hero|The Overview tab of the dashboard, from the bundled demo data.]]
 
@@ -65,7 +75,7 @@ How the charts behave:
 - Chart colours are a palette validated for colour-blind readers in both light and dark mode.
 - The page embeds its data as JSON (`<script type="application/json" id="spendlens-data">`), so other tools can read the numbers.
 
-The dashboard makes no AWS calls; it reads saved runs. Run the checks first, or use `spendlens report`, which does both.
+`spendlens report` runs every check and then builds the dashboard from those runs (`--source last`), writing each check's JSON as well.
 
 ## Branding
 

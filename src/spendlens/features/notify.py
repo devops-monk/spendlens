@@ -18,7 +18,7 @@ from urllib.parse import urlsplit
 
 import typer
 
-from ..common import ConfigOpt, Source, err, history_path, load
+from ..common import ConfigOpt, ProfileOpt, Source, err, history_path, load
 from ..config import Config
 from ..history import HistoryStore, demo_db_path, diff_findings
 from ..plugins import Registry
@@ -184,9 +184,16 @@ def notify(
     link: Annotated[str | None, typer.Option("--link", help="Report URL for the 'Open report' button.")] = None,
     title: Annotated[str | None, typer.Option("--title", help="Message title (default: dashboard.title).")] = None,
     config: ConfigOpt = None,
-    source: Annotated[Source, typer.Option("--source", help="last = your history DB; demo = bundled sample DB.")] = Source.last,
+    profile: ProfileOpt = None,
+    source: Annotated[Source, typer.Option(
+        "--source", help="live = reuse today's saved runs and run every other check now; last = saved runs only, "
+                         "no AWS calls; demo = bundled sample DB.")] = Source.live,
+    refresh: Annotated[bool, typer.Option("--refresh", help="Re-run every check live now, even ones run today.")] = False,
 ) -> None:
-    """Post a summary of the latest saved runs to Slack and/or Teams (no AWS calls).
+    """Post a summary covering every check, at most a day old, to Slack and/or Teams.
+
+    Checks already run today are read from your history; the others are run live first. --source last never
+    calls AWS (use it in CI after `spendlens report`).
 
     Examples:
       spendlens notify --slack --teams --link "$CI_JOB_URL/artifacts/browse"
@@ -195,10 +202,15 @@ def notify(
     """
     if not (slack or teams):
         raise typer.BadParameter("Choose --slack and/or --teams.", param_hint="--slack/--teams")
-    if source is Source.live:
-        raise typer.BadParameter("notify reads saved runs: use --source last or demo.", param_hint="--source")
     cfg = load(config)
     path = demo_db_path() if source is Source.demo else history_path(cfg)
+    if source is Source.live:
+        from .. import refresh as rf
+        from .dashboard import FEATURES
+
+        rf.ensure_fresh(path, FEATURES, config=config, profile=profile, refresh=refresh)
+    elif refresh:
+        raise typer.BadParameter("--refresh runs checks live: drop --source last/demo.", param_hint="--refresh")
     try:
         store = HistoryStore(path, read_only=True)
     except FileNotFoundError as e:
@@ -210,7 +222,8 @@ def notify(
     if not data.runs:
         err.print("[red]No saved runs to summarise.[/]")
         raise typer.Exit(1)
-    summary = build_summary(view_model(data, cfg, source), changes, cfg, link, title)
+    summary = build_summary(view_model(data, cfg, Source.last if source is Source.live else source), changes, cfg,
+                            link, title)
     if only_if_changes and not summary["noteworthy"]:
         err.print("[green]Nothing needs attention; no message sent (--only-if-changes).[/]")
         return

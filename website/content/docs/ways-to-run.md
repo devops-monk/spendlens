@@ -105,8 +105,8 @@ That's the same CLI, useful when the `spendlens` script isn't on your `PATH`.
 
 | Source | What it does | AWS calls |
 |---|---|---|
-| `live` (default) | Queries your account through Steampipe and Cost Explorer, and saves the run to your history | Yes |
-| `last` | Replays your latest saved run of that command: re-render, re-filter or re-export instantly | None |
+| `live` (default) | Queries your account through Steampipe and Cost Explorer, and saves the run to your history. For `dashboard`, `notify` and `savings summary`: reuses checks run today, runs the rest | Yes |
+| `last` | Replays your latest saved run of that command: re-render, re-filter or re-export instantly. For `dashboard`, `notify` and `savings summary`, uses saved runs only | None |
 | `demo` | Uses bundled sample data (account `123456789012`) | None |
 
 ```bash
@@ -115,7 +115,7 @@ spendlens rightsize --source last -f csv -o r.csv     # same results, different 
 spendlens report --source demo --out demo-report      # the whole product on sample data
 ```
 
-Some commands work only from saved runs and never call AWS: `dashboard`, `notify`, `history …` and `ask` (without `--live`). `savings summary` reuses runs from today and runs any other source live; add `--source last` to keep it offline.
+`dashboard`, `notify` and `savings summary` combine many checks. By default they reuse every check already run **today** and run the others live first, so the result always covers everything and is at most a day old. Add `--refresh` to re-run everything, or `--source last` to use saved runs only, with no AWS calls. `history …` and `ask` (without `--live`) always work from saved runs only.
 
 ## 4. Choose the output: `--format` and `--out`
 

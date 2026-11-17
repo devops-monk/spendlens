@@ -83,5 +83,5 @@ jobs:
           SPENDLENS_TEAMS_WEBHOOK: ${{ secrets.SPENDLENS_TEAMS_WEBHOOK }}
         run: |
           link="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          if [ -n "$SPENDLENS_SLACK_WEBHOOK" ]; then spendlens notify --slack --link "$link"; fi
-          if [ -n "$SPENDLENS_TEAMS_WEBHOOK" ]; then spendlens notify --teams --link "$link"; fi
+          if [ -n "$SPENDLENS_SLACK_WEBHOOK" ]; then spendlens notify --slack --source last --link "$link"; fi
+          if [ -n "$SPENDLENS_TEAMS_WEBHOOK" ]; then spendlens notify --teams --source last --link "$link"; fi

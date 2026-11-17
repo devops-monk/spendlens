@@ -174,7 +174,9 @@ RECIPES: dict[str, list[tuple[str, str]]] = {
         ("Longer timeout per step for large accounts", "spendlens report --out reports --step-timeout 3600"),
     ],
     "dashboard": [
-        ("Branded HTML dashboard from your latest saved runs (no AWS calls)", "spendlens dashboard -o report.html"),
+        ("Branded HTML dashboard: reuses checks run today, runs the rest live", "spendlens dashboard -o report.html"),
+        ("Re-run every section now", "spendlens dashboard --refresh -o report.html"),
+        ("Saved runs only, no AWS calls", "spendlens dashboard --source last -o report.html"),
         ("The dashboard on sample data", "spendlens dashboard --source demo -o demo.html"),
     ],
     "notify": [
@@ -182,6 +184,7 @@ RECIPES: dict[str, list[tuple[str, str]]] = {
          "spendlens notify --slack --link https://ci.example.com/report.html"),
         ("Post to Teams only when something needs attention", "spendlens notify --teams --only-if-changes"),
         ("Preview both messages without sending", "spendlens notify --slack --teams --dry-run --source demo"),
+        ("From saved runs only (e.g. right after spendlens report)", "spendlens notify --slack --source last"),
     ],
     "ask": [
         ("Ask a question (answers from your saved runs)", "spendlens ask \"What are my top 5 savings opportunities?\""),

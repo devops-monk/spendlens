@@ -49,7 +49,7 @@ def test_dashboard_from_partial_history_shows_hints(tmp_path, monkeypatch):
                                     resource_type="s3_bucket", resource="arn:aws:s3:::<evil>",
                                     status=Status.ALARM, reason="missing <Team>")])
     out = tmp_path / "r.html"
-    r = runner.invoke(app, ["dashboard", "-o", str(out)])
+    r = runner.invoke(app, ["dashboard", "--source", "last", "-o", str(out)])
     assert r.exit_code == 0, r.output
     html = out.read_text()
     assert "Run <code>spendlens cost diff</code>" in html  # sections without data say how to populate them
@@ -57,9 +57,9 @@ def test_dashboard_from_partial_history_shows_hints(tmp_path, monkeypatch):
 
 
 def test_dashboard_requires_saved_runs(tmp_path):
-    r = runner.invoke(app, ["dashboard", "-o", str(tmp_path / "x.html")])
+    r = runner.invoke(app, ["dashboard", "--source", "last", "-o", str(tmp_path / "x.html")])
     assert r.exit_code == 1
-    assert runner.invoke(app, ["dashboard", "--source", "live"]).exit_code == 2
+    assert runner.invoke(app, ["dashboard", "--source", "last", "--refresh"]).exit_code == 2
 
 
 def test_every_command_supports_html(tmp_path):

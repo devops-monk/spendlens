@@ -162,41 +162,6 @@ SOURCE_HINTS = {
     "savings_hub": ("AWS Cost Optimization Hub recommendations", "spendlens savings hub"),
     "savings_commitments": ("Savings Plan / RI purchase recommendations", "spendlens savings commitments"),
 }
-# the live command that refreshes each source (same arguments as `spendlens report`)
-REFRESH_ARGS = {"rightsize": ["rightsize", "--status", "all"], "waste": ["waste", "--status", "all"],
-                "savings_hub": ["savings", "hub"], "savings_commitments": ["savings", "commitments"]}
-
-
-def _stale_sources(path: Any, refresh: bool) -> list[str]:
-    """Sources without a saved run from today (UTC), or all of them with --refresh."""
-    if refresh:
-        return list(SUMMARY_FEATURES)
-    from ..history import HistoryStore
-
-    today = datetime.now(UTC).date().isoformat()
-    try:
-        store = HistoryStore(path, read_only=True)
-    except FileNotFoundError:
-        return list(SUMMARY_FEATURES)
-    with store:
-        return [f for f in SUMMARY_FEATURES if not ((r := store.latest_run(f)) and r.started_at[:10] == today)]
-
-
-def _refresh_source(feat: str, config: Any, profile: str | None, step: str) -> dict[str, Any]:
-    """Run one source live (a separate process, exactly like `spendlens report`); it saves to the history."""
-    import os
-    import sys
-
-    from .report import _run
-
-    cmd = [sys.executable, "-m", "spendlens", *REFRESH_ARGS[feat], "--source", "live", "-f", "json", "-o", os.devnull]
-    if config:
-        cmd += ["--config", str(config)]
-    if profile:
-        cmd += ["--profile", profile]
-    return _run(feat, cmd, timeout=1800, step=step)
-
-
 @app.command("summary")
 def summary(
     by: Annotated[str, typer.Option("--by", help="Group by: source | service | control | none.")] = "source",
@@ -230,14 +195,9 @@ def summary(
     fetched: list[str] = []
     failed: dict[str, str] = {}
     if source is Source.live:
-        stale = _stale_sources(path, refresh)
-        for i, feat in enumerate(stale, 1):
-            r = _refresh_source(feat, config, profile, step=f"{i}/{len(stale)}")
-            if r["result"] == "failed":
-                failed[feat] = r["detail"]
-                err.print(f"[red]{feat} could not run[/] [dim]({r['detail'] or 'run it on its own to see why'})[/]")
-            else:
-                fetched.append(feat)
+        from .. import refresh as rf
+
+        fetched, failed = rf.ensure_fresh(path, SUMMARY_FEATURES, config=config, profile=profile, refresh=refresh)
     elif refresh:
         raise typer.BadParameter("--refresh runs sources live: drop --source last/demo.", param_hint="--refresh")
     try:
@@ -298,9 +258,6 @@ def summary(
     for n in notes:
         err.print(f"[dim]- {n}[/]")
     err.print(f"[dim]From: {', '.join(used)}. Indicative; review before acting.[/]")
-    stale_used = [f for f in failed if f not in missing]
-    if stale_used:
-        err.print(f"[yellow]Using older saved runs for {', '.join(stale_used)}[/] (today's run failed).")
     missing = [f for f in missing if f not in failed]
     if missing:
         err.print("[yellow]Not included yet[/] (no saved run). For a complete total, run:")

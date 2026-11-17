@@ -162,7 +162,7 @@ def test_savings_summary_reuses_todays_runs_and_refreshes_the_rest(tmp_path, mon
     import sqlite3
     from datetime import UTC, datetime
 
-    from spendlens.features import savings_cmd
+    from spendlens import refresh
     from spendlens.history import demo_db_path
 
     db = tmp_path / "h.db"
@@ -178,7 +178,7 @@ def test_savings_summary_reuses_todays_runs_and_refreshes_the_rest(tmp_path, mon
         calls.append(feat)
         return {"result": "ok", "detail": ""}
 
-    monkeypatch.setattr(savings_cmd, "_refresh_source", fake)
+    monkeypatch.setattr(refresh, "run_live", fake)
     r = runner.invoke(app, ["savings", "summary", "-f", "json"])
     assert j(r)["meta"]["extra"]["not_run"] == []
     assert calls == ["waste", "savings_hub", "savings_commitments"]  # rightsize reused, not re-run
@@ -191,10 +191,10 @@ def test_savings_summary_reuses_todays_runs_and_refreshes_the_rest(tmp_path, mon
 
 
 def test_savings_summary_reports_a_source_that_failed(tmp_path, monkeypatch):
-    from spendlens.features import savings_cmd
+    from spendlens import refresh
 
     monkeypatch.setenv("SPENDLENS__HISTORY__PATH", str(tmp_path / "none.db"))
-    monkeypatch.setattr(savings_cmd, "_refresh_source",
+    monkeypatch.setattr(refresh, "run_live",
                         lambda feat, *a, **k: {"result": "failed", "detail": "Steampipe not running"})
     r = runner.invoke(app, ["savings", "summary"])
     assert r.exit_code == 1 and "could not run" in r.output and "Steampipe not running" in r.output

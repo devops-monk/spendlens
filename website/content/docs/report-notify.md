@@ -33,7 +33,10 @@ export SPENDLENS_SLACK_WEBHOOK=https://hooks.slack.com/services/...
 spendlens notify --slack --link https://ci.example.com/report.html
 spendlens notify --teams --only-if-changes
 spendlens notify --slack --teams --dry-run --source demo     # print the payloads, send nothing
+spendlens notify --slack --source last                       # only saved runs (e.g. right after spendlens report)
 ```
+
+Like the dashboard, `notify` reuses every check already run today and runs the others live first, so the message always covers everything. `--refresh` re-runs them all; `--source last` never calls AWS. The generated CI pipelines use `--source last`, because `spendlens report` has just run every check.
 
 The summary covers:
 - spend and its change;

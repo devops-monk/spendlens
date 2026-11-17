@@ -236,7 +236,7 @@ Unknown keys, typos and out-of-range values are rejected, and the error names th
 | `cost diff` · `trend` · `showback` · `resources` | What changed, where, and who owns it |
 | `anomalies` · `forecast` | Daily spikes; month-end projection against budgets |
 | `savings hub` · `commitments` · `summary` | AWS recommendations, coverage, one de-duplicated total |
-| `dashboard` | A self-contained HTML report with nine tabs |
+| `dashboard` | A self-contained HTML report with nine tabs; reuses checks run today and runs the rest (`--source last`: saved runs only) |
 | `ask` | Questions in plain English, read-only |
 | `report` · `notify` | Run everything; post Slack or Teams summaries |
 | `history list` · `diff` | Saved runs, and new or resolved alarms between them |

@@ -18,7 +18,7 @@ spendlens is a read-only FinOps command line for AWS. It checks your estate agai
 
 ## How it works, in one paragraph
 
-spendlens uses [Steampipe](https://steampipe.io) to expose AWS APIs as SQL tables and [Powerpipe](https://powerpipe.io) to run its bundled controls. Your standards live in one `finops.yaml`. Every run is saved to a local SQLite history, so dashboards, notifications, "what changed since last week" and the AI assistant work offline from data already collected. See [Architecture](../architecture/) for the diagrams.
+spendlens uses [Steampipe](https://steampipe.io) to expose AWS APIs as SQL tables and [Powerpipe](https://powerpipe.io) to run its bundled controls. Your standards live in one `finops.yaml`. Every run is saved to a local SQLite history, so "what changed since last week" and the AI assistant work offline from data already collected, and dashboards and notifications reuse anything already checked today. See [Architecture](../architecture/) for the diagrams.
 
 ## Principles
 
