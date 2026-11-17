@@ -1,0 +1,55 @@
+{% extends "base.html.j2" %}
+{% block main %}
+<nav class="localnav" aria-label="Cheat sheet sections">
+  <div class="localnav-inner">
+    <span class="localnav-title">Cheat sheet</span>
+    <div class="localnav-links">
+      {% for s in sections %}<a href="#{{ s.id }}">{{ s.nav }}</a>{% endfor %}
+    </div>
+  </div>
+</nav>
+
+<section class="hero cs-hero">
+  <p class="eyebrow">Cheat sheet</p>
+  <h1>The commands<br><span class="grad">you'll actually use.</span></h1>
+  <p class="lede">Grouped by the question you're asking. Copy one, run it, open the report. Every command here is checked
+    against the real CLI when this site is built.</p>
+  <ul class="cs-legend" aria-label="What each badge means">
+    <li><span class="cs-badge offline">Offline</span> no AWS calls</li>
+    <li><span class="cs-badge aws">Reads AWS</span> read-only API calls</li>
+    <li><span class="cs-badge ce">Cost Explorer</span> about $0.01 per request</li>
+    <li><span class="cs-badge ai">AI provider</span> sends the question to your LLM</li>
+  </ul>
+  <div class="cs-search"><input class="cs-q" type="search" placeholder="Search, e.g. region, csv, budget, tag"
+    aria-label="Search commands"></div>
+  <p class="cs-tip">Add <code>-f html -o report.html</code> to almost any command for a shareable report,
+    or <code>--source demo</code> to try it on sample data.</p>
+</section>
+
+{% for s in sections %}
+<section class="section cs-section{{ ' alt' if loop.index is even }}" id="{{ s.id }}">
+  <div class="wrap">
+    <div class="cs-head"><h2>{{ s.title }}</h2><p>{{ s.intro }}</p></div>
+    <div class="cs-grid">
+      {% for it in s.cmds %}
+      <article class="cs-card">
+        <div class="cs-top"><p>{{ it.what }}</p><span class="cs-badge {{ it.kind }}" title="{{ it.tip }}">{{ it.badge }}</span></div>
+        <div class="cs-cmd"><code>{{ it.cmd }}</code><button type="button" class="cs-copy" aria-label="Copy command">Copy</button></div>
+      </article>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endfor %}
+
+<section class="section">
+  <div class="wrap narrow" style="text-align:center">
+    <h2 class="h2">Need every option?</h2>
+    <p class="sub" style="margin-bottom:28px">The full reference lists every command with all of its options,
+      accepted values and defaults.</p>
+    <div class="ctas"><a class="btn primary" href="{{ root }}docs/cli/">Commands &amp; options</a>
+      <a class="btn ghost" href="{{ root }}docs/ways-to-run/">Ways to run ›</a></div>
+  </div>
+</section>
+<p class="cs-none" hidden>No command matches. Try another word, or see <a href="{{ root }}docs/cli/">every command</a>.</p>
+{% endblock %}

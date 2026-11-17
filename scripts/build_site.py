@@ -282,6 +282,35 @@ def _option_row(p: Any) -> tuple[str, str, str, str]:
     return names, values, default, help_
 
 
+def check_command(cmdline: str, tree: dict[str, Any], expect: str | None = None) -> list[str]:
+    """Problems with one example command line: unknown command, or an option that command doesn't have."""
+    import shlex
+
+    words = shlex.split(cmdline.split(" | ")[0])
+    if words[:1] != ["spendlens"]:
+        return [f"does not start with spendlens: {cmdline}"]
+    path = next((" ".join(words[1:n]) for n in range(len(words), 1, -1) if " ".join(words[1:n]) in tree), None)
+    if path is None or (expect and path != expect):
+        return [f"unknown command{f' (expected {expect})' if expect else ''}: {cmdline}"]
+    known = _option_names(tree[path]) | {"-h", "--help"}
+    return [f"`spendlens {path}` has no option {w.split('=', 1)[0]}: {cmdline}" for w in words
+            if w.startswith("-") and not w[1:2].isdigit() and w.split("=", 1)[0] not in known]
+
+
+def cheatsheet_sections() -> list[dict[str, Any]]:
+    """Cheat sheet content, validated against the real CLI (the build fails on any wrong command or option)."""
+    import cheatsheet as cs
+
+    tree = _cli_tree()
+    problems = [x for _, _, _, items in cs.SECTIONS for _, cmd, _ in items for x in check_command(cmd, tree)]
+    problems += [f"unknown kind {k}: {c}" for _, _, _, items in cs.SECTIONS for _, c, k in items if k not in cs.KINDS]
+    if problems:
+        raise SystemExit("cheat sheet is out of date:\n  " + "\n  ".join(problems))
+    return [{"id": sid, "title": title, "intro": intro, "nav": cs.NAV.get(sid, title),
+             "cmds": [{"what": w, "cmd": c, "kind": k, "badge": cs.KINDS[k][0], "tip": cs.KINDS[k][1]}
+                       for w, c, k in items]} for sid, title, intro, items in cs.SECTIONS]
+
+
 def _anchor(path: str) -> str:
     return "cmd-" + path.replace(" ", "-")
 
@@ -289,8 +318,6 @@ def _anchor(path: str) -> str:
 def cli_reference_md() -> str:
     """The command catalog: categories, a task index, recipes and every option, generated from the real CLI.
     Raises SystemExit if a CLI command is missing from website/commands.py or a recipe uses an unknown option."""
-    import shlex
-
     import commands as cat
 
     tree = _cli_tree()
@@ -301,16 +328,8 @@ def cli_reference_md() -> str:
         if path not in tree:
             problems.append(f"recipes for unknown command: {path}")
             continue
-        known = _option_names(tree[path]) | {"-h", "--help"}
         for _, cmdline in recipes:
-            words = shlex.split(cmdline)
-            if words[: 1 + len(path.split())] != ["spendlens", *path.split()]:
-                problems.append(f"recipe does not run `spendlens {path}`: {cmdline}")
-            for w in words:
-                if w.startswith("-") and not w[1:2].isdigit():
-                    flag = w.split("=", 1)[0]
-                    if flag not in known:
-                        problems.append(f"`spendlens {path}` has no option {flag}: {cmdline}")
+            problems += check_command(cmdline, tree, expect=path)
     if problems:
         raise SystemExit("command catalog is out of date:\n  " + "\n  ".join(problems))
 
@@ -483,6 +502,9 @@ def build() -> list[Path]:
           stats=stats(), screens=screens(), shots=shots(), features=[{"icon": ICONS[i], "title": t, "body": b, "cmd": c, "doc": d}
                                    for i, t, b, c, d in FEATURES],
           cases=[{"who": w, "title": t, "body": b, "cmd": c} for w, t, b, c in CASES])
+    write("cheatsheet", "cheatsheet.html.j2", title="Cheat sheet · spendlens", section="cheatsheet",
+          description="The spendlens commands you'll actually use, by question, ready to copy.",
+          sections=cheatsheet_sections(), icons=ICONS)
     write("architecture", "architecture.html.j2", title="Architecture · spendlens", section="architecture",
           description="How spendlens works: C4 context and container diagrams and sequence diagrams.",
           d={k: fn() for k, fn in diagrams.ALL.items()}, icons=ICONS, stats=stats())

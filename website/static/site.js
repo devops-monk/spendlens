@@ -119,4 +119,29 @@
     };
     let t; cf.addEventListener("input", () => { clearTimeout(t); t = setTimeout(run, 120); });
   }
+  // cheat sheet: copy buttons and search
+  document.querySelectorAll(".cs-copy").forEach((b) => b.addEventListener("click", async () => {
+    const text = b.parentElement.querySelector("code").innerText;
+    try { await navigator.clipboard.writeText(text); b.textContent = "Copied"; b.classList.add("done"); }
+    catch (e) { b.textContent = "Select + copy"; }
+    setTimeout(() => { b.textContent = "Copy"; b.classList.remove("done"); }, 1400);
+  }));
+  const csq = document.querySelector(".cs-q");
+  if (csq) {
+    const secs = [...document.querySelectorAll(".cs-section")], none = document.querySelector(".cs-none");
+    let tq;
+    csq.addEventListener("input", () => { clearTimeout(tq); tq = setTimeout(() => {
+      const q = csq.value.trim().toLowerCase(); let shown = 0;
+      secs.forEach((sec) => {
+        const head = sec.querySelector(".cs-head").textContent.toLowerCase();
+        let n = 0;
+        sec.querySelectorAll(".cs-card").forEach((c) => {
+          const hit = !q || head.includes(q) || c.textContent.toLowerCase().includes(q);
+          c.hidden = !hit; if (hit) n++;
+        });
+        sec.hidden = n === 0; shown += n;
+      });
+      if (none) none.hidden = shown > 0;
+    }, 120); });
+  }
 })();

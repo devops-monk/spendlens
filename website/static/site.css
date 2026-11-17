@@ -460,3 +460,49 @@ main:has(.localnav) section[id] { scroll-margin-top: 104px; }
 .prose h3[id^="cmd-"] { font-family: var(--mono); font-size: 18px; letter-spacing: 0; margin-top: 40px; padding-top: 18px;
   border-top: 1px solid var(--line); }
 .prose [hidden] { display: none !important; }
+
+/* =====================================================================
+   Cheat sheet (/cheatsheet/)
+   ===================================================================== */
+main:has(.localnav) .cs-section[id] { scroll-margin-top: 104px; }
+.cs-hero { padding-top: 96px; padding-bottom: 72px; }
+.cs-legend { list-style: none; display: flex; flex-wrap: wrap; justify-content: center; gap: 10px 22px; padding: 0; margin: 34px auto 0;
+  font-size: 14px; color: var(--ink-2); }
+.cs-legend li { display: flex; align-items: center; gap: 8px; }
+.cs-search { max-width: 620px; margin: 30px auto 0; }
+.cs-q { width: 100%; font: inherit; font-size: 17px; padding: 15px 20px 15px 48px; border-radius: 16px; border: 1px solid var(--line);
+  background: var(--bg-elev); color: var(--ink); outline: none; box-shadow: var(--shadow);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2386868b' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='6.5'/%3E%3Cpath d='M16 16l4 4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-size: 19px; background-position: 18px center; }
+.cs-q:focus { border-color: var(--accent); }
+.cs-tip { color: var(--ink-3); font-size: 14px; margin-top: 18px; }
+.cs-tip code { font-size: 12.5px; background: var(--code-bg); padding: 2px 7px; border-radius: 6px; color: var(--ink); }
+.cs-section { padding: 80px 22px; }
+.cs-head { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 32px; align-items: end; margin-bottom: 30px; }
+.cs-head h2 { font-size: clamp(30px, 4vw, 44px); font-weight: 700; letter-spacing: -.03em; line-height: 1.08; margin: 0; }
+.cs-head p { color: var(--ink-2); font-size: 18px; margin: 0; }
+.cs-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 480px), 1fr)); gap: 16px; }
+.cs-card { background: var(--bg-elev); border: 1px solid var(--line); border-radius: 20px; padding: 18px 18px 16px;
+  display: flex; flex-direction: column; gap: 12px; min-width: 0; transition: border-color .15s, transform .15s; }
+.section.alt .cs-card { border-color: transparent; }
+.cs-card:hover { transform: translateY(-1px); border-color: var(--line); }
+.cs-top { display: flex; gap: 12px; align-items: flex-start; justify-content: space-between; }
+.cs-top p { margin: 0; font-size: 15.5px; font-weight: 600; line-height: 1.35; }
+.cs-badge { flex: none; font-size: 11.5px; font-weight: 600; padding: 3px 9px; border-radius: 980px; white-space: nowrap; }
+.cs-badge.offline { background: rgba(48,209,88,.14); color: #1f8a3a; }
+.cs-badge.aws { background: var(--accent-soft); color: var(--accent); }
+.cs-badge.ce { background: rgba(255,159,10,.16); color: #b26a00; }
+.cs-badge.ai { background: rgba(162,89,255,.14); color: #7c3aed; }
+@media (prefers-color-scheme: dark) { :root:where(:not([data-theme="light"])) .cs-badge.offline { color: #30d158; }
+  :root:where(:not([data-theme="light"])) .cs-badge.ce { color: #ffb340; } :root:where(:not([data-theme="light"])) .cs-badge.ai { color: #bf8bff; } }
+:root[data-theme="dark"] .cs-badge.offline { color: #30d158; } :root[data-theme="dark"] .cs-badge.ce { color: #ffb340; }
+:root[data-theme="dark"] .cs-badge.ai { color: #bf8bff; }
+.cs-cmd { display: flex; align-items: center; gap: 10px; background: var(--code-bg); border-radius: 12px; padding: 10px 10px 10px 14px; min-width: 0; }
+.cs-cmd code { flex: 1; min-width: 0; font-size: 13px; color: var(--ink); white-space: nowrap; overflow-x: auto; scrollbar-width: thin; }
+.cs-copy { flex: none; font: inherit; font-size: 12px; font-weight: 600; padding: 5px 11px; border-radius: 980px; cursor: pointer;
+  border: 1px solid var(--line); background: var(--bg-elev); color: var(--ink-2); }
+.cs-copy:hover { color: var(--accent); border-color: var(--accent); }
+.cs-copy.done { color: #1f8a3a; border-color: #30d158; }
+.cs-none { text-align: center; color: var(--ink-2); padding: 0 22px 80px; }
+[hidden].cs-card, .cs-section[hidden] { display: none !important; }
+@media (max-width: 800px) { .cs-head { grid-template-columns: 1fr; gap: 10px; } .cs-section { padding: 60px 22px; } }
