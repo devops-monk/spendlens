@@ -25,6 +25,7 @@ from ..engines import cost as ce
 from ..plugins import Registry
 from ..render import Format
 from ..steampipe import SteampipeClient, SteampipeError
+from ..ui import activity
 
 app = typer.Typer(help="AWS spend: what changed, trends, showback by team/tag, resource-level changes.",
                   no_args_is_help=True)
@@ -63,7 +64,7 @@ def _query_periods(cfg: Config, group: ce.GroupBy, periods: list[ce.Period], met
     sql = ce.cost_sql(group, metric, excluded)
     rows: list[dict[str, Any]] = []
     try:
-        with SteampipeClient(cfg.steampipe) as client:
+        with activity("Querying Cost Explorer [dim](Steampipe)[/]"), SteampipeClient(cfg.steampipe) as client:
             for i, p in enumerate(periods):
                 for r in client.query(sql, ce.cost_params(group, p, excluded)):
                     rows.append({"kind": f"p{i}", "period": p.label, "dimension": group.label, "grp": r["grp"],
@@ -293,7 +294,7 @@ def resources_cmd(
         sql = ce.resource_sql(m)
         rows = []
         try:
-            with SteampipeClient(cfg.steampipe) as client:
+            with activity("Querying Cost Explorer [dim](Steampipe)[/]"), SteampipeClient(cfg.steampipe) as client:
                 result = client.query(sql, {"start": windows[0].start.isoformat(), "end": windows[1].end.isoformat()})
         except SteampipeError as e:
             err.print(f"[red]Resource-level cost query failed:[/] {e}\n"

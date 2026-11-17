@@ -1,21 +1,27 @@
-{#- `--format html` for control-based commands (tags, rightsize, waste): summary, filters, one section per check.
-    Context: fm (render.html.findings_model), scope [str], csv_columns [str]. Works without JS (all sections open,
-    filters hidden) and prints with every section expanded. -#}
+{#- `--format html` for control-based commands (tags, rightsize, waste).
+    Context: fm (render.html.findings_model), scope [str]. Rows beyond the first fm.preview_rows per check are drawn
+    in the browser from the embedded payload (#spendlens-data), so reports with tens of thousands of results stay
+    fast. Without JavaScript the overview and each check's first rows still show. -#}
 {% extends "base.html.j2" %}
+{% macro fail_text(c) -%}
+{%- if c.fail -%}<b>{{ "{:,}".format(c.fail) }}</b> of {{ "{:,}".format(c.total) }} fail
+{%- elif c.counts.ok == c.total -%}All {{ "{:,}".format(c.total) }} pass
+{%- else -%}{{ "{:,}".format(c.counts.info + c.counts.skip) }} to review{%- endif -%}
+{%- endmacro %}
 {% block main %}
 <div class="fr">
 
 <section class="fr-summary" aria-label="Summary">
   <div class="fr-kpis">
     <div class="fr-kpi fr-kpi-alarm">
-      <div class="k"><span class="sdot alarm" aria-hidden="true"></span>Alarms</div>
-      <div class="v">{{ "{:,}".format(fm.totals.alarm) }}</div>
-      <div class="d">on {{ "{:,}".format(fm.alarm_resources) }} of {{ "{:,}".format(fm.resources) }} resources</div>
+      <div class="k"><span class="sdot alarm" aria-hidden="true"></span>Failing resources</div>
+      <div class="v">{{ "{:,}".format(fm.failing_resources) }}</div>
+      <div class="d">of {{ "{:,}".format(fm.resources) }} resources checked</div>
     </div>
     <div class="fr-kpi">
       <div class="k">Compliance</div>
       <div class="v">{{ "%.1f%%"|format(fm.compliance) if fm.compliance is not none else "n/a" }}</div>
-      <div class="d">OK out of OK + alarm results</div>
+      <div class="d">{{ "{:,}".format(fm.totals.ok) }} pass · {{ "{:,}".format(fm.totals.alarm) }} fail</div>
     </div>
     <div class="fr-kpi fr-kpi-saving">
       <div class="k">Estimated saving</div>
@@ -23,15 +29,15 @@
       <div class="d">{% if fm.saving_year %}{{ fm.saving_year }} a year · {% endif %}indicative, review before acting</div>
     </div>
     <div class="fr-kpi">
-      <div class="k">Checks</div>
-      <div class="v">{{ fm.controls|length }}</div>
+      <div class="k">Checks failing</div>
+      <div class="v">{{ fm.checks_failing }}<small>of {{ fm.controls|length }}</small></div>
       <div class="d">{{ "{:,}".format(fm.total) }} results{% if fm.services %} · {{ fm.services|join(", ") }}{% endif %}</div>
     </div>
   </div>
 
   {% if fm.segments %}
   <div class="fr-dist" role="img" aria-label="Results by status: {% for s in fm.segments %}{{ s.label }} {{ s.n }}{{ ', ' if not loop.last }}{% endfor %}">
-    {% for s in fm.segments %}<span class="seg-{{ s.status }}" style="width:{{ s.pct }}%" title="{{ s.label }}: {{ s.n }}"></span>{% endfor %}
+    {% for s in fm.segments %}<span class="seg-{{ s.status }}" style="width:{{ s.pct }}%" title="{{ s.label }}: {{ "{:,}".format(s.n) }}"></span>{% endfor %}
   </div>
   <ul class="fr-legend">
     {% for s in fm.segments %}<li><span class="sdot {{ s.status }}" aria-hidden="true"></span>{{ s.label }} <b>{{ "{:,}".format(s.n) }}</b></li>{% endfor %}
@@ -49,18 +55,36 @@
     </ol>
   </div>
   {% endif %}
-
   {% if scope %}<p class="fr-scope">{{ scope|join(" · ") }}</p>{% endif %}
 </section>
 
+<section class="fr-overview" aria-label="Checks overview">
+  <h2>Checks <span>{{ fm.controls|length }}</span></h2>
+  <ul class="ov">
+    {% for c in fm.controls %}
+    <li><a class="ov-row worst-{{ c.worst }}" href="#check-{{ c.i }}" data-i="{{ c.i }}">
+      <span class="sdot {{ c.worst }}" aria-hidden="true"></span>
+      <span class="ov-title"><b>{{ c.title }}</b><span>{{ c.service }}{% if c.thresholds %} · {% for t in c.thresholds %}{{ t.setting.split(".")[-1] }} {{ t.value }}{{ "; " if not loop.last }}{% endfor %}{% endif %}</span></span>
+      <span class="failbar" aria-hidden="true"><i style="width:{{ c.fail_pct }}%"></i></span>
+      <span class="ov-fail">{{ fail_text(c) }}</span>
+      <span class="ov-saving">{{ c.saving_text }}{% if c.saving_text %}<small>/mo</small>{% endif %}</span>
+    </a></li>
+    {% endfor %}
+  </ul>
+</section>
+
 <div class="fr-toolbar" role="search" hidden>
-  <input class="fr-q" type="search" placeholder="Search resources, reasons, checks" aria-label="Search findings">
+  <input class="fr-q" type="search" placeholder="Search resources, reasons, accounts" aria-label="Search findings">
   <div class="fr-chips" role="group" aria-label="Status">
-    {% for s in fm.segments %}<button type="button" class="chip" data-status="{{ s.status }}" aria-pressed="true"><span class="sdot {{ s.status }}" aria-hidden="true"></span>{{ s.label }} <span class="n">{{ s.n }}</span></button>{% endfor %}
+    {% for s in fm.segments %}<button type="button" class="chip" data-status="{{ s.status }}" aria-pressed="true"><span class="sdot {{ s.status }}" aria-hidden="true"></span>{{ s.label }} <span class="n">{{ "{:,}".format(s.n) }}</span></button>{% endfor %}
   </div>
   {% if fm.services|length > 1 %}
   <select class="fr-svc" aria-label="Service"><option value="">All services</option>
     {% for s in fm.services %}<option value="{{ s }}">{{ s }}</option>{% endfor %}</select>
+  {% endif %}
+  {% if fm.regions|length > 1 %}
+  <select class="fr-reg" aria-label="Region"><option value="">All regions</option>
+    {% for r in fm.regions %}<option value="{{ r }}">{{ r }}</option>{% endfor %}</select>
   {% endif %}
   <div class="fr-actions">
     <button type="button" class="fr-expand">Expand all</button>
@@ -72,31 +96,47 @@
 
 <section class="fr-checks" aria-label="Checks">
   {% for c in fm.controls %}
-  <details class="ctl worst-{{ c.worst }}" data-service="{{ c.service }}"{% if c.counts.alarm or c.counts.error %} open{% endif %}>
+  <details class="ctl worst-{{ c.worst }}" id="check-{{ c.i }}" data-i="{{ c.i }}" data-service="{{ c.service }}"{% if c.fail and loop.index <= 3 %} open{% endif %}>
     <summary>
       <span class="sdot {{ c.worst }}" aria-hidden="true"></span>
       <span class="ctl-title"><b>{{ c.title }}</b><code>{{ c.id }}</code></span>
       <span class="ctl-meta">
         {% if c.service %}<span class="pill">{{ c.service }}</span>{% endif %}
-        {% for s in ["alarm", "error", "info", "skip", "ok"] if c.counts[s] %}<span class="cnt {{ s }}">{{ c.counts[s] }} {{ s }}</span>{% endfor %}
+        <span class="ctl-match" hidden></span>
+        <span class="failbar" aria-hidden="true"><i style="width:{{ c.fail_pct }}%"></i></span>
+        <span class="ctl-fail">{{ fail_text(c) }}</span>
         {% if c.saving_text %}<span class="ctl-saving">{{ c.saving_text }}/mo</span>{% endif %}
       </span>
     </summary>
-    <div class="tablewrap"><table>
-      <thead><tr><th>Status</th><th>Resource</th><th>Reason</th><th>Account</th><th>Region</th><th class="num">Saving / month</th></tr></thead>
-      <tbody>
-        {% for r in c.rows %}
-        <tr data-i="{{ r.i }}" data-status="{{ r.status }}" data-q="{{ (r.resource ~ ' ' ~ r.reason ~ ' ' ~ c.title ~ ' ' ~ c.id ~ ' ' ~ r.account ~ ' ' ~ r.region)|lower }}">
-          <td class="nw"><span class="sbadge {{ r.status }}">{{ r.label }}</span></td>
-          <td class="res"><b>{{ r.name }}</b>{% if r.name != r.resource %}<span>{{ r.resource }}</span>{% endif %}</td>
-          <td class="wrap">{{ r.reason }}</td>
-          <td class="nw">{{ r.account }}</td>
-          <td class="nw">{{ r.region }}</td>
-          <td class="num">{{ r.saving_text }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table></div>
+    <div class="ctl-body">
+      {% if c.description or c.thresholds %}
+      <div class="ctl-policy">
+        {% if c.description %}<p><span class="lbl">Checks</span>{{ c.description }}</p>{% endif %}
+        {% if c.thresholds %}<p class="thr"><span class="lbl">Threshold</span>
+          {% for t in c.thresholds %}<span class="thr-chip"><code>{{ t.setting }}</code> = <b>{{ t.value }}</b></span>{% endfor %}
+          <span class="thr-note">from finops.yaml for this run</span></p>{% endif %}
+        <p class="counts"><span class="lbl">Results</span>
+          {% for s in ["alarm", "error", "info", "skip", "ok"] if c.counts[s] %}<span class="cnt {{ s }}">{{ "{:,}".format(c.counts[s]) }} {{ s }}</span>{% endfor %}</p>
+      </div>
+      {% endif %}
+      <div class="tablewrap"><table>
+        <thead><tr><th>Status</th><th>Resource</th><th>Finding</th><th>Account</th><th>Region</th><th class="num">Saving / month</th></tr></thead>
+        <tbody>
+          {% for r in c.preview %}
+          <tr>
+            <td class="nw"><span class="sbadge {{ r.status }}">{{ r.label }}</span></td>
+            <td class="res"><b>{{ r.name }}</b>{% if r.name != r.resource %}<span>{{ r.resource }}</span>{% endif %}</td>
+            <td class="wrap">{{ r.reason }}</td>
+            <td class="nw">{{ r.account }}</td>
+            <td class="nw">{{ r.region }}</td>
+            <td class="num">{{ r.saving_text }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table></div>
+      <div class="ctl-foot"><span class="ctl-shown">Showing {{ c.preview|length }} of {{ "{:,}".format(c.total) }}</span>
+        <button type="button" class="ctl-more" hidden></button><button type="button" class="ctl-all" hidden></button></div>
+    </div>
   </details>
   {% else %}
   <p class="empty">No findings.</p>
@@ -105,5 +145,4 @@
 </section>
 
 </div>
-<script type="application/json" id="spendlens-csv-columns">{{ csv_columns|tojson }}</script>
 {% endblock %}

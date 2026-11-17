@@ -58,7 +58,8 @@ control "rds_instance_low_utilization" {
       end as status,
       case
         when u.avg_max is null then 'CloudWatch metrics not available for ' || i.title || '.'
-        else i.title || ' (' || i.class || ') averages ' || u.avg_max || '% peak CPU over ' || u.days || ' days.'
+        else i.title || ' (' || i.class || ') averages ' || u.avg_max || '% peak CPU over ' || u.days
+          || ' days (downsize at or below ' || $1::text || '%, review at or below ' || $2::text || '%).'
       end as reason,
       i.class as db_class,
       i.multi_az
@@ -109,7 +110,8 @@ control "rds_instance_low_connections" {
       case
         when u.avg_max is null then 'CloudWatch metrics not available for ' || i.title || '.'
         when u.avg_max = 0 then i.title || ' has had no connections in ' || u.days || ' days.'
-        else i.title || ' averages ' || u.avg_max || ' peak connections/day over ' || u.days || ' days.'
+        else i.title || ' averages ' || u.avg_max || ' peak connections/day over ' || u.days
+          || ' days (review below ' || $1::text || ').'
       end as reason,
       i.class as db_class,
       i.multi_az

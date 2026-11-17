@@ -208,7 +208,8 @@ control "ecs_cluster_low_utilization" {
       end as status,
       case
         when u.avg_max is null then 'CloudWatch metrics not available for ' || c.cluster_name || '.'
-        else c.cluster_name || ' averages ' || u.avg_max || '% peak CPU over ' || u.days || ' days.'
+        else c.cluster_name || ' averages ' || u.avg_max || '% peak CPU over ' || u.days
+          || ' days (low below ' || $1::text || '%, review below ' || $2::text || '%).'
       end as reason
       ${replace(local.tag_dimensions_qualifier_sql, "__QUALIFIER__", "c.")}
       ${replace(local.common_dimensions_qualifier_sql, "__QUALIFIER__", "c.")}

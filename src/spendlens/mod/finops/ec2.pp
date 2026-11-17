@@ -86,7 +86,8 @@ control "ec2_instance_low_utilization" {
       case
         when i.instance_state <> 'running' then i.title || ' is ' || i.instance_state || '.'
         when u.peak_cpu is null then 'CloudWatch metrics not available for ' || i.title || '.'
-        else i.title || ' (' || i.instance_type || ') peaked at ' || u.peak_cpu || '% CPU over ' || u.days || ' days.'
+        else i.title || ' (' || i.instance_type || ') peaked at ' || u.peak_cpu || '% CPU over ' || u.days
+          || ' days (low below ' || $1::text || '%, review below ' || $2::text || '%).'
       end as reason,
       i.instance_type
       ${replace(local.tag_dimensions_qualifier_sql, "__QUALIFIER__", "i.")}

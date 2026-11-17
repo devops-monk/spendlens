@@ -67,19 +67,37 @@ _CONTROL_RE = re.compile(r'^control\s+"([A-Za-z0-9_]+)"\s*\{(.*?)^\}', re.MULTIL
 _TITLE_RE = re.compile(r'^\s*title\s*=\s*"([^"]*)"', re.MULTILINE)
 _SEVERITY_RE = re.compile(r'^\s*severity\s*=\s*"([^"]*)"', re.MULTILINE)
 _TAG_RE = re.compile(r'^\s*(spendlens_check|service|resource_type)\s*=\s*"([^"]*)"', re.MULTILINE)
+_DESC_RE = re.compile(r'^\s*description\s*=\s*"([^"]*)"', re.MULTILINE)
+_VARREF_RE = re.compile(r"\bvar\.([A-Za-z0-9_]+)")
+_VARDEF_RE = re.compile(r'^variable\s+"([A-Za-z0-9_]+)"\s*\{(.*?)^\}', re.MULTILINE | re.DOTALL)
 
 
-def mod_controls(mod_dir: Path) -> dict[str, dict[str, str]]:
-    """Static index of controls in a mod: name -> {title, spendlens_check, service, resource_type}."""
-    out: dict[str, dict[str, str]] = {}
+def mod_controls(mod_dir: Path) -> dict[str, dict[str, Any]]:
+    """Static index of controls in a mod: name -> {title, description, spendlens_check, service, resource_type,
+    severity, variables}. `variables` are the mod variables (thresholds) the control reads, in order."""
+    out: dict[str, dict[str, Any]] = {}
     for f in sorted(mod_dir.rglob("*.pp")):
         for name, body in _CONTROL_RE.findall(f.read_text()):
-            info = dict(_TAG_RE.findall(body))
+            info: dict[str, Any] = dict(_TAG_RE.findall(body))
             if m := _TITLE_RE.search(body):
                 info["title"] = m.group(1)
+            if m := _DESC_RE.search(body):
+                info["description"] = m.group(1)
             if m := _SEVERITY_RE.search(body):
                 info["severity"] = m.group(1)
+            info["variables"] = list(dict.fromkeys(v for v in _VARREF_RE.findall(body)
+                                                   if v not in ("common_dimensions", "tag_dimensions", "database")))
             out[name] = info
+    return out
+
+
+def variable_settings(mod_dir: Path) -> dict[str, str]:
+    """Mod variable -> the finops.yaml setting it comes from (taken from 'description = "finops.yaml X"')."""
+    out: dict[str, str] = {}
+    for f in sorted(mod_dir.rglob("*.pp")):
+        for name, body in _VARDEF_RE.findall(f.read_text()):
+            if (m := _DESC_RE.search(body)) and m.group(1).startswith("finops.yaml "):
+                out[name] = m.group(1).removeprefix("finops.yaml ").split()[0].rstrip(":,.;")
     return out
 
 
@@ -222,18 +240,24 @@ class PowerpipeRunner:
 
     def run(self, targets: list[str], *, where: str | None = None) -> RunResult:
         from .steampipe import SteampipeClient, is_managed
+        from .ui import activity
 
         if is_managed(self.cfg.steampipe):  # create/refresh the managed connection (aws.regions) before Powerpipe
             from .steampipe import SteampipeError
 
+            regions = ", ".join(self.cfg.aws.regions)
             try:
-                with SteampipeClient(self.cfg.steampipe, timeout_s=60) as c:
+                with activity(f"Preparing Steampipe connection [bold]{self.cfg.steampipe.connection}[/] ({regions})"), \
+                        SteampipeClient(self.cfg.steampipe, timeout_s=60) as c:
                     c.connect()
             except SteampipeError as e:
                 raise PowerpipeError(str(e)) from e
         mod = self._mod_name()
+        names = ", ".join(t.rsplit(".", 1)[-1] for t in targets)
         targets = [t if t.startswith(f"{mod}.") else f"{mod}.benchmark.{t}" for t in targets]
-        with tempfile.TemporaryDirectory(prefix="spendlens-pp-") as tmp:
+        with tempfile.TemporaryDirectory(prefix="spendlens-pp-") as tmp, \
+                activity(f"Running [bold]{names}[/] checks in Powerpipe [dim](reads AWS APIs and CloudWatch; large "
+                         "accounts can take several minutes)[/]") as act:
             workdir = Path(tmp)
             os.chmod(workdir, 0o700)
             self.prepare(workdir)
@@ -244,14 +268,16 @@ class PowerpipeRunner:
                 )
             except subprocess.TimeoutExpired as e:
                 raise PowerpipeError(f"powerpipe timed out after {self.cfg.powerpipe.timeout_s}s") from e
-        try:
-            docs = list(iter_json_documents(p.stdout))
-        except json.JSONDecodeError:
-            docs = []
-        if not docs:
-            msg = (p.stderr or p.stdout).strip().splitlines()
-            raise PowerpipeError("powerpipe failed: " + ("\n".join(msg[:8]) or f"exit code {p.returncode}"))
-        findings = [f for d in docs for f in parse_results(d)]
+            try:
+                docs = list(iter_json_documents(p.stdout))
+            except json.JSONDecodeError:
+                docs = []
+            if not docs:
+                msg = (p.stderr or p.stdout).strip().splitlines()
+                raise PowerpipeError("powerpipe failed: " + ("\n".join(msg[:8]) or f"exit code {p.returncode}"))
+            findings = [f for d in docs for f in parse_results(d)]
+            checks = len({f.control for f in findings})
+            act.done(f"{names}: {len(findings):,} results from {checks} checks")
         return RunResult(findings, docs, p.stderr)
 
     def _mod_name(self) -> str:

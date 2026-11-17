@@ -27,6 +27,7 @@ from ..models import Finding, Severity, Status
 from ..plugins import Registry
 from ..render import Format
 from ..steampipe import SteampipeClient, SteampipeError
+from ..ui import activity
 
 FEATURE = "forecast"
 COLUMNS = ["status", "scope", "limit", "actual", "forecast", "forecast_pct_of_limit", "label", "method"]
@@ -59,7 +60,7 @@ def run_live(cfg: Config, today: date) -> list[Finding]:
     findings = []
     warn = cfg.budgets.warn_pct
     try:
-        with SteampipeClient(cfg.steampipe) as client:
+        with activity("Querying Cost Explorer forecast and AWS Budgets [dim](Steampipe)[/]"), SteampipeClient(cfg.steampipe) as client:
             mtd = _mtd_actual(client, cfg, today)
             proj = fc.project(mtd, today, _ce_remaining(client, today))
             try:

@@ -12,10 +12,16 @@ spendlens waste -f html -o waste.html    # an interactive findings report (below
 ## The findings report: `-f html` on tags, rightsize and waste
 
 The check commands write a full report rather than a plain table. It contains:
-- **Summary:** alarms, compliance %, estimated saving per month and per year, and the number of checks, with a status bar.
+- **Summary:** failing resources, compliance %, estimated saving per month and per year, and how many checks fail, with a status bar.
 - **Largest savings:** the five biggest opportunities.
-- **Toolbar:** search, status filters (Alarm, Info, Skip, Error, OK) and a service filter.
-- **One collapsible section per check:** pass and fail counts, the saving, and every resource with its reason, account and region. Checks with alarms open first.
+- **Checks overview:** one line per check, worst first. Each line shows a fail bar, "14,733 of 14,852 fail", the thresholds the check used and its saving. Click a line to jump to that check.
+- **Toolbar:** search, status filters (Alarm, Info, Skip, Error, OK), and service and region filters. It stays at the top as you scroll.
+- **One collapsible section per check:**
+  - **Checks:** what the check looks for.
+  - **Threshold:** the exact settings from `finops.yaml` this run used, e.g. `sizing.cloudwatch_log_group_retention_max_days = 1`. This tells you both the limit and where to change it.
+  - **Results:** the counts per status.
+  - Every resource follows, with its status, readable name and full ARN, the finding (why it passed or failed, with the current value), account, region and saving. Failures are listed first.
+- **Fast at any size:** each check shows its first 50 results, then **Show more** and **Show all**. Search and filters work across every result, including ones not yet shown. Tens of thousands of results stay responsive, and the file stays small.
 - **Download CSV:** exports exactly the rows you've filtered to, with the same columns as `-f csv`.
 - **Print:** expands every check.
 

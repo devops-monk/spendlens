@@ -70,20 +70,22 @@ def report(
         common += ["--set", s]
     selected = [(n, a) for n, a in STEPS if (not only or n in only) and n not in (skip or [])]
     results = []
-    for name, args in selected:
+    total = len(selected) + 2  # + savings summary + dashboard
+    for i, (name, args) in enumerate(selected, 1):
         cmd = [sys.executable, "-m", "spendlens", *args, *common, "--source", source.value, "-f", "json",
                "-o", str(out / f"{name}.json")]
         if profile:
             cmd += ["--profile", profile]
-        results.append(_run(name, cmd, timeout))
+        results.append(_run(name, cmd, timeout, step=f"{i}/{total}"))
     # derived artifacts read the history the steps just wrote (or the demo DB)
     hist = "demo" if source is Source.demo else "last"
     cfg_args = ["--config", str(config)] if config else []
     results.append(_run("savings_summary", [sys.executable, "-m", "spendlens", "savings", "summary", "--by", "none",
                                             "--top", "500", "--source", hist, *cfg_args, "-f", "json",
-                                            "-o", str(out / "savings_summary.json")], timeout))
+                                            "-o", str(out / "savings_summary.json")], timeout,
+                        step=f"{total - 1}/{total}"))
     results.append(_run("dashboard", [sys.executable, "-m", "spendlens", "dashboard", "--source", hist, *cfg_args,
-                                      "-o", str(out / "report.html")], timeout))
+                                      "-o", str(out / "report.html")], timeout, step=f"{total}/{total}"))
     (out / "report-steps.json").write_text(json.dumps(results, indent=2))
 
     t = Table(title=f"spendlens report → {out}", header_style=f"bold {BRAND}")
@@ -99,14 +101,20 @@ def report(
         raise typer.Exit(1)
 
 
-def _run(name: str, cmd: list[str], timeout: int) -> dict:
+def _run(name: str, cmd: list[str], timeout: int, step: str = "") -> dict:
+    from ..ui import activity
+
     t0 = time.monotonic()
-    try:
-        p = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, check=False)
-        code, stderr = p.returncode, p.stderr
-    except subprocess.TimeoutExpired:
-        code, stderr = -1, f"timed out after {timeout}s"
-    result = "ok" if code == 0 else "alarms" if code == 3 else "failed"
+    label = name.replace("_", " ")
+    with activity(f"[dim]{step}[/] [bold]{label}[/]") as act:
+        try:
+            p = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, check=False)
+            code, stderr = p.returncode, p.stderr
+        except subprocess.TimeoutExpired:
+            code, stderr = -1, f"timed out after {timeout}s"
+        result = "ok" if code == 0 else "alarms" if code == 3 else "failed"
+        note = "[red]failed[/]" if result == "failed" else "[yellow]findings[/]" if result == "alarms" else "ok"
+        act.done(f"[dim]{step}[/] {label} · {note}", failed=result == "failed")
     lines = [ln.strip() for ln in stderr.splitlines() if ln.strip()]
     detail = (lines[-1] if lines else "")[:300]
     return {"step": name, "exit_code": code, "result": result, "seconds": round(time.monotonic() - t0, 1),

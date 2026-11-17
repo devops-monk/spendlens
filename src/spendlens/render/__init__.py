@@ -67,9 +67,11 @@ def render(
 
         text = render_json(records, meta)
     else:
+        from ..ui import activity
         from .html import render_html
 
-        text = render_html(records, cols, meta)
+        with activity(f"Writing HTML report ({len(records):,} rows)"):
+            text = render_html(records, cols, meta)
     if out:
         out.parent.mkdir(parents=True, exist_ok=True)
         out.write_text(text)

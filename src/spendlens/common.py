@@ -69,9 +69,10 @@ def load(
     except (FileNotFoundError, ConfigError) as e:
         err.print(f"[red]Config error:[/] {e}")
         raise typer.Exit(2) from e
-    from .render.html import set_theme
+    from .render.html import set_report_context, set_theme
 
     set_theme(cfg.dashboard)
+    set_report_context(cfg.to_powerpipe_vars())  # thresholds shown in HTML findings reports
     if profile:
         cfg.aws.profile = profile
     if cfg.aws.profile:
@@ -238,9 +239,10 @@ def steampipe_rows(cfg: Config, sql: str, params: Any = None, *, what: str = "qu
                    hint: str = "") -> list[dict[str, Any]]:
     """Run one read-only query for a feature; exit with a readable message (and optional hint) on failure."""
     from .steampipe import SteampipeClient, SteampipeError
+    from .ui import activity
 
     try:
-        with SteampipeClient(cfg.steampipe) as c:
+        with activity(f"Querying {what} [dim](Steampipe)[/]"), SteampipeClient(cfg.steampipe) as c:
             return c.query(sql, params)
     except SteampipeError as e:
         tip = f"\n[dim]{hint}[/]" if hint and ("AccessDenied" in str(e) or "not authorized" in str(e).lower()) else ""

@@ -102,6 +102,8 @@ spendlens cost diff
 spendlens report --out reports        # everything at once, plus reports/report.html
 ```
 
+While a command runs, spendlens shows what it's doing with a live timer: preparing the Steampipe connection, running the checks in Powerpipe, querying Cost Explorer. Each step ends with a ✓ line and its duration. Large accounts can take several minutes. The live display appears only in an interactive terminal, so CI logs stay clean; set `SPENDLENS_NO_PROGRESS=1` to turn it off.
+
 Every live run is saved to your local history (`~/.local/share/spendlens/spendlens.db`), so you can re-render any report offline with `--source last`.
 
 ## Next
