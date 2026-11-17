@@ -118,17 +118,28 @@ SECTIONS: list[tuple[str, str, str, list[tuple[str, str, str]]]] = [
         ("Savings Plan and RI coverage", "spendlens savings commitments", "ce"),
         ("AWS Cost Optimization Hub recommendations", "spendlens savings hub --min-saving 50", "aws"),
     ]),
+    ("fresh", "Fresh reports", "dashboard, notify and savings summary reuse what you checked today and run the rest "
+     "live, so they always cover everything and are at most a day old.", [
+        ("Dashboard: reuse today's checks, run the missing ones", "spendlens dashboard -o report.html", "ce"),
+        ("Dashboard: re-run every section now (e.g. after a change)", "spendlens dashboard --refresh -o report.html",
+         "ce"),
+        ("Dashboard from saved runs only: instant, no AWS calls", "spendlens dashboard --source last -o report.html",
+         "offline"),
+        ("Dashboard for another account or profile", "spendlens dashboard --profile finops -o finops.html", "ce"),
+        ("Dashboard with another policy file", "spendlens dashboard -c prod.yaml -o prod.html", "ce"),
+        ("The dashboard on sample data, to show someone", "spendlens dashboard --source demo -o demo.html", "offline"),
+        ("Slack summary covering every check", "spendlens notify --slack", "ce"),
+        ("Re-check everything, then post to Teams", "spendlens notify --teams --refresh", "ce"),
+        ("Post only if something needs attention", "spendlens notify --slack --only-if-changes", "ce"),
+        ("Post from saved runs only, e.g. right after report", "spendlens notify --slack --source last", "offline"),
+        ("Savings total re-checked now", "spendlens savings summary --refresh", "ce"),
+        ("Refresh just the cost sections, then build the dashboard",
+         "spendlens report --only cost_diff --only cost_trend --only anomalies --only forecast", "ce"),
+    ]),
     ("share", "Reports and sharing", "Turn runs into something you can send.", [
-        ("Every section on one branded page: reuses today's checks, runs the rest",
-         "spendlens dashboard -o report.html", "ce"),
-        ("…re-running every section now", "spendlens dashboard --refresh -o report.html", "ce"),
-        ("…from saved runs only (no AWS calls)", "spendlens dashboard --source last -o report.html", "offline"),
         ("Run every check and build the dashboard", "spendlens report --out reports", "ce"),
         ("Any result as CSV for a spreadsheet", "spendlens waste -f csv -o waste.csv", "aws"),
         ("Preview the Slack / Teams summary", "spendlens notify --slack --teams --dry-run --source demo", "offline"),
-        ("Post the summary to Slack (webhook in SPENDLENS_SLACK_WEBHOOK)", "spendlens notify --slack", "ce"),
-        ("…from saved runs only, e.g. right after report", "spendlens notify --slack --source last", "offline"),
-        ("The dashboard on sample data, to show someone", "spendlens dashboard --source demo -o demo.html", "offline"),
         ("Waste over $100/month, straight from JSON",
          "spendlens waste -f json | jq '.rows[] | select(.est_monthly_saving > 100)'", "aws"),
     ]),
@@ -179,5 +190,5 @@ KINDS = {
 
 # Short labels for the sticky section bar.
 NAV = {"start": "First run", "changed": "Bill changes", "trends": "Trends", "spikes": "Spikes & budget",
-       "waste": "Waste", "hunt": "One check", "tags": "Tags", "savings": "Savings", "share": "Reports", "ci": "CI gates",
+       "waste": "Waste", "hunt": "One check", "tags": "Tags", "savings": "Savings", "fresh": "Fresh reports", "share": "Sharing", "ci": "CI gates",
        "replay": "History", "ai": "AI", "scope": "Settings"}
