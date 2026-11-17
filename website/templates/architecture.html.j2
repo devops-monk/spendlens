@@ -134,6 +134,54 @@
   </div>
 </section>
 
+<section class="section showcase arch alt" id="ask-live">
+  <div class="wrap sc stack">
+    <div class="sc-text">
+      <div class="sc-title">
+        <p class="t-eyebrow">Sequence · AI + Steampipe AWS plugin</p>
+        <h2>Any AWS question,<br>read-only.</h2>
+      </div>
+      <div class="sc-copy">
+        <p>With <code>--live</code> the assistant can answer from any of the AWS plugin's tables, not only cost:
+          inventory, security groups, IAM, Lambda runtimes and more. It never calls AWS directly. It writes SQL,
+          and Steampipe turns that SQL into read-only AWS API calls with your credentials.</p>
+        <ul class="chips"><li>Hundreds of AWS tables</li><li>Your IAM role decides what it can see</li><li>Every query in the audit trail</li></ul>
+      </div>
+    </div>
+    <div class="sc-media">{{ diagram("seq_ask_live") }}</div>
+  </div>
+</section>
+
+<section class="section" id="agent-loop">
+  <div class="wrap">
+    <p class="t-eyebrow center">How the AI works</p>
+    <h2 class="h2">Plan, query, check, answer.</h2>
+    <p class="sub">The model is a planner, not an operator. It can only ask spendlens to run one of its tools, and every
+      tool reads.</p>
+    <div class="steps">
+      <div class="step"><h3>You ask</h3>
+        <p>spendlens sends your question, the FinOps analyst instructions and the tool list to your AI provider:
+          Bedrock, Anthropic, OpenAI, Azure OpenAI or any OpenAI-compatible server (Ollama, vLLM, GLM).</p></div>
+      <div class="step"><h3>It discovers</h3>
+        <p>It starts with your saved runs (<code>history_overview</code>). With <code>--live</code> it can also list
+          the AWS plugin's tables and read their columns, so it learns the schema instead of guessing.</p></div>
+      <div class="step"><h3>It queries</h3>
+        <p>It writes one <code>SELECT</code>. spendlens parses it, rejects anything that is not a single read, and
+          runs it on a read-only connection with a timeout and a row cap.</p></div>
+      <div class="step"><h3>Steampipe calls AWS</h3>
+        <p>The AWS plugin maps the table to <code>Describe*</code>, <code>List*</code> or <code>Get*</code> calls in
+          your configured regions, pages through the results and returns rows. Cost Explorer tables cost about
+          $0.01 per request.</p></div>
+      <div class="step"><h3>It repeats</h3>
+        <p>Rows go back to the model as data, never as instructions. It may refine the query or join another table,
+          up to <code>llm.max_steps</code> tool calls (12 by default).</p></div>
+      <div class="step"><h3>You check</h3>
+        <p>The answer cites the SQL and numbers it used. <code>--show-tools</code> prints every call, and
+          <code>--json</code> saves the full audit trail. Savings are proposals for you to review.</p></div>
+    </div>
+  </div>
+</section>
+
 <section class="section showcase ai" id="safety">
   <div class="wrap">
     <p class="t-eyebrow center">Safety</p>

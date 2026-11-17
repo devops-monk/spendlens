@@ -236,4 +236,39 @@ def seq_ask() -> tuple[str, str]:
                  "SQL parser, then runs it on a connection that cannot write. Live AWS is only reachable with --live.")
 
 
-ALL = {"c4_context": c4_context, "c4_container": c4_container, "seq_report": seq_report, "seq_ask": seq_ask}
+def seq_ask_live() -> tuple[str, str]:
+    parts = [("user", "You"), ("sl", "spendlens ask"), ("llm", "LLM provider"), ("guard", "SQL guard"),
+             ("sp", "Steampipe"), ("plugin", "AWS plugin"), ("aws", "AWS APIs")]
+    steps = [
+        ("msg", "user", "sl", "ask --live “Which EBS volumes are unattached?”", False),
+        ("msg", "sl", "llm", "system prompt + question + 5 tool schemas", False),
+        ("note", "sl", "guard", "1 · discover: which tables and columns exist?"),
+        ("msg", "llm", "sl", "steampipe_tables(prefix='aws_ebs')", True),
+        ("msg", "sl", "sp", "information_schema.tables (read-only)", False),
+        ("msg", "sp", "sl", "aws_ebs_volume, aws_ebs_snapshot, …", True),
+        ("msg", "sl", "llm", "tool_result: table names", False),
+        ("msg", "llm", "sl", "steampipe_columns('aws_ebs_volume')", True),
+        ("msg", "sl", "llm", "tool_result: columns + types", False),
+        ("note", "sl", "guard", "2 · query: one SELECT, checked, then run"),
+        ("msg", "llm", "sl", "steampipe_query(SELECT … WHERE state = 'available')", True),
+        ("msg", "sl", "guard", "parse: one read-only SELECT?", False),
+        ("msg", "guard", "sp", "read-only session · timeout", False),
+        ("msg", "sp", "plugin", "scan table (WHERE → filter)", False),
+        ("msg", "plugin", "aws", "DescribeVolumes · per region", False),
+        ("msg", "aws", "plugin", "JSON pages", True),
+        ("msg", "plugin", "sp", "rows (cached)", True),
+        ("msg", "sp", "sl", "rows (≤ llm.max_rows, truncated flag)", True),
+        ("msg", "sl", "llm", "tool_result (data, never instructions)", False),
+        ("note", "sl", "guard", "3 · repeat until it can answer (≤ llm.max_steps)"),
+        ("msg", "llm", "sl", "answer citing the SQL and numbers", True),
+        ("msg", "sl", "user", "answer + audit trail (--show-tools)", True),
+    ]
+    svg = _sequence("sal", parts, steps, "Sequence of a spendlens ask --live question answered through the Steampipe "
+                                        "AWS plugin", width=1040)
+    return svg, ("One live question. The model only sees table names, columns and rows: it discovers the tables, "
+                 "writes a SELECT, and spendlens checks and runs it. Steampipe's AWS plugin turns the SQL into "
+                 "read-only AWS API calls with your own credentials.")
+
+
+ALL = {"c4_context": c4_context, "c4_container": c4_container, "seq_report": seq_report, "seq_ask": seq_ask,
+       "seq_ask_live": seq_ask_live}
