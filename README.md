@@ -21,6 +21,7 @@
 <p align="center">
   <a href="https://spendlens.devops-monk.com"><b>Website</b></a> ·
   <a href="https://spendlens.devops-monk.com/docs/">Docs</a> ·
+  <a href="https://spendlens.devops-monk.com/cheatsheet/">Cheat sheet</a> ·
   <a href="https://spendlens.devops-monk.com/architecture/">Architecture</a> ·
   <a href="https://hub.docker.com/r/abhaypratap/spendlens">Docker Hub</a>
 </p>
@@ -37,6 +38,18 @@
 > [!NOTE]
 > v0.2.0. spendlens is tested end to end through Steampipe against an AWS emulator. Verification against a live
 > account with a read-only role is next (see [PLAN.md](PLAN.md)).
+
+## New in 0.2.0
+
+- **Always fresh, never half-empty.** `dashboard`, `notify` and `savings summary` reuse every check already run today and run the rest first, so they always cover everything. Use `--refresh` to re-run all, or `--source last` for no AWS calls. [More](#always-fresh-never-half-empty)
+- **Cost drill-down.** `spendlens cost diff -g service -b tag:Name` shows which resource or app is behind each service's change. `-b` also takes `usage-type`, `region` or any tag; add `-f html` for a searchable report.
+- **Reports that explain themselves.** Every dashboard tab and HTML report has a "How to read this" box with your actual thresholds and the setting that changes each one. "Flagged" always states its rule (e.g. at least $10 AND at least 20%).
+- **Charted reports for every cost command.** `-f html` on `cost diff`, `trend`, `showback`, `anomalies` and `forecast` gives bar, line and budget charts with the full table.
+- **Findings at scale.** `-f html` on `tags`, `rightsize` and `waste` gives an interactive report with filters and search, each check's thresholds, and why each resource alarmed. It handles tens of thousands of results.
+- **Live progress, and eu-west-1 by default.** Long runs show the current step and an elapsed timer; set `aws.regions` to query other regions.
+- **A [cheat sheet](https://spendlens.devops-monk.com/cheatsheet/)** of 125 ready-to-copy commands, grouped by the question they answer.
+
+**Heads-up:** `dashboard`, `notify` and `savings summary` now call AWS by default when a check hasn't run today. Add `--source last` to keep them offline. Full notes: [release v0.2.0](https://github.com/devops-monk/spendlens/releases/tag/v0.2.0).
 
 ---
 
@@ -82,7 +95,8 @@ spendlens uses whatever AWS role your terminal already has assumed. It stores no
 ## Know what changed. Before finance asks.
 
 Compare any two months, quarters or date ranges, by service, account, region or any tag. New and removed services
-are always shown, and changes that cross your thresholds are flagged.
+are always shown, and changes that cross your thresholds are flagged, with the rule stated: by default at least $10
+**and** at least 20% (`cost.change_alarm_abs` / `cost.change_alarm_pct`).
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="website/static/shots/cost-dark.webp">
@@ -96,6 +110,8 @@ spendlens cost diff --from 2026-07..2026-09 --to 2026-10..2026-12 -g tag:Team
 spendlens cost trend -n 6                            # monthly pivot with month-over-month change
 spendlens cost showback -t Team                      # spend per team, untagged share called out
 spendlens cost diff -g service -b tag:Name           # inside each service: which tagged resources changed
+spendlens cost diff -g usage-type --top 15           # what inside the services changed (logs? storage? transfer?)
+spendlens cost diff -f html -o cost-diff.html        # charted report: tiles, flagged list, change and spend charts
 ```
 
 ## One number. Every dollar explained.
