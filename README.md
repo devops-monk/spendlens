@@ -110,6 +110,7 @@ Each resource counts once, AWS's figure wins where both exist, and every adjustm
 
 ```bash
 spendlens savings summary          # one de-duplicated total (reuses today's checks, runs the rest)
+spendlens savings summary --refresh  # re-check all four sources now
 spendlens savings hub              # AWS Cost Optimization Hub recommendations
 spendlens savings commitments      # Savings Plan and RI coverage, expiring plans
 ```
@@ -199,6 +200,29 @@ spendlens init --ci gitlab                         # or --ci github: a scheduled
 - **`notify`:** reads webhook URLs only from `$SPENDLENS_SLACK_WEBHOOK` and `$SPENDLENS_TEAMS_WEBHOOK`.
 - **CI templates:** keep the run history between pipelines.
 
+### Always fresh, never half-empty
+
+`dashboard`, `notify` and `savings summary` combine many checks. By default they reuse every check already run **today** and run the rest live first, so the result covers everything and is at most a day old. A check run by one of them is reused by the others later that day.
+
+```bash
+# Default: reuse today's checks, run the rest
+spendlens dashboard -o report.html
+spendlens notify --slack
+spendlens savings summary
+
+# Re-run everything now, e.g. after a deployment or clean-up
+spendlens dashboard --refresh -o report.html
+spendlens notify --slack --refresh
+spendlens savings summary --refresh
+
+# Saved runs only, no AWS calls (e.g. in CI right after spendlens report)
+spendlens dashboard --source last -o report.html
+spendlens notify --slack --source last
+spendlens savings summary --source last
+```
+
+If a check can't run, for example because of a missing permission, the output says why and uses that check's last saved run.
+
 Setup is in [docs/ci.md](docs/ci.md).
 
 ---
@@ -235,10 +259,10 @@ Unknown keys, typos and out-of-range values are rejected, and the error names th
 | `rightsize` · `waste` | 65 controls with $/month estimates |
 | `cost diff` · `trend` · `showback` · `resources` | What changed, where, and who owns it |
 | `anomalies` · `forecast` | Daily spikes; month-end projection against budgets |
-| `savings hub` · `commitments` · `summary` | AWS recommendations, coverage, one de-duplicated total |
-| `dashboard` | A self-contained HTML report with nine tabs; reuses checks run today and runs the rest (`--source last`: saved runs only) |
+| `savings hub` · `commitments` · `summary` | AWS recommendations, coverage, one de-duplicated total (`summary --refresh`: re-check now) |
+| `dashboard` | A self-contained HTML report with nine tabs, always covering every check (`--refresh`: re-run all now) |
 | `ask` | Questions in plain English, read-only |
-| `report` · `notify` | Run everything; post Slack or Teams summaries |
+| `report` · `notify` | Run everything; post Slack or Teams summaries (`notify --refresh`: re-check first) |
 | `history list` · `diff` | Saved runs, and new or resolved alarms between them |
 | `init` · `doctor` · `params` · `config` | Set up, check, and inspect configuration |
 
@@ -246,7 +270,7 @@ Every report command accepts:
 - `--format table|csv|json|html` and `--out FILE`;
 - `--source live|last|demo`.
 
-`--source last` replays your latest saved run offline. The full reference is the [CLI reference](https://spendlens.devops-monk.com/docs/cli/).
+`--source last` replays your latest saved run offline. `dashboard`, `notify` and `savings summary` also accept `--refresh` (see [Always fresh](#always-fresh-never-half-empty)). The full reference is the [CLI reference](https://spendlens.devops-monk.com/docs/cli/).
 
 ## Extending
 
