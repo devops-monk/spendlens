@@ -110,12 +110,36 @@ That's the same CLI, useful when the `spendlens` script isn't on your `PATH`.
 | `demo` | Uses bundled sample data (account `123456789012`) | None |
 
 ```bash
-spendlens rightsize                                   # live, saved
-spendlens rightsize --source last -f csv -o r.csv     # same results, different format, no AWS calls
-spendlens report --source demo --out demo-report      # the whole product on sample data
+# live, and saved to your history
+spendlens rightsize
+# the same results in another format, no AWS calls
+spendlens rightsize --source last -f csv -o r.csv
+# the whole product on sample data
+spendlens report --source demo --out demo-report
 ```
 
-`dashboard`, `notify` and `savings summary` combine many checks. By default they reuse every check already run **today** and run the others live first, so the result always covers everything and is at most a day old. Add `--refresh` to re-run everything, or `--source last` to use saved runs only, with no AWS calls. `history …` and `ask` (without `--live`) always work from saved runs only.
+### Keep summaries fresh: `--refresh`
+
+`dashboard`, `notify` and `savings summary` combine many checks. By default they reuse every check already run **today** (UTC) and run the others live first, so the result always covers everything and is at most a day old. A check run by one of them is reused by the others later the same day.
+
+```bash
+# Default: reuse today's checks, run the rest
+spendlens dashboard -o report.html
+spendlens notify --slack
+spendlens savings summary
+
+# Re-run everything now
+spendlens dashboard --refresh -o report.html
+spendlens notify --slack --refresh
+spendlens savings summary --refresh
+
+# Saved runs only, no AWS calls
+spendlens dashboard --source last -o report.html
+spendlens notify --slack --source last
+spendlens savings summary --source last
+```
+
+Use `--refresh` after a deployment or clean-up, when this morning's results are out of date. Use `--source last` in CI right after `spendlens report`, or whenever you must not call AWS. `history …` and `ask` (without `--live`) always work from saved runs only.
 
 ## 4. Choose the output: `--format` and `--out`
 

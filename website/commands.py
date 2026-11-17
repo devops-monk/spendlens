@@ -184,6 +184,7 @@ RECIPES: dict[str, list[tuple[str, str]]] = {
          "spendlens notify --slack --link https://ci.example.com/report.html"),
         ("Post to Teams only when something needs attention", "spendlens notify --teams --only-if-changes"),
         ("Preview both messages without sending", "spendlens notify --slack --teams --dry-run --source demo"),
+        ("Re-check everything now, then post", "spendlens notify --teams --refresh"),
         ("From saved runs only (e.g. right after spendlens report)", "spendlens notify --slack --source last"),
     ],
     "ask": [

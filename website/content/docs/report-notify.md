@@ -33,10 +33,17 @@ export SPENDLENS_SLACK_WEBHOOK=https://hooks.slack.com/services/...
 spendlens notify --slack --link https://ci.example.com/report.html
 spendlens notify --teams --only-if-changes
 spendlens notify --slack --teams --dry-run --source demo     # print the payloads, send nothing
+spendlens notify --teams --refresh                           # re-check everything now, then post
 spendlens notify --slack --source last                       # only saved runs (e.g. right after spendlens report)
 ```
 
-Like the dashboard, `notify` reuses every check already run today and runs the others live first, so the message always covers everything. `--refresh` re-runs them all; `--source last` never calls AWS. The generated CI pipelines use `--source last`, because `spendlens report` has just run every check.
+**The message always covers every check, and is at most a day old:**
+- A check already run **today** (UTC) is read from your history: no AWS calls for it.
+- Every other check is **run live first**: read-only AWS calls, plus Cost Explorer (about $0.01 per request) for the cost checks. Each run is saved, so the dashboard and savings summary reuse it later today.
+- `--refresh` re-runs every check now, e.g. after a deployment or clean-up.
+- `--source last` never calls AWS. The generated CI pipelines use it, because `spendlens report` has just run every check.
+
+If a check can't run (e.g. a missing permission), the output says why and the message uses its last saved run.
 
 The summary covers:
 - spend and its change;
