@@ -156,6 +156,12 @@ def commitments(
 
 
 SUMMARY_FEATURES = ("rightsize", "waste", "savings_hub", "savings_commitments")
+SOURCE_HINTS = {
+    "rightsize": ("oversized resources and company standards", "spendlens rightsize"),
+    "waste": ("idle and orphaned resources", "spendlens waste"),
+    "savings_hub": ("AWS Cost Optimization Hub recommendations", "spendlens savings hub"),
+    "savings_commitments": ("Savings Plan / RI purchase recommendations", "spendlens savings commitments"),
+}
 
 
 @app.command("summary")
@@ -185,10 +191,12 @@ def summary(
     spendlens_rows: list[dict[str, Any]] = []
     hub_rows: list[dict[str, Any]] = []
     used = []
+    missing: list[str] = []
     with store:
         for feat in SUMMARY_FEATURES:
             run = store.latest_run(feat)
             if not run:
+                missing.append(feat)
                 continue
             used.append(f"{feat} #{run.id} ({run.started_at[:10]})")
             for f in store.findings(run.id):
@@ -198,7 +206,9 @@ def summary(
                        "est_monthly_saving": f.est_monthly_saving, "reason": f.reason, "feature": feat}
                 (hub_rows if feat == "savings_hub" else spendlens_rows).append(row)
     if not used:
-        err.print("[red]No saved runs yet.[/] Run rightsize / waste / savings hub / savings commitments first.")
+        err.print("[red]No saved runs yet.[/] savings summary adds up saved runs; run these first:")
+        for what, cmd in SOURCE_HINTS.values():
+            err.print(f"  [bold]{cmd}[/]  [dim]# {what}[/]")
         raise typer.Exit(1)
     merged, notes = sv.merge_savings(spendlens_rows, hub_rows)
     if by == "none":
@@ -208,15 +218,21 @@ def summary(
         key = {"source": "source", "service": "service", "control": "control"}[by]
         agg: dict[str, dict[str, Any]] = {}
         for r in merged:
-            a = agg.setdefault(r[key], {by: r[key], "items": 0, "est_monthly_saving": 0.0})
+            a = agg.setdefault(r[key], {by: r[key], "items": 0, "est_monthly_saving": 0.0, "_top": None})
             a["items"] += 1
             a["est_monthly_saving"] = round(a["est_monthly_saving"] + r["est_monthly_saving"], 2)
+            if a["_top"] is None or r["est_monthly_saving"] > a["_top"]["est_monthly_saving"]:
+                a["_top"] = r
         rows = sorted(agg.values(), key=lambda r: -r["est_monthly_saving"])
-        cols = [by, "items", "est_monthly_saving"]
+        for a in rows:  # the single biggest item in each group: what to look at first
+            t = a.pop("_top")
+            a["biggest_item"] = f"{t['resource']} ({t['control']})" if t else ""
+            a["biggest_saving"] = t["est_monthly_saving"] if t else 0.0
+        cols = [by, "items", "est_monthly_saving", "biggest_saving", "biggest_item"]
     total = round(sum(r["est_monthly_saving"] for r in merged), 2)
     from ..models import ReportMeta
 
-    meta = ReportMeta(title="Savings summary", extra={"source": source.value, "runs": used,
+    meta = ReportMeta(title="Savings summary", extra={"source": source.value, "runs": used, "not_run": missing,
                                                       "est_monthly_saving_total": total})
     emit(rows, fmt, out, "Savings summary", columns=cols, meta=meta)
     err.print(f"[bold]Total est. saving {cfg.pricing.currency} {total:,.2f}/month · {cfg.pricing.currency} "
@@ -224,6 +240,12 @@ def summary(
     for n in notes:
         err.print(f"[dim]- {n}[/]")
     err.print(f"[dim]From: {', '.join(used)}. Indicative; review before acting.[/]")
+    if missing:
+        err.print("[yellow]Not included yet[/] (no saved run). For a complete total, run:")
+        for feat in missing:
+            what, cmd = SOURCE_HINTS[feat]
+            err.print(f"  [bold]{cmd}[/]  [dim]# {what}[/]")
+        err.print("[dim]then run spendlens savings summary again.[/]")
 
 
 def register(reg: Registry) -> None:

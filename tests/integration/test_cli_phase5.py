@@ -135,3 +135,23 @@ def test_savings_hub_and_commitments_live(monkeypatch):
 ], ids=["forecast", "budgets", "hub", "purchase_type", "savings_plans", "daily", "daily_tag"])
 def test_phase5_sql_valid(sql):
     assert check_sql(sql) == []
+
+
+def test_savings_summary_says_what_is_missing_and_names_the_biggest_item(tmp_path, monkeypatch):
+    import shutil
+    import sqlite3
+
+    from spendlens.history import demo_db_path
+
+    db = tmp_path / "h.db"
+    shutil.copy(demo_db_path(), db)
+    with sqlite3.connect(db) as c:  # only a rightsize run, like a first-time user
+        c.execute("delete from findings where run_id in (select id from runs where feature != 'rightsize')")
+        c.execute("delete from runs where feature != 'rightsize'")
+    monkeypatch.setenv("SPENDLENS__HISTORY__PATH", str(db))
+    r = runner.invoke(app, ["savings", "summary", "--by", "service", "-f", "json"])
+    doc = j(r)
+    assert doc["meta"]["extra"]["not_run"] == ["waste", "savings_hub", "savings_commitments"]
+    assert "Not included yet" in r.output and "spendlens waste" in r.output and "spendlens savings hub" in r.output
+    top = doc["rows"][0]
+    assert top["biggest_item"] and 0 < top["biggest_saving"] <= top["est_monthly_saving"]

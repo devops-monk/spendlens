@@ -108,6 +108,8 @@ SECTIONS: list[tuple[str, str, str, list[tuple[str, str, str]]]] = [
         ("The 70 resource types covered", "spendlens tags types", "offline"),
     ]),
     ("savings", "Savings", "One number you can defend, and where it comes from.", [
+        ("Refresh every savings source live, then build the report",
+         "spendlens report --only rightsize --only waste --only savings_hub --only savings_commitments", "ce"),
         ("One de-duplicated total from your saved runs", "spendlens savings summary", "offline"),
         ("…per service", "spendlens savings summary --by service", "offline"),
         ("The savings total as a report", "spendlens savings summary -f html -o savings.html", "offline"),
