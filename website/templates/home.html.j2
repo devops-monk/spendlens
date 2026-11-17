@@ -6,7 +6,7 @@
 {%- endmacro %}
 {% block main %}
 <section class="hero hero-xl">
-  <a class="pill" href="#new"><b>New</b> v{{ version }} · always-fresh reports, cost drill-down, self-explaining charts ›</a>
+  <a class="pill" href="#new"><b>New</b> v{{ version }} · executive brief, AI that checks its own queries ›</a>
   <p class="eyebrow">FinOps for AWS, from your terminal</p>
   <h1>See every dollar.<br><span class="grad">Act on every insight.</span></h1>
   <p class="lede">spendlens finds untagged resources, oversized instances, idle waste and unexpected cost spikes, puts a
@@ -27,62 +27,61 @@
 <section class="section new-in" id="new">
   <div class="wrap">
     <p class="eyebrow">New in v{{ version }}</p>
-    <h2 class="h2">Always complete.<br><span class="grad">Always explained.</span></h2>
-    <p class="sub">Reports that are never half-empty, cost changes you can trace to the resource, and every chart
-      telling you how to read it.</p>
+    <h2 class="h2">One page for managers.<br><span class="grad">Any AWS question, right first time.</span></h2>
+    <p class="sub">An executive brief written by the FinOps AI profile, and an assistant that looks up the real AWS
+      schema, checks every query before it runs, waits for slow ones and never asks twice.</p>
     <div class="bento new-bento">
       <article class="tile t-wide">
-        <span class="tile-ico" aria-hidden="true">{{ icons["clock"]|safe }}</span>
-        <p class="t-eyebrow">Always fresh</p>
-        <h3>Never half-empty.</h3>
-        <p>The dashboard, Slack and Teams summaries, and the savings total reuse every check already run today and
-          run the rest first. Every report covers everything, and is at most a day old.</p>
-        <pre class="t-code"><code>spendlens dashboard -o report.html
-spendlens dashboard --refresh -o report.html
-spendlens dashboard --source last -o report.html</code></pre>
-        <p class="t-foot">Same for notify and savings summary · reuse, re-run all, or no AWS calls</p>
+        <span class="tile-ico" aria-hidden="true">{{ icons["layout"]|safe }}</span>
+        <p class="t-eyebrow">Executive brief</p>
+        <h3>The page you send to a manager.</h3>
+        <p>An AI analyst summary, five headline numbers, key insights, spend against the budget, what changed,
+          anomalies with their likely cause, and a checklist of the largest savings to review. spendlens computes
+          every figure; the AI only writes the words.</p>
+        <pre class="t-code"><code>spendlens brief -o brief.html
+spendlens brief --source last --no-ai -o brief.html</code></pre>
+        <p class="t-foot">Printable · light and dark · <code>spendlens report</code> writes it too</p>
       </article>
       <article class="tile t-wide">
-        <span class="tile-ico" aria-hidden="true">{{ icons["flow"]|safe }}</span>
-        <p class="t-eyebrow">Cost drill-down</p>
-        <h3>From "EC2 went up" to which app.</h3>
-        <p>Break every service's change down by a second level: a tag such as Name or Team, usage type or region.
-          Add <code>-f html</code> for a searchable report.</p>
-        <pre class="t-code"><code>spendlens cost diff -g service -b tag:Name
-spendlens cost diff -g service -b usage-type
-spendlens cost diff -g usage-type --top 15</code></pre>
-        <p class="t-foot">Works with months, ranges and month to date</p>
+        <span class="tile-ico" aria-hidden="true">{{ icons["spark"]|safe }}</span>
+        <p class="t-eyebrow">Right first time</p>
+        <h3>No guessed tables or columns.</h3>
+        <p>With <code>--live</code> the assistant searches a catalog built from the Steampipe AWS plugin's own
+          source: 589 tables, every column's meaning, required filters and examples. Every query is checked before
+          it reaches AWS; a mistake comes back with the exact fix.</p>
+        <pre class="t-code"><code>spendlens ask --live "Which security groups allow port 22 from anywhere?"</code></pre>
+        <p class="t-foot">Passes 1,613 of the plugin's 1,620 documented examples; the other 7 are doc mistakes</p>
       </article>
       <article class="tile">
-        <span class="tile-ico" aria-hidden="true">{{ icons["book"]|safe }}</span>
-        <p class="t-eyebrow">Self-explaining</p>
-        <h3>"How to read this", everywhere.</h3>
-        <p>Every dashboard tab and report says what it shows, how it's calculated with your thresholds, and what to
-          do next. "Flagged" always states its rule.</p>
+        <span class="tile-ico" aria-hidden="true">{{ icons["clock"]|safe }}</span>
+        <p class="t-eyebrow">Patient</p>
+        <h3>Slow queries are waited for.</h3>
+        <p>Live queries run as background jobs. The assistant waits for the rows instead of timing out, up to five
+          minutes.</p>
       </article>
       <article class="tile">
-        <span class="tile-ico" aria-hidden="true">{{ icons["chart"]|safe }}</span>
-        <p class="t-eyebrow">Charted reports</p>
-        <h3>Charts for every cost command.</h3>
-        <p><code>-f html</code> on cost diff, trend, showback, anomalies and forecast gives bar, line and budget
-          charts, with the full table.</p>
+        <span class="tile-ico" aria-hidden="true">{{ icons["coins"]|safe }}</span>
+        <p class="t-eyebrow">Cached</p>
+        <h3>Never asked twice.</h3>
+        <p>Fresh results are reused: resources 15 min, metrics 5, Cost Explorer 6 h. The same question on the same
+          data costs no tokens.</p>
       </article>
       <article class="tile">
-        <span class="tile-ico" aria-hidden="true">{{ icons["list"]|safe }}</span>
-        <p class="t-eyebrow">Findings at scale</p>
-        <h3>Tens of thousands of results.</h3>
-        <p>Filter, search and sort every check, with its thresholds, why each resource alarmed, and its current
-          value.</p>
+        <span class="tile-ico" aria-hidden="true">{{ icons["terminal"]|safe }}</span>
+        <p class="t-eyebrow">For you too</p>
+        <h3>The assistant's tools, offline.</h3>
+        <p><code>schema find</code> picks the table, <code>schema show</code> explains it, <code>schema check</code>
+          validates your SQL.</p>
       </article>
       <article class="tile">
-        <span class="tile-ico" aria-hidden="true">{{ icons["pulse"]|safe }}</span>
-        <p class="t-eyebrow">Live progress</p>
-        <h3>No more silent waits.</h3>
-        <p>Long runs show the current step and an elapsed timer. eu-west-1 by default, any regions you choose.</p>
+        <span class="tile-ico" aria-hidden="true">{{ icons["key"]|safe }}</span>
+        <p class="t-eyebrow">Still read-only</p>
+        <h3>Checked, scoped, audited.</h3>
+        <p>Read-only sessions, results scoped to your account and regions, and every query in the audit trail.</p>
       </article>
     </div>
     <div class="ctas new-ctas">
-      <a class="btn primary" href="{{ root }}cheatsheet/">Open the cheat sheet</a>
+      <a class="btn primary" href="{{ root }}architecture/#ai-pipeline">How the AI works</a>
       <a class="btn ghost" href="{{ repo_url }}/releases/tag/v{{ version }}">Release notes ›</a>
     </div>
   </div>

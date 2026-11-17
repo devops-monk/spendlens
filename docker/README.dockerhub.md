@@ -111,8 +111,14 @@ AWS Cost Optimization Hub, Savings Plan and RI coverage, and spendlens's own fin
 
 ![Dashboard savings](https://spendlens.devops-monk.com/static/screens/dashboard-savings.png)
 
+### One page for managers
+`spendlens brief -o brief.html` writes a printable executive brief: an analyst summary written by the FinOps AI profile, five headline numbers, key insights, monthly spend against the budget, anomalies, and a checklist of the largest savings to review. spendlens computes every figure; `--no-ai` uses a built-in rule-based summary and sends nothing to an AI provider. `spendlens report` also writes `brief.html`.
+
+![Executive brief](https://spendlens.devops-monk.com/static/shots/brief-light.webp)
+
 ### And more
-- **`spendlens ask "why did EC2 go up?"`:** an AI assistant that answers from your data (Amazon Bedrock with your AWS role, Anthropic, OpenAI, Azure OpenAI or any OpenAI-compatible model). Its SQL is checked by three read-only safety layers.
+- **`spendlens ask "why did EC2 go up?"`:** an AI assistant that answers from your data (Amazon Bedrock with your AWS role, Anthropic, OpenAI, Azure OpenAI or any OpenAI-compatible model). With `--live` it can answer from any of the AWS plugin's 589 tables: it looks up the real columns and required filters in a catalog built from the plugin's source, every query is checked before it reaches AWS, slow queries are waited for, and fresh results and repeated answers come from a cache (keep `-v spendlens-data:/data` to reuse it). Its SQL is read-only at three layers.
+- **`spendlens schema find "unattached volumes"` / `schema show <table>` / `schema check "<sql>"`:** the assistant's table catalog and query checker, offline.
 - **`spendlens notify --slack --teams`:** a summary of what changed, posted to your channel. Like the dashboard, it reuses today's checks and runs the rest (`--refresh` re-checks everything first).
 - **`spendlens init --ci gitlab|github`:** a scheduled pipeline on a read-only OIDC role.
 - **Table, CSV, JSON or HTML** output from every command, and every threshold set from one `finops.yaml`.
@@ -125,13 +131,13 @@ AWS Cost Optimization Hub, Savings Plan and RI coverage, and spendlens's own fin
 
 | | |
 |---|---|
-| **Tags** | `latest`, `0.2.0`, `0.2` (plus `sha-<commit>` per build) |
+| **Tags** | `latest`, `0.3.0`, `0.3` (plus `sha-<commit>` per build) |
 | **Platforms** | `linux/amd64` and `linux/arm64` (Graviton, Apple silicon), each built natively and smoke-tested |
 | **License** | spendlens: Apache-2.0. The image also contains Steampipe and Powerpipe (AGPL-3.0, unmodified) and the AWS plugin (Apache-2.0); see `/usr/share/doc/spendlens/NOTICE` |
 | **User** | `finops` (uid 10001). Steampipe refuses to run as root |
 | **Working directory** | `/work`: put `finops.yaml` here; reports are written here |
 | **Volume** | `/data`: the run history (`/data/spendlens.db`), which keeps trends and "what changed" between runs |
-| **Entrypoint** | Starts the local Steampipe service only when a command needs live data, then stops it. `dashboard`, `notify` and `savings summary` need it unless you pass `--source last` or `--source demo`. Exit codes pass through (`--fail-on-alarm` → 3, for CI gates) |
+| **Entrypoint** | Starts the local Steampipe service only when a command needs live data, then stops it. `dashboard`, `brief`, `notify` and `savings summary` need it unless you pass `--source last` or `--source demo`. Exit codes pass through (`--fail-on-alarm` → 3, for CI gates) |
 
 | Environment variable | Purpose |
 |---|---|
@@ -148,7 +154,7 @@ If you bind-mount `/work` or `/data` on Linux, they must be writable by uid 1000
 ```yaml
 # GitLab
 spendlens:
-  image: { name: abhaypratap/spendlens:0.2.0, entrypoint: [""] }
+  image: { name: abhaypratap/spendlens:0.3.0, entrypoint: [""] }
   script:
     - spendlens-entrypoint report --out reports
     # report has just run every check: post from those saved runs, no second round of AWS calls

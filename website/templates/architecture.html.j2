@@ -12,6 +12,8 @@
       <a href="#principles">Principles</a>
       <a href="#report-run">Report run</a>
       <a href="#ask">Ask</a>
+      <a href="#ask-live">Live AI</a>
+      <a href="#ai-pipeline">AI pipeline</a>
       <a href="#safety">Safety</a>
     </div>
   </div>
@@ -21,10 +23,11 @@
   <p class="eyebrow">Architecture</p>
   <h1>Simple parts.<br><span class="grad">Clear boundaries.</span></h1>
   <p class="lede">spendlens is a Python CLI that turns AWS APIs into SQL with Steampipe, runs your company's controls with
-    Powerpipe, and keeps every result in a local history that reports, notifications and the AI assistant read.</p>
+    Powerpipe, and keeps every result in a local history that reports, the executive brief, notifications and the AI
+    assistant read. For live questions the assistant works from a catalog of the AWS plugin's 589 tables.</p>
   <ul class="stack-strip" aria-label="Built with">
     <li>Python</li><li>Steampipe</li><li>Powerpipe</li><li>SQLite</li><li>Jinja2</li><li>sqlglot</li>
-    <li>Anthropic SDK</li><li>OpenAI SDK</li>
+    <li>Anthropic SDK</li><li>OpenAI SDK</li><li>AWS plugin catalog</li>
   </ul>
 </section>
 
@@ -54,7 +57,8 @@
       </div>
       <div class="sc-copy">
         <p>Controls run through Powerpipe, cost questions go straight to Steampipe as bounded SQL, and every run lands
-          in a SQLite history that the dashboard, notifications and the AI assistant read without touching AWS again.</p>
+          in a SQLite history that the dashboard, the executive brief, notifications and the AI assistant read without
+          touching AWS again.</p>
         <ul class="chips"><li>{{ stats.controls }} controls</li><li>One history</li><li>Pluggable</li></ul>
       </div>
     </div>

@@ -36,8 +36,19 @@
 <p align="center"><sub>One self-contained HTML report, shown with the bundled demo data.</sub></p>
 
 > [!NOTE]
-> v0.2.0. spendlens is tested end to end through Steampipe against an AWS emulator. Verification against a live
+> v0.3.0. spendlens is tested end to end through Steampipe against an AWS emulator. Verification against a live
 > account with a read-only role is next (see [PLAN.md](PLAN.md)).
+
+## New in 0.3.0
+
+- **One page for managers.** `spendlens brief -o brief.html` writes an executive report: an analyst summary by the FinOps AI profile, five headline numbers, key insights, monthly spend against the budget, what changed, anomalies with their likely cause, and a checklist of the largest savings to review. spendlens computes every figure; `--no-ai` uses a built-in rule-based summary. [More](#one-page-for-managers)
+- **Ask about any AWS table, right first time.** With `--live`, the assistant looks up the real tables, columns and required filters in a catalog built from the Steampipe AWS plugin's source (589 tables), and every query is checked before it reaches AWS. A wrong column comes back with "did you mean".
+- **Patient and cached.** Slow live queries run as jobs the assistant waits for. Fresh results are reused (15 min for resources, 5 for metrics, 6 h for Cost Explorer), and the same question on the same data costs no tokens. `--fresh` skips the cache.
+- **The assistant's tools, for you.** `spendlens schema find | show | check` searches the catalog and checks a query offline; `spendlens cache show | clear` inspects the cache.
+- **`spendlens report` also writes `brief.html`** (rule-based; add `--ai` for the AI summary).
+- **The [cheat sheet](https://spendlens.devops-monk.com/cheatsheet/)** now has 136 commands.
+
+**Heads-up:** the assistant's live tools are renamed (`steampipe_query` is now `aws_query`, plus `aws_find_tables`, `aws_describe_table`, `aws_check_query`, `aws_query_result`), and a live query may now run for up to 5 minutes (`llm.query_timeout_s`, was 60 s). Full notes: [release v0.3.0](https://github.com/devops-monk/spendlens/releases/tag/v0.3.0).
 
 ## New in 0.2.0
 

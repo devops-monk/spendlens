@@ -70,7 +70,7 @@ def c4_context() -> tuple[str, str]:
     b = []
     # people / callers (left)
     b.append(_box(20, 40, 200, 70, "FinOps / platform engineer", "terminal, assumed AWS role", "Person"))
-    b.append(_box(20, 150, 200, 70, "Engineering manager", "reads reports, asks questions", "Person"))
+    b.append(_box(20, 150, 200, 70, "Engineering manager", "reads the brief, asks questions", "Person"))
     b.append(_box(20, 260, 200, 70, "CI scheduler", "GitLab CI / GitHub Actions", "System"))
     # spendlens (centre)
     b.append(_box(330, 120, 220, 130, "spendlens", "FinOps CLI · read-only", "Software system", accent=True))
@@ -81,7 +81,7 @@ def c4_context() -> tuple[str, str]:
     b.append(_box(720, 278, 240, 66, "Slack / Teams", "incoming webhooks", "External system", ext=True))
     # arrows
     b.append(_arrow(u, 220, 75, 330, 150, "runs commands", 262, 98))
-    b.append(_arrow(u, 220, 185, 330, 185, "asks · opens report", 275, 178))
+    b.append(_arrow(u, 220, 185, 330, 185, "asks · opens brief", 275, 178))
     b.append(_arrow(u, 220, 295, 330, 225, "spendlens report", 272, 275))
     b.append(_arrow(u, 550, 140, 720, 53, "reads inventory + metrics", 635, 92))
     b.append(_arrow(u, 550, 165, 720, 139, "reads cost, budgets, recs", 635, 148))
@@ -113,7 +113,7 @@ def c4_container() -> tuple[str, str]:
     b.append(_box(530, 200, 210, 72, "Steampipe (Postgres)", "aws plugin · read-only session", "Container"))
     b.append(_box(230, 340, 200, 72, "History store", "SQLite: runs · findings · cost", "Container"))
     b.append(_box(530, 340, 210, 72, "AI agent", "catalog · checker · jobs · cache", "Container"))
-    b.append(_box(230, 430, 200, 58, "Renderers", "table · CSV · JSON · HTML", "Container"))
+    b.append(_box(230, 430, 200, 58, "Renderers", "table · CSV · JSON · HTML · brief", "Container"))
     # externals
     b.append(_box(830, 200, 160, 72, "AWS APIs", "role from terminal / OIDC", "External", ext=True))
     b.append(_box(830, 340, 160, 72, "LLM provider", "official SDKs", "External", ext=True))
@@ -203,14 +203,14 @@ def seq_report() -> tuple[str, str]:
         ("msg", "sl", "sp", "cost diff · anomalies · forecast: bounded SQL", False),
         ("msg", "sp", "aws", "GetCostAndUsage / GetCostForecast", False),
         ("msg", "sl", "db", "save each run (findings, cost rows, params)", False),
-        ("self", "sl", "dashboard + savings summary from history"),
+        ("self", "sl", "savings summary · dashboard · executive brief from history"),
         ("msg", "sl", "hook", "notify: summary + new alarms since last run", False),
         ("msg", "ci", "db", "save history.db · keep reports/ artifact", False),
     ]
     svg = _sequence("sr", parts, steps, "Sequence of a scheduled spendlens report run in CI")
     return svg, ("A scheduled run. The pipeline holds no AWS keys: it trades an OIDC token for a read-only role. "
-                 "spendlens writes every result to the history DB, so the dashboard, notifications and next week's "
-                 "'what changed' all come from data already collected.")
+                 "spendlens writes every result to the history DB, so the dashboard, the executive brief, "
+                 "notifications and next week's 'what changed' all come from data already collected.")
 
 
 def seq_ask() -> tuple[str, str]:
