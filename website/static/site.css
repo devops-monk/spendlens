@@ -507,3 +507,16 @@ main:has(.localnav) .cs-section[id] { scroll-margin-top: 104px; }
 .cs-none { text-align: center; color: var(--ink-2); padding: 0 22px 80px; }
 [hidden].cs-card, .cs-section[hidden] { display: none !important; }
 @media (max-width: 800px) { .cs-head { grid-template-columns: 1fr; gap: 10px; } .cs-section { padding: 60px 22px; } }
+
+/* Home: "New in" section */
+.new-in .eyebrow { text-align: center; }
+.new-bento .t-wide { grid-row: auto; }
+.new-bento .tile h3 { font-size: 24px; }
+.new-bento .tile p:not(.t-eyebrow) { line-height: 1.5; }
+.t-code { margin: 20px 0 12px; background: var(--code-bg); border-radius: 14px; padding: 14px 16px; font-size: 13px; line-height: 1.7;
+  white-space: pre-wrap; overflow-wrap: anywhere; color: var(--ink); }
+.t-code code { background: none; padding: 0; font-size: inherit; }
+.tile .t-foot { margin-top: auto; font-size: 13.5px; color: var(--ink-3); }
+.new-ctas { margin-top: 40px; }
+@media (max-width: 1000px) { .new-bento { grid-template-columns: repeat(2, minmax(0, 1fr)); } .new-bento .t-wide { grid-column: span 2; } }
+@media (max-width: 640px) { .new-bento { grid-template-columns: 1fr; } .new-bento .t-wide { grid-column: auto; } }

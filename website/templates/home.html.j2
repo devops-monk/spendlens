@@ -6,7 +6,7 @@
 {%- endmacro %}
 {% block main %}
 <section class="hero hero-xl">
-  <a class="pill" href="#install"><b>New</b> v{{ version }} · one-line install and Docker image ›</a>
+  <a class="pill" href="#new"><b>New</b> v{{ version }} · always-fresh reports, cost drill-down, self-explaining charts ›</a>
   <p class="eyebrow">FinOps for AWS, from your terminal</p>
   <h1>See every dollar.<br><span class="grad">Act on every insight.</span></h1>
   <p class="lede">spendlens finds untagged resources, oversized instances, idle waste and unexpected cost spikes, puts a
@@ -22,6 +22,70 @@
     </div>
     <figcaption>One self-contained HTML report. Works offline, in CI artifacts, and in print. Shown with demo data.</figcaption>
   </figure>
+</section>
+
+<section class="section new-in" id="new">
+  <div class="wrap">
+    <p class="eyebrow">New in v{{ version }}</p>
+    <h2 class="h2">Always complete.<br><span class="grad">Always explained.</span></h2>
+    <p class="sub">Reports that are never half-empty, cost changes you can trace to the resource, and every chart
+      telling you how to read it.</p>
+    <div class="bento new-bento">
+      <article class="tile t-wide">
+        <span class="tile-ico" aria-hidden="true">{{ icons["clock"]|safe }}</span>
+        <p class="t-eyebrow">Always fresh</p>
+        <h3>Never half-empty.</h3>
+        <p>The dashboard, Slack and Teams summaries, and the savings total reuse every check already run today and
+          run the rest first. Every report covers everything, and is at most a day old.</p>
+        <pre class="t-code"><code>spendlens dashboard -o report.html
+spendlens dashboard --refresh -o report.html
+spendlens dashboard --source last -o report.html</code></pre>
+        <p class="t-foot">Same for notify and savings summary · reuse, re-run all, or no AWS calls</p>
+      </article>
+      <article class="tile t-wide">
+        <span class="tile-ico" aria-hidden="true">{{ icons["flow"]|safe }}</span>
+        <p class="t-eyebrow">Cost drill-down</p>
+        <h3>From "EC2 went up" to which app.</h3>
+        <p>Break every service's change down by a second level: a tag such as Name or Team, usage type or region.
+          Add <code>-f html</code> for a searchable report.</p>
+        <pre class="t-code"><code>spendlens cost diff -g service -b tag:Name
+spendlens cost diff -g service -b usage-type
+spendlens cost diff -g usage-type --top 15</code></pre>
+        <p class="t-foot">Works with months, ranges and month to date</p>
+      </article>
+      <article class="tile">
+        <span class="tile-ico" aria-hidden="true">{{ icons["book"]|safe }}</span>
+        <p class="t-eyebrow">Self-explaining</p>
+        <h3>"How to read this", everywhere.</h3>
+        <p>Every dashboard tab and report says what it shows, how it's calculated with your thresholds, and what to
+          do next. "Flagged" always states its rule.</p>
+      </article>
+      <article class="tile">
+        <span class="tile-ico" aria-hidden="true">{{ icons["chart"]|safe }}</span>
+        <p class="t-eyebrow">Charted reports</p>
+        <h3>Charts for every cost command.</h3>
+        <p><code>-f html</code> on cost diff, trend, showback, anomalies and forecast gives bar, line and budget
+          charts, with the full table.</p>
+      </article>
+      <article class="tile">
+        <span class="tile-ico" aria-hidden="true">{{ icons["list"]|safe }}</span>
+        <p class="t-eyebrow">Findings at scale</p>
+        <h3>Tens of thousands of results.</h3>
+        <p>Filter, search and sort every check, with its thresholds, why each resource alarmed, and its current
+          value.</p>
+      </article>
+      <article class="tile">
+        <span class="tile-ico" aria-hidden="true">{{ icons["pulse"]|safe }}</span>
+        <p class="t-eyebrow">Live progress</p>
+        <h3>No more silent waits.</h3>
+        <p>Long runs show the current step and an elapsed timer. eu-west-1 by default, any regions you choose.</p>
+      </article>
+    </div>
+    <div class="ctas new-ctas">
+      <a class="btn primary" href="{{ root }}cheatsheet/">Open the cheat sheet</a>
+      <a class="btn ghost" href="{{ repo_url }}/releases/tag/v{{ version }}">Release notes ›</a>
+    </div>
+  </div>
 </section>
 
 <section class="section alt" id="features">
@@ -76,8 +140,9 @@
       </div>
       <div class="sc-copy">
       <p>Compare any two months, quarters or date ranges, by service, account, region or any tag. New and removed
-        services are always shown, and changes that cross your thresholds are flagged.</p>
-      <ul class="chips"><li>Month over month</li><li>Month to date</li><li>Quarter vs quarter</li><li>By tag</li><li>CI gate</li></ul>
+        services are always shown, changes that cross your thresholds are flagged with the rule stated, and
+        <code>-b tag:Name</code> breaks each service's change down to the resource or app behind it.</p>
+      <ul class="chips"><li>Month over month</li><li>Month to date</li><li>Quarter vs quarter</li><li>By tag</li><li>Drill-down</li><li>CI gate</li></ul>
       <a class="more" href="{{ root }}docs/cost/">Cost analysis ›</a>
       </div>
     </div>
@@ -94,8 +159,9 @@
       </div>
       <div class="sc-copy">
       <p>spendlens's own rightsizing and waste findings, merged with AWS Cost Optimization Hub and Savings Plan
-        coverage. Each resource counts once, AWS's figures win where both exist, and every adjustment is listed.</p>
-      <ul class="chips"><li>De-duplicated</li><li>AWS figures preferred</li><li>Per resource</li><li>Review before acting</li></ul>
+        coverage. Each resource counts once, AWS's figures win where both exist, and every adjustment is listed.
+        Every total covers all four sources and is at most a day old.</p>
+      <ul class="chips"><li>De-duplicated</li><li>AWS figures preferred</li><li>Always complete</li><li>Review before acting</li></ul>
       <a class="more" href="{{ root }}docs/savings/">Savings ›</a>
       </div>
     </div>
@@ -176,6 +242,7 @@ Bedrock and Redshift crossed your alert thresholds.
     <h2 class="h2">And so much more.</h2>
     <p class="sub">Every feature is a command. Every command speaks table, CSV, JSON and HTML.</p>
     <div class="ctas" style="margin:-28px 0 44px"><a class="btn primary" href="{{ root }}docs/cli/">Browse every command</a>
+      <a class="btn ghost" href="{{ root }}cheatsheet/">Cheat sheet ›</a>
       <a class="btn ghost" href="{{ root }}docs/ways-to-run/">Ways to run ›</a></div>
     <div class="grid">
       {% for f in features %}

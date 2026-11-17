@@ -499,7 +499,7 @@ def build() -> list[Path]:
     write("", "home.html.j2", title="spendlens: FinOps for AWS, from your terminal", section="home",
           description="Read-only FinOps CLI for AWS: tag compliance, rightsizing, waste, cost diff, anomalies, "
                       "forecast, savings and an AI assistant.",
-          stats=stats(), screens=screens(), shots=shots(), features=[{"icon": ICONS[i], "title": t, "body": b, "cmd": c, "doc": d}
+          stats=stats(), screens=screens(), shots=shots(), icons=ICONS, features=[{"icon": ICONS[i], "title": t, "body": b, "cmd": c, "doc": d}
                                    for i, t, b, c, d in FEATURES],
           cases=[{"who": w, "title": t, "body": b, "cmd": c} for w, t, b, c in CASES])
     write("cheatsheet", "cheatsheet.html.j2", title="Cheat sheet · spendlens", section="cheatsheet",
