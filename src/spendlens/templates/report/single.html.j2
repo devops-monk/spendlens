@@ -1,0 +1,33 @@
+{#- `--format html` for cost diff / trend / showback / anomalies / forecast: the same charts and "How to read this"
+    guides as the dashboard, for one run, with the full table. Context: kind, vm (dashboard-style view model). -#}
+{% extends "base.html.j2" %}
+{% from "macros.html.j2" import card, tile %}
+{% import "sections.html.j2" as sec %}
+{% block main %}
+{% if kind == "cost_diff" and vm.cost_diff %}
+{% set s = vm.cost_diff %}{% set t = s.total %}
+<div class="tiles">
+  {{ tile({"label": "Spend in " ~ s.p1, "value": charts.money(t.compare, vm.currency), "detail": "was " ~ charts.money(t.base, vm.currency) ~ " in " ~ s.p0}) }}
+  {{ tile({"label": "Change", "value": charts.signed_money(t.change, vm.currency), "detail": (charts.pct(t.change_pct, True) ~ " vs " ~ s.p0) if t.change_pct is not none else "vs " ~ s.p0}) }}
+  {{ tile({"label": "Flagged changes", "value": s.flagged|string, "detail": s.rule_short}) }}
+  {% if s.up %}{{ tile({"label": "Biggest increase", "value": charts.signed_money(s.up.change, vm.currency), "detail": s.up.group}) }}{% endif %}
+  {% if s.down %}{{ tile({"label": "Biggest decrease", "value": charts.signed_money(s.down.change, vm.currency), "detail": s.down.group}) }}{% endif %}
+</div>
+{% if s.flagged_rows %}
+{% call card("Flagged changes", "These crossed your thresholds; look at them first") %}
+<ul class="flag-list">{% for r in s.flagged_rows %}<li><b>{{ r.group }}</b> {{ charts.money(r.base, vm.currency) }} → {{ charts.money(r.compare, vm.currency) }}
+  <span class="chg {{ 'up' if r.change > 0 else 'down' }}">{{ charts.signed_money(r.change, vm.currency) }}{% if r.change_pct is not none %} ({{ charts.pct(r.change_pct, True) }}){% endif %}</span> · {{ r.status }}</li>{% endfor %}</ul>
+{% endcall %}
+{% endif %}
+{{ sec.cost_diff(s, 1080, vm.currency, full_table=true) }}
+{% if s.spend_bars %}
+{% call card("Where the money goes in " ~ s.p1, "Largest " ~ s.group_by ~ " by spend; hover a bar for its share") %}
+{{ charts.hbars(s.spend_bars, label="Spend by " ~ s.group_by ~ " in " ~ s.p1, cur=vm.currency, width=1080) }}
+{% endcall %}
+{% endif %}
+{% elif kind == "cost_trend" %}{{ sec.trend(vm.trend, 1080, vm.currency, full_table=true) }}
+{% elif kind == "cost_showback" %}{{ sec.showback(vm.showback, 520, vm.currency, full_table=true) }}
+{% elif kind == "anomalies" %}{{ sec.anomalies(vm.anomalies, vm.guides.anomalies, 1080, vm.currency, full_table=true) }}
+{% elif kind == "forecast" %}{{ sec.forecast(vm.forecast, vm.guides.forecast, full_table=true) }}
+{% endif %}
+{% endblock %}

@@ -101,7 +101,12 @@ def anomalies(
     findings, meta = findings_from_source(FEATURE, source, cfg, lambda: run_live(cfg, group, t),
                                           meta={"group_by": group.label, "anomaly": cfg.anomaly.model_dump()})
     meta.title = f"Cost anomalies by {group.label}"
-    emit(as_rows(findings), fmt, out, meta.title, columns=COLUMNS, meta=meta)
+    if fmt is Format.html:
+        from .dashboard import single_report, write_report
+
+        write_report(single_report("anomalies", cfg, meta, {}, findings=findings), out)
+    else:
+        emit(as_rows(findings), fmt, out, meta.title, columns=COLUMNS, meta=meta)
     excess = sum(f.dimensions.get("delta", 0) for f in findings if f.dimensions.get("direction") == "spike")
     err.print(f"[bold]{len(findings)} anomaly(ies)[/]" + (f" · excess spend {excess:,.2f}" if excess else "")
               + f" · threshold z>={cfg.anomaly.threshold}, min +{cfg.anomaly.min_increase}/day,"

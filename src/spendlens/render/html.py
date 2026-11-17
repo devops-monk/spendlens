@@ -34,6 +34,7 @@ from . import charts as ch
 THEME: DashboardConfig = DashboardConfig()  # set by common.load() from finops.yaml
 
 HEADERS = {
+    "base": "Before", "compare": "After",
     "est_monthly_saving": "Saving / month", "account_id": "Account", "resource_type": "Resource type",
     "change_pct": "Change %", "change_pct_daily": "Daily-rate change %", "share_pct": "Share %",
     "compliance_pct": "Compliance %", "coverage_pct": "Coverage %", "target_pct": "Target %",
@@ -68,6 +69,8 @@ def _cell(col: str, v: Any) -> dict[str, Any]:
         return {"text": json.dumps(v, default=str) if v else "", "cls": "wrap", "sort": None}
     if col == "status":
         return {"text": str(v), "cls": f"st {v}", "sort": None}
+    if col == "flagged" and isinstance(v, bool):
+        return {"text": "⚑ flagged" if v else "", "cls": "st alarm nw" if v else "", "sort": None}
     if _is_num(v):
         txt = f"{v:,.2f}" if isinstance(v, float) else f"{v:,}"
         if col.endswith("pct"):
@@ -353,6 +356,7 @@ def breakdown_model(records: list[dict[str, Any]], meta: ReportMeta) -> dict[str
         "periods": f"{(meta.extra.get('base') or {}).get('label', '')} → {(meta.extra.get('compare') or {}).get('label', '')}",
         "metric": meta.extra.get("metric", ""),
         "tagged": b.startswith("tag:") or g.startswith("tag:"),
+        "rule": meta.extra.get("flag_rule", ""),
     }
 
 

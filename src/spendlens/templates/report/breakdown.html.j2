@@ -32,6 +32,7 @@
   <p class="fr-scope">{{ bd.periods }} · grouped by {{ bd.g }} → {{ bd.b }}{% if bd.metric %} · metric {{ bd.metric }}{% endif %}
     {%- if bd.tagged %} · tags must be activated as cost allocation tags; spend before activation or on untagged
     resources shows as "(untagged)"{% endif %}</p>
+  {% if bd.rule %}<p class="rule"><b>Flagged</b> = {{ bd.rule }}.</p>{% endif %}
 </section>
 
 <section class="fr-overview" aria-label="{{ bd.g }} overview">

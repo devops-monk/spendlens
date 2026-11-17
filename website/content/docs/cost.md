@@ -22,6 +22,15 @@ Each row shows the base and compare amounts, the change and change %, and a stat
 
 New and removed services are always included.
 
+**HTML report** (`-f html`):
+- summary tiles: spend, change, flagged count, biggest increase and decrease;
+- a **Flagged changes** list;
+- a diverging bar chart of every change;
+- a "Where the money goes" bar chart;
+- a "How to read this" box, and the full table.
+
+`cost trend`, `cost showback`, `anomalies` and `forecast` also produce charted HTML reports with the same explanations.
+
 A change is **flagged** when it crosses both thresholds:
 - `cost.change_alarm_abs` (default 10);
 - `cost.change_alarm_pct` (default 20%).

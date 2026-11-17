@@ -85,6 +85,12 @@ def _split(rows: list[dict[str, Any]], periods: list[ce.Period]) -> list[tuple[c
     return out
 
 
+def _rule(cfg: Config, currency: str) -> str:
+    from .guides import flag_rule
+
+    return flag_rule(cfg, currency)
+
+
 def _currency(rows: list[dict[str, Any]], cfg: Config) -> str:
     return next((r["currency"] for r in rows if r.get("currency")), cfg.pricing.currency)
 
@@ -172,13 +178,20 @@ def diff_cmd(
     meta.title = f"Cost diff by {meta_saved.get('group_by', group.label)}: {p0.label} → {p1.label}"
     meta.extra.update({"base": p0.as_dict(), "compare": p1.as_dict(), "metric": meta_saved.get("metric", m),
                        "total": tot})
-    emit(shown, fmt, out, meta.title, columns=DIFF_COLUMNS, meta=meta)
+    if fmt is Format.html:
+        from .dashboard import single_report, write_report
+
+        write_report(single_report("cost_diff", cfg, meta, {**meta_saved, "group_by": meta_saved.get(
+            "group_by", group.label)}, cost=rows), out)
+    else:
+        emit(shown, fmt, out, meta.title, columns=DIFF_COLUMNS, meta=meta)
     flagged = [r for r in result if r["flagged"]]
     sign = "+" if tot["change"] >= 0 else ""
     pct = f" ({sign}{tot['change_pct']}%)" if tot["change_pct"] is not None else ""
     err.print(f"[bold]Total {currency} {tot['base']:,.2f} → {tot['compare']:,.2f}: {sign}{tot['change']:,.2f}{pct}[/]"
               f" · {len(flagged)} flagged change(s)"
               + (" · periods differ in length, see change_pct_daily (json/csv)" if p0.days != p1.days else ""))
+    err.print(f"[dim]Flagged = {_rule(cfg, currency)}.[/]")
     if group.kind == "tag":
         err.print("[dim]Tag grouping cannot exclude credits/refunds (Cost Explorer limitation).[/]")
     if fail_on_flag and flagged:
@@ -269,6 +282,7 @@ def _breakdown_diff(cfg: Config, group: ce.GroupBy, second: ce.GroupBy, periods:
         shown.append({g_label: "TOTAL", b_label: "", **{k: tot.get(k) for k in cols[2:]}})
     meta.title = f"Cost diff by {g_label} → {b_label}: {p0.label} → {p1.label}"
     meta.extra.update({"view": "breakdown", "group_label": g_label, "breakdown_label": b_label,
+                       "flag_rule": _rule(cfg, currency),
                        "base": p0.as_dict(), "compare": p1.as_dict(), "metric": meta_saved.get("metric", m),
                        "total": tot, "groups": summaries})
     emit(shown, fmt, out, meta.title, columns=cols, meta=meta)
@@ -277,6 +291,7 @@ def _breakdown_diff(cfg: Config, group: ce.GroupBy, second: ce.GroupBy, periods:
     pct = f" ({sign}{tot['change_pct']}%)" if tot["change_pct"] is not None else ""
     err.print(f"[bold]Total {currency} {tot['base']:,.2f} → {tot['compare']:,.2f}: {sign}{tot['change']:,.2f}{pct}[/]"
               f" · {len(summaries)} {g_label} value(s) · {len(flagged)} flagged change(s)")
+    err.print(f"[dim]Flagged = {_rule(cfg, currency)}.[/]")
     if second.kind == "tag" or group.kind == "tag":
         err.print("[dim]Tags must be activated as cost allocation tags in Billing; spend before activation, or on "
                   f"untagged resources, shows as {chr(39)}(untagged){chr(39)}.[/]")
@@ -317,6 +332,11 @@ def trend_cmd(
         periods = [ce.Period.from_dict(d) for d in meta_saved.get("periods", [])] or periods
     result = ce.trend(_split(rows, periods), top)
     meta.title = f"Cost trend by {meta_saved.get('group_by', group.label)} ({_currency(rows, cfg)})"
+    if fmt is Format.html:
+        from .dashboard import single_report, write_report
+
+        write_report(single_report("cost_trend", cfg, meta, meta_saved, cost=rows), out)
+        return
     emit(result, fmt, out, meta.title,
          columns=["group", *[p.label for p in periods], "total", "last_change", "last_change_pct"], meta=meta)
 
@@ -365,9 +385,14 @@ def showback_cmd(
         totals, _ = ce.totals_by_group(r for r in rows if r["dimension"] == f"tag:{k}")
         out_rows += ce.showback(totals, k, cfg.budgets.per_tag.get(k), currency)
     meta.title = f"Showback {label} by {', '.join(keys)}"
-    emit(out_rows, fmt, out, meta.title,
-         columns=["tag_key", "tag_value", "amount", "share_pct", "budget", "budget_variance", "over_budget", "currency"],
-         meta=meta)
+    if fmt is Format.html:
+        from .dashboard import single_report, write_report
+
+        write_report(single_report("cost_showback", cfg, meta, {**meta_saved, "tag_keys": keys}, cost=rows), out)
+    else:
+        emit(out_rows, fmt, out, meta.title,
+             columns=["tag_key", "tag_value", "amount", "share_pct", "budget", "budget_variance", "over_budget",
+                      "currency"], meta=meta)
     for k in keys:
         untagged = next((r for r in out_rows if r["tag_key"] == k and r["tag_value"] == "(untagged)"), None)
         if untagged and untagged["share_pct"]:

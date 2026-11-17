@@ -1,0 +1,47 @@
+{#- Sections shared by the dashboard and the single-command HTML reports (cost diff, trend, showback,
+    anomalies, forecast). Each takes its view model from features/dashboard.py; `cur` is the currency. -#}
+{% from "macros.html.j2" import card, missing, data_table, table_view, guide %}
+
+{% macro cost_diff(s, width, cur, full_table=false) -%}
+{% if not s %}{% call card("Cost change", "Month over month") %}{{ missing("cost diff") }}{% endcall %}
+{% else %}{% call card("Biggest cost changes", s.hint) %}
+{{ guide(s.guide, open=full_table) }}
+{{ charts.diverging_hbars(s.bars, label=s.chart_label, cur=cur, width=width) }}
+<div class="legend"><span class="key"><i style="background:var(--div-pos)"></i>Increase</span><span class="key"><i style="background:var(--div-neg)"></i>Decrease</span></div>
+<p class="rule"><b>Flagged</b> = {{ s.rule }}.</p>
+{% if full_table %}{{ data_table(s.table) }}{% else %}{{ table_view(s.table) }}{% endif %}{% endcall %}{% endif %}
+{%- endmacro %}
+
+{% macro trend(t, width, cur, full_table=false) -%}
+{% if not t %}{% call card("Monthly trend") %}{{ missing("cost trend") }}{% endcall %}
+{% else %}{% call card("Monthly trend: top " ~ t.series|length, t.hint) %}
+{{ guide(t.guide, open=full_table) }}
+{{ charts.legend(t.series) }}{{ charts.lines(t.series, t.x_labels, label="Monthly cost, top groups", cur=cur, width=width, height=340) }}
+{% if full_table %}{{ data_table(t.table) }}{% else %}{{ table_view(t.table) }}{% endif %}{% endcall %}{% endif %}
+{%- endmacro %}
+
+{% macro showback(list, width, cur, full_table=false) -%}
+{% if not list %}{% call card("Showback") %}{{ missing("cost showback") }}{% endcall %}
+{% else %}<div class="grid2">{% for s in list %}{% call card("Spend by " ~ s.key, s.hint) %}
+{{ guide(s.guide, open=full_table) }}
+{{ charts.hbars(s.bars, label="Spend by " ~ s.key, cur=cur, width=width) }}
+{% if s.untagged_pct is not none %}<p class="note">Grey bar: spend without a <b>{{ s.key }}</b> tag ({{ s.untagged_pct }}). Tag it to allocate it.</p>{% endif %}
+{% if full_table %}{{ data_table(s.table) }}{% else %}{{ table_view(s.table) }}{% endif %}{% endcall %}{% endfor %}</div>{% endif %}
+{%- endmacro %}
+
+{% macro anomalies(a, items, width, cur, full_table=false) -%}
+{% if not a %}{% call card("Cost anomalies") %}{{ missing("anomalies") }}{% endcall %}
+{% else %}{% call card("Cost anomalies", a.hint) %}
+{{ guide(items, open=full_table) }}
+{% if a.bars %}{{ charts.hbars(a.bars, label="Excess spend per anomaly", fill="var(--div-pos)", cur=cur, width=width) }}
+{% else %}<p class="empty">No anomalies in the last check. Spend is within its normal range.</p>{% endif %}
+{% if full_table %}{{ data_table(a.table) }}{% else %}{{ table_view(a.table) }}{% endif %}{% endcall %}{% endif %}
+{%- endmacro %}
+
+{% macro forecast(s, items, full_table=false) -%}
+{% if not s %}{% call card("Forecast vs budgets") %}{{ missing("forecast") }}{% endcall %}
+{% else %}{% call card("Month-end forecast vs budgets", s.hint) %}
+{{ guide(items, open=full_table) }}
+{% for m in s.meters %}{{ charts.meter(m.name, m.pct, m.status, m.detail) }}{% endfor %}
+{% if full_table %}{{ data_table(s.table) }}{% else %}{{ table_view(s.table) }}{% endif %}{% endcall %}{% endif %}
+{%- endmacro %}

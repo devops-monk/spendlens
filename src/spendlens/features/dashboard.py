@@ -25,6 +25,7 @@ from ..models import Finding, Status
 from ..plugins import Registry, registry
 from ..render import charts as ch
 from ..render.html import render_template, table_model
+from . import guides
 from .summary import compliance_pct, summarise
 
 FEATURES = ("cost_diff", "cost_trend", "cost_showback", "forecast", "anomalies", "tags", "rightsize", "waste",
@@ -50,13 +51,27 @@ class Data:
             self.findings[f] = store.findings(run.id)
             self.cost[f] = store.cost_rows(run.id)
 
+    @classmethod
+    def single(cls, feature: str, run_meta: dict[str, Any], *, cost: list[dict[str, Any]] | None = None,
+               findings: list[Finding] | None = None, run_id: int | None = None, account: str | None = None,
+               started_at: str | None = None) -> Data:
+        """Data for one run held in memory (e.g. the command that just ran), without a history store."""
+        d = cls.__new__(cls)
+        d.runs = {feature: Run(id=run_id or 0, feature=feature,
+                               started_at=started_at or datetime.now(UTC).isoformat(timespec="seconds"),
+                               account_id=account, caller_arn=None, params={}, meta=run_meta)}
+        d.findings = {feature: findings or []}
+        d.cost = {feature: cost or []}
+        return d
+
     def has(self, f: str) -> bool:
         return f in self.runs
 
     def provenance(self, f: str) -> str:
         r = self.runs[f]
         ci = r.meta.get("CI_PIPELINE_ID") or r.meta.get("GITHUB_RUN_ID")
-        return f"Run #{r.id} · {r.started_at[:16].replace('T', ' ')} UTC" + (f" · pipeline {ci}" if ci else "")
+        run = f"Run #{r.id} · " if r.id else ""
+        return f"{run}{r.started_at[:16].replace('T', ' ')} UTC" + (f" · pipeline {ci}" if ci else "")
 
     @property
     def account(self) -> str | None:
@@ -84,7 +99,21 @@ def vm_cost_diff(d: Data, cfg: Config, cur: str) -> dict[str, Any] | None:
     diff = ce.diff(_totals(rows, "p0"), _totals(rows, "p1"), t, cur, p0.days, p1.days)
     flagged = [r for r in diff if r["flagged"]]
     group_by = run.meta.get("group_by", "service")
+    changed = [x for x in diff if x["status"] != "flat"]
+    up = max(changed, key=lambda r: r["change"], default=None)
+    down = min(changed, key=lambda r: r["change"], default=None)
+    spend = sorted((x for x in diff if x["compare"] > 0), key=lambda r: -r["compare"])
+    total_cmp = sum(x["compare"] for x in diff) or 1
     return {
+        "group_by": group_by, "rule": guides.flag_rule(cfg, cur),
+        "rule_short": f"≥ {ch.money(cfg.cost.change_alarm_abs, cur)} and ≥ {cfg.cost.change_alarm_pct:g}% change",
+        "guide": guides.as_items(guides.cost_diff(cfg, p0.label, p1.label, group_by, run.meta.get("metric"), cur)),
+        "up": up if up and up["change"] > 0 else None, "down": down if down and down["change"] < 0 else None,
+        "flagged_rows": flagged,
+        "spend_bars": [{"label": r["group"], "value": r["compare"],
+                        "tip": f"{r['group']}: {ch.money(r['compare'], cur)} in {p1.label} "
+                               f"({ch.pct(100 * r['compare'] / total_cmp)} of spend)"}
+                       for r in spend[: cfg.dashboard.top_n]],
         "p0": p0.label, "p1": p1.label, "total": ce.diff_total(diff, cur), "flagged": len(flagged),
         "chart_label": f"Cost change by {group_by}",
         "hint": (f"{p0.label} → {p1.label} by {group_by} · {len(flagged)} flagged (≥ {ch.money(cfg.cost.change_alarm_abs, cur)} "
@@ -106,6 +135,7 @@ def vm_trend(d: Data) -> dict[str, Any] | None:
     # <= 4 series: the validated adjacent slots 1-4 (direct labels where they don't collide + legend + table)
     series = [{"name": r["group"], "values": [r[p.label] for p in periods], "slot": i + 1} for i, r in enumerate(pivot[:4])]
     return {"series": series, "x_labels": [p.label for p in periods],
+            "guide": guides.as_items(guides.trend(Config(), run.meta.get("group_by", "service"))),
             "hint": f"By {run.meta.get('group_by', 'service')} · {d.provenance('cost_trend')}",
             "table": table_model(pivot, ["group", *[p.label for p in periods], "total", "last_change", "last_change_pct"])}
 
@@ -121,6 +151,7 @@ def vm_showback(d: Data, cfg: Config, cur: str) -> list[dict[str, Any]]:
         untagged = next((r for r in data if r["tag_value"] == "(untagged)"), None)
         out.append({
             "key": key, "hint": f"{period} · {d.provenance('cost_showback')}",
+            "guide": guides.as_items(guides.showback(cfg, key)),
             "untagged_pct": ch.pct(untagged["share_pct"]) if untagged else None,
             "bars": [{"label": r["tag_value"], "value": r["amount"], "muted": r["tag_value"] == "(untagged)",
                        "tip": f"{r['tag_value']}: {ch.money(r['amount'], cur)} ({ch.pct(r['share_pct'])})"
@@ -250,6 +281,12 @@ def view_model(d: Data, cfg: Config, source: Source) -> dict[str, Any]:
         "forecast": vm_forecast(d, cur), "anomalies": vm_anomalies(d, cur), "tags": vm_tags(d, cfg),
         "rightsize": vm_findings(d, "rightsize", cfg, cur), "waste": vm_findings(d, "waste", cfg, cur),
         "savings": vm_savings(d, cfg, cur),
+        "guides": {"overview": guides.as_items(guides.overview()),
+                   "anomalies": guides.as_items(guides.anomalies(cfg, cur)),
+                   "forecast": guides.as_items(guides.forecast(cfg)), "tags": guides.as_items(guides.tags(cfg)),
+                   "rightsize": guides.as_items(guides.findings(cfg, "rightsize")),
+                   "waste": guides.as_items(guides.findings(cfg, "waste")),
+                   "savings": guides.as_items(guides.savings())},
     }
     # overview: exactly one hero figure + stat tiles
     tiles, hero = [], None
@@ -258,7 +295,9 @@ def view_model(d: Data, cfg: Config, source: Source) -> dict[str, Any]:
         hero = {"label": f"Spend in {cd['p1']}", "value": ch.money(t["compare"], cur),
                 "direction": "up" if t["change"] > 0 else "down",
                 "delta": f"{ch.signed_money(t['change'], cur)} ({ch.pct(t['change_pct'], True)}) vs {cd['p0']}"}
-        tiles.append({"label": "Flagged cost changes", "value": str(cd["flagged"]), "detail": "big changes vs last month"})
+        tiles.append({"label": "Flagged cost changes", "value": str(cd["flagged"]),
+                      "detail": f"≥ {ch.money(cfg.cost.change_alarm_abs, cur)} and ≥ {cfg.cost.change_alarm_pct:g}% "
+                                f"vs {cd['p0']}"})
     if (fc := vm["forecast"]) and (a := fc["account"]):
         tiles.append({"label": "Projected month end", "value": ch.money(a.get("forecast"), cur),
                       "detail": f"budget {ch.money(a.get('limit'), cur)} · {a.get('label')}" if a.get("limit") else "no budget set"})
@@ -291,6 +330,33 @@ def build(d: Data, cfg: Config, source: Source) -> str:
         tabs=TABS + [(s["id"], s["title"]) for s in extra], vm={**vm, "extra_sections": extra},
         view_model=vm,  # embedded as JSON for tools / the AI assistant
     )
+
+
+def single_report(kind: str, cfg: Config, meta: Any, run_meta: dict[str, Any], *,
+                  cost: list[dict[str, Any]] | None = None, findings: list[Finding] | None = None) -> str:
+    """`--format html` for cost diff / trend / showback / anomalies / forecast: the dashboard's charts and guides
+    for the run that was just made (or replayed), plus the full table."""
+    d = Data.single(kind, run_meta, cost=cost, findings=findings, run_id=(meta.extra or {}).get("run_id"),
+                    account=meta.account_id,
+                    started_at=meta.generated_at.astimezone(UTC).isoformat(timespec="seconds"))
+    vm = view_model(d, cfg, Source.last)
+    gen = meta.generated_at.astimezone(UTC).strftime("%Y-%m-%d %H:%M UTC")
+    src = (meta.extra or {}).get("source", "")
+    return render_template(
+        "single.html.j2", title=meta.title, kind=kind, vm=vm, view_model=vm,
+        subtitle=" · ".join(x for x in [f"AWS account {meta.account_id}" if meta.account_id else "", gen] if x),
+        footer=f"Generated by spendlens · {gen}" + (f" · source {src}" if src else "")
+               + " · Cost Explorer data (read-only); estimates are for review",
+    )
+
+
+def write_report(html: str, out: Path | None) -> None:
+    if out is None:
+        typer.echo(html)
+        return
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(html)
+    err.print(f"[green]Wrote[/] {out}")
 
 
 def dashboard(

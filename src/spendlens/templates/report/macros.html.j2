@@ -36,3 +36,10 @@
 {% macro notes(items) -%}
 {% for n in items %}<p class="note">· {{ n }}</p>{% endfor %}
 {%- endmacro %}
+
+{% macro guide(items, open=true) -%}
+{%- if items -%}
+<details class="guide"{% if open %} open{% endif %}><summary>How to read this</summary>
+<dl>{% for it in items %}<dt>{{ it.q }}</dt><dd>{{ it.a }}</dd>{% endfor %}</dl></details>
+{%- endif -%}
+{%- endmacro %}

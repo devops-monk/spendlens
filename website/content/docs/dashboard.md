@@ -53,6 +53,13 @@ One self-contained HTML file. It has no network requests, so it works offline, a
 - **Waste**
 - **Savings**
 
+**Every section explains itself.** A **How to read this** box on each tab says:
+- **What it shows.**
+- **How it's calculated:** with your actual thresholds and the `finops.yaml` setting that changes each one, e.g. "flagged = at least $10 and at least 20% (cost.change_alarm_abs / cost.change_alarm_pct)".
+- **What to do next.**
+
+The same charts and explanations appear when you run a single cost command with `-f html` (`cost diff`, `cost trend`, `cost showback`, `anomalies`, `forecast`).
+
 How the charts behave:
 - Every chart has hover and keyboard tooltips, and a **Table view**.
 - Chart colours are a palette validated for colour-blind readers in both light and dark mode.

@@ -121,7 +121,12 @@ def forecast(
     findings, meta = findings_from_source(FEATURE, source, cfg, lambda: run_live(cfg, t))
     meta.title = "Month-end forecast vs budgets"
     rows = [{"status": f.status.value, **{k: f.dimensions.get(k) for k in COLUMNS if k != "status"}} for f in findings]
-    emit(rows, fmt, out, meta.title, columns=COLUMNS, meta=meta)
+    if fmt is Format.html:
+        from .dashboard import single_report, write_report
+
+        write_report(single_report("forecast", cfg, meta, {}, findings=findings), out)
+    else:
+        emit(rows, fmt, out, meta.title, columns=COLUMNS, meta=meta)
     acct = next((f for f in findings if f.resource == "account"), None)
     if acct:
         d = acct.dimensions

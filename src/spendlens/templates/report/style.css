@@ -202,3 +202,21 @@ details.ctl .tablewrap{border-top:0;margin-top:0}
 .bd details.ctl.worst-ok{border-left:4px solid var(--good)}
 tr.bd-hide,details.bd-grp.bd-hide{display:none}
 @media (max-width:760px){.bd-row{grid-template-columns:12px minmax(0,1fr) auto}}
+/* ---------- explanations: "How to read this", flag rule, flagged list ---------- */
+details.guide{margin:4px 0 14px;border:1px solid var(--border);border-radius:14px;background:var(--page)}
+details.guide>summary{cursor:pointer;list-style:none;padding:9px 14px;font-size:13px;font-weight:600;color:var(--ink-2);
+ display:flex;align-items:center;gap:8px}
+details.guide>summary::-webkit-details-marker{display:none}
+details.guide>summary::before{content:"i";display:inline-grid;place-items:center;width:18px;height:18px;border-radius:50%;
+ background:var(--brand);color:#fff;font:700 11px/1 Georgia,serif}
+details.guide>summary::after{content:"›";margin-left:auto;transition:transform .15s}
+details.guide[open]>summary::after{transform:rotate(90deg)}
+details.guide dl{margin:0;padding:2px 16px 12px;display:grid;grid-template-columns:150px 1fr;gap:6px 16px;font-size:13px}
+details.guide dt{font-weight:600;color:var(--ink)}details.guide dd{margin:0;color:var(--ink-2);line-height:1.5}
+@media (max-width:700px){details.guide dl{grid-template-columns:1fr}details.guide dd{margin-bottom:6px}}
+p.rule{font-size:12.5px;color:var(--ink-2);margin:6px 0 10px;padding:8px 12px;border-radius:10px;background:var(--page);
+ border:1px dashed var(--border)}
+p.rule b{color:var(--ink)}
+.flag-list{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.flag-list li{padding:9px 12px;border-radius:10px;background:var(--page);border:1px solid var(--border);font-size:13.5px}
+.chg.up{color:var(--critical)}.chg.down{color:var(--good-ink)}
