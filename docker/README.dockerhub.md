@@ -43,6 +43,29 @@ alias spendlens='docker run --rm -it -v ~/.aws:/home/finops/.aws:ro -e AWS_PROFI
 spendlens tags --summary
 ```
 
+### Dashboards and summaries that are never half-empty
+
+`dashboard`, `notify` and `savings summary` combine many checks. By default they reuse every check already run **today** and run the rest live first, so the result covers everything and is at most a day old. With the alias above:
+
+```bash
+# Default: reuse today's checks, run the rest
+spendlens dashboard -o report.html
+spendlens notify --slack
+spendlens savings summary
+
+# Re-run everything now, e.g. after a deployment or clean-up
+spendlens dashboard --refresh -o report.html
+spendlens notify --slack --refresh
+spendlens savings summary --refresh
+
+# Saved runs only, no AWS calls (and no Steampipe start-up)
+spendlens dashboard --source last -o report.html
+spendlens notify --slack --source last
+spendlens savings summary --source last
+```
+
+**Keep `-v spendlens-data:/data`.** Today's checks are reused from the run history in `/data`. Without that volume, each `docker run` starts with an empty history and re-checks everything. If a check can't run, for example because of a missing permission, the output says why and uses that check's last saved run.
+
 ---
 
 ## What you get
@@ -75,12 +98,12 @@ Daily spikes measured against a robust baseline, and the projected month-end spe
 ![spendlens forecast](https://spendlens.devops-monk.com/static/screens/cli-forecast.png)
 
 ### One savings number, no double counting
-AWS Cost Optimization Hub, Savings Plan and RI coverage, and spendlens's own findings merged into one total. Each resource is counted once.
+AWS Cost Optimization Hub, Savings Plan and RI coverage, and spendlens's own findings merged into one total. Each resource is counted once. `spendlens savings summary` reuses sources checked today and runs the rest; `--refresh` re-checks all four now.
 
 ![spendlens savings summary](https://spendlens.devops-monk.com/static/screens/cli-savings.png)
 
 ### Self-contained HTML dashboard
-`spendlens dashboard` or `spendlens report` writes one HTML file with nine tabs. It works offline, as a CI artifact, and printed.
+`spendlens dashboard` or `spendlens report` writes one HTML file with nine tabs. It works offline, as a CI artifact, and printed. `dashboard` always covers every tab: it reuses checks run today and runs the rest (`--refresh` re-runs all of them, `--source last` uses saved runs only).
 
 ![Dashboard overview](https://spendlens.devops-monk.com/static/screens/dashboard-overview.png)
 
@@ -90,7 +113,7 @@ AWS Cost Optimization Hub, Savings Plan and RI coverage, and spendlens's own fin
 
 ### And more
 - **`spendlens ask "why did EC2 go up?"`:** an AI assistant that answers from your data (Amazon Bedrock with your AWS role, Anthropic, OpenAI, Azure OpenAI or any OpenAI-compatible model). Its SQL is checked by three read-only safety layers.
-- **`spendlens notify --slack --teams`:** a summary of what changed, posted to your channel.
+- **`spendlens notify --slack --teams`:** a summary of what changed, posted to your channel. Like the dashboard, it reuses today's checks and runs the rest (`--refresh` re-checks everything first).
 - **`spendlens init --ci gitlab|github`:** a scheduled pipeline on a read-only OIDC role.
 - **Table, CSV, JSON or HTML** output from every command, and every threshold set from one `finops.yaml`.
 
@@ -108,7 +131,7 @@ AWS Cost Optimization Hub, Savings Plan and RI coverage, and spendlens's own fin
 | **User** | `finops` (uid 10001). Steampipe refuses to run as root |
 | **Working directory** | `/work`: put `finops.yaml` here; reports are written here |
 | **Volume** | `/data`: the run history (`/data/spendlens.db`), which keeps trends and "what changed" between runs |
-| **Entrypoint** | Starts the local Steampipe service only when a command needs live data, then stops it. Exit codes pass through (`--fail-on-alarm` → 3, for CI gates) |
+| **Entrypoint** | Starts the local Steampipe service only when a command needs live data, then stops it. `dashboard`, `notify` and `savings summary` need it unless you pass `--source last` or `--source demo`. Exit codes pass through (`--fail-on-alarm` → 3, for CI gates) |
 
 | Environment variable | Purpose |
 |---|---|
@@ -126,7 +149,10 @@ If you bind-mount `/work` or `/data` on Linux, they must be writable by uid 1000
 # GitLab
 spendlens:
   image: { name: abhaypratap/spendlens:0.1.0, entrypoint: [""] }
-  script: [ "spendlens-entrypoint report --out reports" ]
+  script:
+    - spendlens-entrypoint report --out reports
+    # report has just run every check: post from those saved runs, no second round of AWS calls
+    - spendlens-entrypoint notify --slack --source last
   artifacts: { paths: [reports/] }
 ```
 
