@@ -35,7 +35,7 @@
 <p align="center"><sub>One self-contained HTML report, shown with the bundled demo data.</sub></p>
 
 > [!NOTE]
-> v0.1.0. spendlens is tested end to end through Steampipe against an AWS emulator. Verification against a live
+> v0.2.0. spendlens is tested end to end through Steampipe against an AWS emulator. Verification against a live
 > account with a read-only role is next (see [PLAN.md](PLAN.md)).
 
 ---

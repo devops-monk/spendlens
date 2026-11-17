@@ -1,8 +1,8 @@
 # Build the spendlens image natively on amd64 and arm64 runners (no QEMU: Steampipe crashes under
 # emulation), smoke-test each offline, then publish one multi-arch tag to Docker Hub.
 #
-# Triggers: a version tag (git tag v0.1.0 && git push origin v0.1.0), or a manual run:
-#   gh workflow run docker-publish.yml -f version=0.1.0   (publishes 0.1.0, 0.1 and latest from the chosen branch)
+# Triggers: a version tag (git tag v0.2.0 && git push origin v0.2.0), or a manual run:
+#   gh workflow run docker-publish.yml -f version=0.2.0   (publishes 0.2.0, 0.2 and latest from the chosen branch)
 # Needs: repository secret DOCKERHUB_TOKEN (Docker Hub access token, Read & Write).
 #        optional repository variable DOCKERHUB_USERNAME (default abhaypratap).
 name: docker-publish
