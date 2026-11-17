@@ -93,4 +93,30 @@
     }, { rootMargin: "-110px 0px -55% 0px" });
     lnSecs.forEach((s) => io2.observe(s));
   }
+  // command catalog: filter commands (h3 blocks) by any text in their description, recipes or options
+  const cf = document.querySelector(".prose .cmd-filter");
+  if (cf) {
+    const prose = cf.closest(".prose");
+    const blocks = [];
+    let cur = null, h2 = null;
+    [...prose.children].forEach((el) => {
+      if (el.tagName === "H2") { h2 = { el, items: [], rest: [] }; blocks.push(h2); cur = null; }
+      else if (el.tagName === "H3" && h2) { cur = { el, parts: [el] }; h2.items.push(cur); }
+      else if (cur) cur.parts.push(el);
+      else if (h2) h2.rest.push(el);
+    });
+    const run = () => {
+      const q = cf.value.trim().toLowerCase();
+      blocks.forEach((b) => {
+        let any = false;
+        b.items.forEach((it) => {
+          const hit = !q || it.parts.some((p) => p.textContent.toLowerCase().includes(q));
+          it.parts.forEach((p) => (p.hidden = !hit)); if (hit) any = true;
+        });
+        const show = !q || any;
+        b.el.hidden = !show; b.rest.forEach((r) => (r.hidden = !!q));
+      });
+    };
+    let t; cf.addEventListener("input", () => { clearTimeout(t); t = setTimeout(run, 120); });
+  }
 })();

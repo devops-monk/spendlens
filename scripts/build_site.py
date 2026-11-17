@@ -10,12 +10,14 @@ Docs = website/content/docs/*.md + the repo's docs/{permissions,ci,controls,cont
 
 from __future__ import annotations
 
+import html as html_lib
 import json
 import re
 import shutil
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
@@ -35,13 +37,13 @@ REPO_URL = "https://github.com/devops-monk/spendlens"
 
 NAV = [
     ("Get started", [("", "Introduction"), ("getting-started", "Getting started"), ("configuration", "Configuration"),
-                     ("permissions", "IAM permissions"), ("docker", "Docker")]),
+                     ("permissions", "IAM permissions"), ("docker", "Docker"), ("ways-to-run", "Ways to run")]),
     ("Features", [("tags", "Tag compliance"), ("rightsize-waste", "Rightsizing & waste"), ("cost", "Cost analysis"),
                   ("anomalies-forecast", "Anomalies & forecast"), ("savings", "Savings"),
                   ("dashboard", "Dashboard & formats"), ("history", "History & sources")]),
     ("AI", [("ai-assistant", "AI assistant")]),
     ("Automation", [("report-notify", "Reports & notifications"), ("ci", "CI/CD")]),
-    ("Reference", [("cli", "CLI reference"), ("controls", "Controls catalog"), ("control-mapping", "Control mapping"),
+    ("Reference", [("cli", "Commands & options"), ("controls", "Controls catalog"), ("control-mapping", "Control mapping"),
                    ("extending", "Extending"), ("development", "Development & testing")]),
 ]
 REPO_DOCS = {"docker": "docker.md", "permissions": "permissions.md", "ci": "ci.md", "controls": "controls.md",
@@ -115,7 +117,8 @@ DOC_INFO = {
     "ai-assistant": ("spark", "Plain-English answers from your data, with read-only safety."),
     "report-notify": ("bell", "One-command reports and Slack and Teams summaries."),
     "ci": ("flow", "Scheduled pipelines on a read-only OIDC role."),
-    "cli": ("terminal", "Every command and option, generated from the CLI."),
+    "cli": ("terminal", "Every command by category, with recipes and every option."),
+    "ways-to-run": ("flow", "Local, Docker, CI, demo and replay: every way to run spendlens."),
     "controls": ("list", "The full catalog of built-in controls."),
     "control-mapping": ("map", "How spendlens controls map to their sources."),
     "extending": ("puzzle", "Plugins: commands, controls, estimators, AI tools, dashboard tabs."),
@@ -219,42 +222,144 @@ def stats() -> dict:
 # ------------------------------------------------------------------ CLI reference (generated)
 
 
-def cli_reference_md() -> str:
+def _cli_tree() -> dict[str, Any]:
+    """Every leaf command of the real CLI: path -> click command."""
     import typer.main
 
     from spendlens.cli import app
 
-    out = ["# CLI reference", "",
-           "Generated from the installed command tree, so it always matches the CLI. Every command also has `--help`.", ""]
+    out: dict[str, Any] = {}
 
-    def walk(cmd, path):
+    def walk(cmd: Any, path: list[str]) -> None:
         subs = getattr(cmd, "commands", None) or {}
-        if path and not subs:
-            doc = (cmd.help or "").strip().split("\n\n")[0].replace("\n", " ")
-            doc = re.sub(r"\[/?[a-z ]+\]", "", doc)
-            args = [p.name for p in cmd.params if getattr(p, "param_type_name", "") == "argument"]
-            out.append(f"## `spendlens {' '.join(path)}`" + (f" `<{', '.join(args)}>`" if args else ""))
-            out.append("")
-            out.append(doc)
-            out.append("")
-            opts = [p for p in cmd.params if getattr(p, "param_type_name", "") == "option" and p.name != "help"
-                    and not getattr(p, "hidden", False)]
-            if opts:
-                out.append("| Option | Description |")
-                out.append("|---|---|")
-                for o in opts:
-                    names = ", ".join(f"`{n}`" for n in o.opts + list(o.secondary_opts or []))
-                    help_ = re.sub(r"\[/?[a-z ]+\]", "", (o.help or "").replace("|", "\\|"))
-                    out.append(f"| {names} | {help_} |")
-                out.append("")
+        runnable = getattr(cmd, "invoke_without_command", False) and any(
+            getattr(p, "param_type_name", "") == "option" and p.name != "help" for p in cmd.params)
+        if path and (not subs or runnable):  # leaf commands, and groups that also run on their own (tags, waste)
+            out[" ".join(path)] = cmd
         for n, sub in subs.items():
             walk(sub, [*path, n])
 
     walk(typer.main.get_command(app), [])
+    return out
+
+
+def _option_names(cmd: Any) -> set[str]:
+    return {o for p in cmd.params for o in (*getattr(p, "opts", ()), *(getattr(p, "secondary_opts", None) or ()))}
+
+
+def _option_row(p: Any) -> tuple[str, str, str, str]:
+    """(names, accepted values, default, description) for one option, from its real type."""
+    import enum
+    import typing
+
+    names = ", ".join(f"`{n}`" for n in [*p.opts, *(p.secondary_opts or [])])
+    ann = getattr(getattr(p, "type_descriptor", None), "annotation", None)
+    origin, args = typing.get_origin(ann), typing.get_args(ann)
+    repeat = origin is list or getattr(p, "multiple", False)
+    inner = args[0] if repeat and args else ann
+    if origin is typing.Union or str(origin) == "<class 'types.UnionType'>":
+        inner = next((a for a in args if a is not type(None)), str)
+    if p.is_flag:
+        values = "flag"
+    elif isinstance(inner, type) and issubclass(inner, enum.Enum):
+        values = " \\| ".join(f"`{e.value}`" for e in inner)
+    elif inner is int or inner is float:
+        values = "number"
+    elif getattr(inner, "__name__", "") == "Path":
+        values = "file path"
+    else:
+        values = "text"
+    if repeat:
+        values += " (repeatable)"
+    d = p.default
+    if p.is_flag:
+        default = "on" if d else "off"
+    elif d is None or d == [] or d == ():
+        default = "—"
+    else:
+        default = f"`{d.value if isinstance(d, enum.Enum) else d}`"
+    help_ = re.sub(r"\[/?[a-z ]*\]", "", (p.help or "").replace("|", "\\|")).strip()
+    return names, values, default, help_
+
+
+def _anchor(path: str) -> str:
+    return "cmd-" + path.replace(" ", "-")
+
+
+def cli_reference_md() -> str:
+    """The command catalog: categories, a task index, recipes and every option, generated from the real CLI.
+    Raises SystemExit if a CLI command is missing from website/commands.py or a recipe uses an unknown option."""
+    import shlex
+
+    import commands as cat
+
+    tree = _cli_tree()
+    listed = [c for _, _, cmds in cat.CATEGORIES for c in cmds]
+    problems = [f"not in any category: {c}" for c in tree if c not in listed]
+    problems += [f"category lists unknown command: {c}" for c in listed if c not in tree]
+    for path, recipes in cat.RECIPES.items():
+        if path not in tree:
+            problems.append(f"recipes for unknown command: {path}")
+            continue
+        known = _option_names(tree[path]) | {"-h", "--help"}
+        for _, cmdline in recipes:
+            words = shlex.split(cmdline)
+            if words[: 1 + len(path.split())] != ["spendlens", *path.split()]:
+                problems.append(f"recipe does not run `spendlens {path}`: {cmdline}")
+            for w in words:
+                if w.startswith("-") and not w[1:2].isdigit():
+                    flag = w.split("=", 1)[0]
+                    if flag not in known:
+                        problems.append(f"`spendlens {path}` has no option {flag}: {cmdline}")
+    if problems:
+        raise SystemExit("command catalog is out of date:\n  " + "\n  ".join(problems))
+
+    out = ["# Commands & options", "",
+           ("Every spendlens command, grouped by what you want to do, with ready-to-run examples and every option. "
+           "This page is generated from the CLI itself, so it always matches the version you install; "
+           "`spendlens <command> --help` shows the same in your terminal."), "",
+           ('<input class="cmd-filter" type="search" placeholder="Filter commands and options, e.g. tag, csv, '
+           'budget" aria-label="Filter commands">'), "",
+           "## Find a command", "", "| I want to… | Run |", "|---|---|"]
+    for task, path in cat.TASKS:
+        out.append(f"| {task} | [`spendlens {path}`](#{_anchor(path)}) |")
+    out += ["", "## Options most commands share", "",
+            ("These work the same way on every command that accepts them; each command's table below lists which "
+            "it takes."), "", "| Option | What it does |", "|---|---|"]
+    out += [f"| `{k}` | {v} |" for k, v in cat.COMMON_OPTIONS.items()]
+    out += ["", ("Exit codes: `0` success · `1` error · `2` invalid option or config · `3` a `--fail-on-…` gate "
+            "found something (use it to fail CI jobs). See [Ways to run](../ways-to-run/) for every way to "
+            "run these commands."), ""]
+    common = set(cat.COMMON_OPTIONS)
+    for name, intro, paths in cat.CATEGORIES:
+        out += [f"## {name}", "", intro, ""]
+        for path in paths:
+            cmd = tree[path]
+            args = [p.name for p in cmd.params if getattr(p, "param_type_name", "") == "argument"]
+            doc = re.sub(r"\[/?[a-z ]*\]", "", (cmd.help or "").strip())
+            first, *rest = [x.strip() for x in doc.split("\n\n")] or [""]
+            out += [f'### spendlens {path}{" <" + "> <".join(args) + ">" if args else ""} {{#{_anchor(path)}}}', "",
+                    first.replace("\n", " "), ""]
+            extra = [x for x in rest if not x.lower().startswith(("default:", "examples", "spendlens "))
+                     and "spendlens " not in x]
+            for x in extra:
+                out += [x.replace("\n", " "), ""]
+            recipes = cat.RECIPES.get(path, [])
+            if recipes:
+                block = "\n\n".join(f"# {what}\n{c}" for what, c in recipes)
+                out += ["```bash", block, "```", ""]
+            opts = [p for p in cmd.params if getattr(p, "param_type_name", "") == "option" and p.name != "help"
+                    and not getattr(p, "hidden", False)]
+            own = [p for p in opts if not set(p.opts) & common]
+            shared = sorted({o for p in opts for o in p.opts if o in common})
+            if own:
+                out += ["| Option | Values | Default | What it does |", "|---|---|---|---|"]
+                out += ["| " + " | ".join(_option_row(p)) + " |" for p in own]
+                out.append("")
+            if shared:
+                out += ["Also accepts: " + ", ".join(f"`{o}`" for o in shared)
+                        + " ([shared options](#options-most-commands-share)).", ""]
     return "\n".join(out)
-
-
-# ------------------------------------------------------------------ markdown
 
 
 def gfm_lists(text: str) -> str:
@@ -291,7 +396,7 @@ def render_md(text: str) -> tuple[str, str, str, str]:
     html = re.sub(r'href="([a-z0-9-]+)\.md(#[^"]*)?"', lambda m: f'href="../{m.group(1)}/{m.group(2) or ""}"', html)
     html = re.sub(r'href="\.\./\.\./(src|scripts|tests)/', f'href="{REPO_URL}/tree/main/\\1/', html)
     title = re.search(r"<h1[^>]*>(.*?)</h1>\s*", html)
-    h1 = re.sub(r"<[^>]+>", "", title.group(1)) if title else ""
+    h1 = html_lib.unescape(re.sub(r"<[^>]+>", "", title.group(1))) if title else ""
     lead = ""
     if title:
         html = html[: title.start()] + html[title.end():]
