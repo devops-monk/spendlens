@@ -5,7 +5,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from .provider import Provider, Turn
-from .tools import AuditEntry, Toolbox, ToolResult
+from .tools import WAIT_TOOLS, AuditEntry, Toolbox, ToolResult
+
+MAX_WAITS = 60
 
 
 @dataclass
@@ -31,10 +33,14 @@ class Agent:
         turn = self.provider.send_user(question)
         totals = [turn]
         steps = 0
+        waits = 0
         while turn.calls and not turn.refused:
-            if steps >= self.max_steps:
-                return self._answer(turn, totals, audit_start, hit_limit=True)
-            steps += 1
+            if all(c.name in WAIT_TOOLS for c in turn.calls) and waits < MAX_WAITS:
+                waits += 1  # waiting for a running live query is bounded by llm.query_timeout_s, not max_steps
+            else:
+                if steps >= self.max_steps:
+                    return self._answer(turn, totals, audit_start, hit_limit=True)
+                steps += 1
             results = []
             for call in turn.calls:
                 if call.arguments is None:

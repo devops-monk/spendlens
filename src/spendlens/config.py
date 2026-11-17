@@ -213,6 +213,19 @@ Provider = Literal["openai", "azure", "bedrock", "anthropic", "openai_compatible
 Effort = Literal["low", "medium", "high", "xhigh", "max"]
 
 
+class AICacheConfig(_Strict):
+    """`spendlens ask` / `brief` caches (ai-cache.db next to the history DB). Freshness is per data class:
+    a cached live result is reused only while younger than its TTL; answers also expire when new runs are saved."""
+
+    enabled: bool = True
+    path: str | None = None  # default: ai-cache.db in the history DB's folder
+    inventory_ttl_s: int = Field(900, ge=0)  # resources (instances, volumes, buckets ...): 15 min
+    metrics_ttl_s: int = Field(300, ge=0)  # CloudWatch metrics, CloudTrail, logs: 5 min
+    cost_ttl_s: int = Field(21600, ge=0)  # Cost Explorer (updates a few times a day): 6 h
+    answer_ttl_s: int = Field(3600, ge=0)  # a whole answer to the same question on the same data: 1 h
+    max_mb: int = Field(100, ge=1)
+
+
 class LLMConfig(_Strict):
     """`spendlens ask`. Claude (anthropic / bedrock) goes through the official Anthropic SDK; OpenAI, Azure OpenAI
     and OpenAI-compatible servers (Ollama, vLLM, LM Studio ...) through the official OpenAI SDK."""
@@ -231,7 +244,9 @@ class LLMConfig(_Strict):
     fallback_model: str | None = None  # Bedrock middleware target (default anthropic.claude-opus-4-8)
     max_rows: int = Field(500, ge=1)
     max_result_chars: int = Field(20000, ge=1000)  # per tool result sent to the model
-    query_timeout_s: int = Field(60, ge=1)
+    query_timeout_s: int = Field(300, ge=1)  # hard limit for one live query; then it is cancelled
+    query_wait_s: int = Field(30, ge=1, le=600)  # wait this long per call, then the model waits again for the job
+    cache: AICacheConfig = Field(default_factory=AICacheConfig)
 
 
 class Notifications(_Strict):

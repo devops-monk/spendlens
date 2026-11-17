@@ -103,6 +103,14 @@ llm:
   max_steps: 12
   fallbacks: true                # Claude: retry safety-declined requests on a fallback model
   max_rows: 500
+  query_wait_s: 30               # spendlens ask --live: wait per call, then the AI waits again for slow queries
+  query_timeout_s: 300           # a live query running longer is cancelled
+  cache:                         # reuse recent live results and answers (saves AWS calls and tokens)
+    enabled: true
+    inventory_ttl_s: 900         # resources: 15 min
+    metrics_ttl_s: 300           # CloudWatch metrics, CloudTrail, logs: 5 min
+    cost_ttl_s: 21600            # Cost Explorer: 6 h
+    answer_ttl_s: 3600           # the same question on the same data: 1 h (new saved runs invalidate it)
 
 notifications:
   slack_webhook_env: SPENDLENS_SLACK_WEBHOOK

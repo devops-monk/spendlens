@@ -80,7 +80,7 @@ def test_toolbox_history_tools_and_audit(db):
     assert bad.is_error and "only SELECT" in bad.content
     assert tb.execute("4", "nope", {}).is_error
     assert "missing required" in tb.execute("5", "history_query", {}).content
-    assert tb.execute("6", "steampipe_query", {"sql": "select 1"}).is_error  # not offered without --live
+    assert tb.execute("6", "aws_query", {"sql": "select 1"}).is_error  # not offered without --live
     assert [a.ok for a in tb.audit] == [True, True, False, False, False, False]
     assert tb.audit[0].rows == 1
 
@@ -98,7 +98,7 @@ def test_toolbox_truncates_and_caps_rows(db):
 
 def test_live_tools_offered_only_with_live(db):
     names = {s.name for s in Toolbox(load_config(environ={}), db, live=True).specs()}
-    assert {"steampipe_tables", "steampipe_columns", "steampipe_query"} <= names
+    assert {"aws_find_tables", "aws_describe_table", "aws_check_query", "aws_query", "aws_query_result"} <= names
 
 
 def test_plugin_tool_errors_are_contained(db):

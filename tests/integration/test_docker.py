@@ -77,6 +77,9 @@ def test_live_commands_start_and_stop_steampipe(fakebin: Path, args: list[str]) 
     ["notify", "--slack", "--dry-run", "--source", "last"],
     ["savings", "summary", "--source=last"],
     ["history", "list"],
+    ["schema", "find", "unattached volumes"],
+    ["cache", "show"],
+    ["brief", "--source", "last", "--no-ai"],
     ["params"],
     ["init"],
 ])

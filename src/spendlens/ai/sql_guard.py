@@ -8,6 +8,8 @@ Layer 1 of 3. The guard is a fast, explainable "no" for the model; it is NOT the
 
 from __future__ import annotations
 
+import re
+
 import sqlglot
 from sqlglot import exp
 from sqlglot.errors import ParseError, TokenError
@@ -28,13 +30,20 @@ class UnsafeSQL(ValueError):
     pass
 
 
+def parseable(text: str, dialect: str = "postgres") -> str:
+    """Postgres network operators (inet <<= cidr, >>=, <<, >>) are not in sqlglot's grammar. For structural checks
+    only, read them as the same-shaped '=' comparison; the original text is always what runs."""
+    return re.sub(r"(?<![-#])(?:<<=|>>=|<<|>>)", "=", text) if dialect == "postgres" else text
+
+
 def check_select(sql: str, dialect: str = "postgres") -> str:
     """Return the statement (trimmed) if it is a single read-only query, else raise UnsafeSQL with a reason."""
     text = (sql or "").strip().rstrip(";").strip()
     if not text:
         raise UnsafeSQL("empty query")
+    parse_text = parseable(text, dialect)
     try:
-        statements = [s for s in sqlglot.parse(text, read=dialect) if s is not None]
+        statements = [s for s in sqlglot.parse(parse_text, read=dialect) if s is not None]
     except (ParseError, TokenError) as e:
         raise UnsafeSQL(f"could not parse SQL: {str(e).splitlines()[0]}") from e
     if len(statements) != 1:

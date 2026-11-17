@@ -1,4 +1,4 @@
-.PHONY: test test-unit test-integration test-system lint generate docker-build docker-smoke
+.PHONY: test test-unit test-integration test-system lint generate catalog docker-build docker-smoke
 
 PY ?= .venv/bin/python
 
@@ -22,6 +22,11 @@ generate:          ## regenerate mod variables, tag controls, control docs and t
 	$(PY) scripts/gen_tag_controls.py
 	$(PY) scripts/gen_control_docs.py
 	$(PY) scripts/build_demo_db.py
+
+PLUGIN_SRC ?= ../steampipe-plugin-aws
+
+catalog:           ## rebuild the AI's AWS table catalog from a steampipe-plugin-aws clone (pinned version)
+	$(PY) scripts/build_aws_catalog.py $(PLUGIN_SRC)
 
 IMAGE ?= spendlens:dev
 

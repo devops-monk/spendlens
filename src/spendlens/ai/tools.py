@@ -1,7 +1,10 @@
 """Tools the assistant may call. All read-only; every call is recorded in an audit trail.
 
-History tools (default, offline, free) read the local SQLite history/demo DB. Steampipe tools (live AWS) are only
-offered with `spendlens ask --live`. Plugins add tools via registry.add_ai_tool(AITool(...)).
+History tools (default, offline, free) read the local SQLite history/demo DB. Live AWS tools are only offered with
+`spendlens ask --live`; they work from the AWS table catalog (ai/catalog.py) so the model finds the right table and
+real columns instead of guessing, every query is checked before it runs (ai/sql_check.py), slow queries run as
+background jobs the model waits for (ai/jobs.py), and fresh results are reused from the cache (ai/cache.py).
+Plugins add tools via registry.add_ai_tool(AITool(...)).
 """
 
 from __future__ import annotations
@@ -17,6 +20,9 @@ from typing import Any
 
 from ..config import Config
 from .sql_guard import UnsafeSQL, check_select
+
+LIVE_COLUMNS_TTL_S = 86400  # the installed plugin's column list changes only on a plugin upgrade
+WAIT_TOOLS = {"aws_query_result"}  # waiting for a running query does not use up llm.max_steps
 
 logging.getLogger("sqlglot").setLevel(logging.ERROR)
 
@@ -101,8 +107,13 @@ class Toolbox:
     live: bool = False
     extra: list[ToolSpec] = field(default_factory=list)
     audit: list[AuditEntry] = field(default_factory=list)
+    fresh: bool = False  # skip cache reads (still write)
+    cache: Any = None  # AICache | None
+    live_ttls: list[float] = field(default_factory=list)  # remaining freshness (s) of each live result used
     _sqlite: sqlite3.Connection | None = None
     _steampipe: Any = None
+    _catalog: Any = None
+    _jobs: Any = None
 
     # ----- plumbing
 
@@ -119,21 +130,33 @@ class Toolbox:
                      lambda a: self.history_query(a["sql"])),
         ]
         if self.live:
+            q = {"sql": {"type": "string", "description": "One read-only PostgreSQL SELECT on aws_* tables."}}
             specs += [
-                ToolSpec("steampipe_tables",
-                         "List Steampipe AWS tables (live). Optional prefix filter, e.g. 'aws_ec2', 'aws_cost'.",
-                         _schema({"prefix": {"type": "string", "description": "Table name prefix, e.g. aws_rds."}}),
-                         lambda a: self.steampipe_tables(a.get("prefix") or "aws_")),
-                ToolSpec("steampipe_columns", "Columns and types of one Steampipe AWS table (live).",
-                         _schema({"table": {"type": "string"}}, ["table"]), lambda a: self.steampipe_columns(a["table"])),
-                ToolSpec("steampipe_query",
-                         "Run ONE read-only PostgreSQL SELECT against live AWS through Steampipe, using the AWS role "
-                         "assumed in the user's terminal. Prefer history tools; use this only for facts not in "
-                         "history. Cost Explorer tables (aws_cost_*) cost $0.01 per API call: always constrain "
-                         "period_start/period_end. aws_cost_usage needs granularity, dimension_type_1 and "
-                         "dimension_type_2 in the WHERE clause.",
-                         _schema({"sql": {"type": "string", "description": "A single SELECT statement."}}, ["sql"]),
-                         lambda a: self.steampipe_query(a["sql"])),
+                ToolSpec("aws_find_tables",
+                         "Find the Steampipe AWS tables that can answer a question (searches ~590 tables by name, "
+                         "service, description and columns). Call this first for any live AWS question.",
+                         _schema({"question": {"type": "string", "description": "The question or keywords."}},
+                                 ["question"]),
+                         lambda a: self.aws_find_tables(a["question"])),
+                ToolSpec("aws_describe_table",
+                         "Columns (type and meaning), REQUIRED filters with valid values, fast filter columns and "
+                         "example queries for one AWS table. Call before writing SQL; never guess column names.",
+                         _schema({"table": {"type": "string"}}, ["table"]),
+                         lambda a: self.aws_describe_table(a["table"])),
+                ToolSpec("aws_check_query",
+                         "Check a query without running it (no AWS calls): tables, columns, required filters, JSON "
+                         "operators, cost and time-range guards. aws_query runs the same check automatically.",
+                         _schema(q, ["sql"]), lambda a: self.aws_check_query(a["sql"])),
+                ToolSpec("aws_query",
+                         "Run ONE read-only SELECT against live AWS through Steampipe with the user's AWS role. The "
+                         "query is checked first; a fresh cached result is returned when one exists. If it takes "
+                         "longer than a few seconds the result is {status: running, job_id}: call aws_query_result "
+                         "to wait for it. Prefer history tools when they can answer.",
+                         _schema(q, ["sql"]), lambda a: self.aws_query(a["sql"])),
+                ToolSpec("aws_query_result",
+                         "Wait for a running aws_query job and return its rows (or that it is still running).",
+                         _schema({"job_id": {"type": "string"}}, ["job_id"]),
+                         lambda a: self.aws_query_result(a["job_id"])),
             ]
         return specs + self.extra
 
@@ -172,6 +195,8 @@ class Toolbox:
             self._sqlite.close()
         if self._steampipe is not None:
             self._steampipe.close()
+        if self._jobs is not None:
+            self._jobs.close()
 
     # ----- history
 
@@ -209,41 +234,138 @@ class Toolbox:
         return {"database": str(self.history_db), "features": features, "schema": HISTORY_SCHEMA_HINT,
                 "row_count": len(features)}
 
-    # ----- steampipe (live)
+    # ----- live AWS (Steampipe)
 
-    def _sp(self) -> Any:
+    def _client(self) -> Any:
+        from ..steampipe import SteampipeClient
+
+        return SteampipeClient(self.cfg.steampipe, read_only=True, timeout_s=self.cfg.llm.query_timeout_s)
+
+    def _scope(self) -> str:
+        from .cache import scope
+
+        return scope(self.cfg)
+
+    def catalog(self) -> Any:
+        """The AWS catalog, with the installed plugin's real columns merged in when Steampipe is reachable."""
+        if self._catalog is None:
+            from . import catalog as cat_mod
+
+            base = cat_mod.load()
+            live = self._live_columns()
+            self._catalog = base.with_live(live) if live else base
+        return self._catalog
+
+    def _live_columns(self) -> dict[str, list[tuple[str, str]]] | None:
+        from ..steampipe import SteampipeError
+        from .cache import digest
+
+        key = digest("columns", self._scope())
+        if self.cache and (hit := self.cache.get("columns", key)):
+            return {t: [tuple(c) for c in cols] for t, cols in hit[0].items()}
+        try:
+            with self._client() as c:
+                rows = c.query("select table_name, column_name, data_type from information_schema.columns "
+                               "where table_schema = %(s)s order by table_name, ordinal_position",
+                               {"s": self.cfg.steampipe.connection})
+        except (SteampipeError, OSError):
+            return None  # Steampipe unreachable: the bundled catalog alone still guides the model
+        live: dict[str, list[tuple[str, str]]] = {}
+        for r in rows:
+            live.setdefault(r["table_name"], []).append((r["column_name"], r["data_type"]))
+        if live and self.cache:
+            self.cache.put("columns", key, live, LIVE_COLUMNS_TTL_S, label=f"{len(live)} tables")
+        return live or None
+
+    def _jobs_runner(self) -> Any:
+        if self._jobs is None:
+            from .jobs import QueryJobs
+
+            self._jobs = QueryJobs(self._client, max_rows=self.cfg.llm.max_rows,
+                                   timeout_s=self.cfg.llm.query_timeout_s)
+        return self._jobs
+
+    def _require_live(self) -> None:
         if not self.live:
             raise ToolError("live AWS queries are disabled; re-run with --live")
-        if self._steampipe is None:
-            from ..steampipe import SteampipeClient
 
-            self._steampipe = SteampipeClient(self.cfg.steampipe, read_only=True,
-                                              timeout_s=self.cfg.llm.query_timeout_s)
-        return self._steampipe
+    def aws_find_tables(self, question: str) -> dict[str, Any]:
+        self._require_live()
+        hits = self.catalog().find(question, 8)
+        return {"tables": hits, "row_count": len(hits),
+                "next": "call aws_describe_table on the best match before writing SQL"}
 
-    def _sp_rows(self, sql: str, params: Any = None) -> dict[str, Any]:
-        from ..steampipe import SteampipeError
+    def aws_describe_table(self, table: str) -> dict[str, Any]:
+        self._require_live()
+        cat = self.catalog()
+        t = cat.get(table)
+        if t is None:
+            raise ToolError(f"table {table} does not exist. Did you mean: {', '.join(cat.similar(table)) or 'none'}? "
+                            "Use aws_find_tables.")
+        out = cat.describe(t.name)
+        out["row_count"] = len(out["columns"])
+        return out
 
-        try:
-            rows = self._sp().query(sql, params, limit=self.cfg.llm.max_rows + 1)
-        except SteampipeError as e:
-            raise ToolError(f"Steampipe error: {e}") from e
+    def aws_check_query(self, sql: str) -> dict[str, Any]:
+        self._require_live()
+        from .sql_check import check
+
+        return check(sql, self.catalog(), max_rows=self.cfg.llm.max_rows).as_dict()
+
+    def aws_query(self, sql: str) -> dict[str, Any]:
+        self._require_live()
+        from .cache import digest, normalise_sql, ttl_for
+        from .sql_check import check
+
+        res = check(sql, self.catalog(), max_rows=self.cfg.llm.max_rows)
+        if not res.ok:
+            raise ToolError("the query was not run; fix it first: "
+                            + json.dumps([p.as_dict() for p in res.errors], separators=(",", ":")))
+        ttl = ttl_for(res.tables, self.catalog(), self.cfg)
+        key = digest("query", self._scope(), normalise_sql(res.sql))
+        if self.cache and not self.fresh and (hit := self.cache.get("query", key)):
+            payload, created = hit
+            age = time.time() - created
+            self.live_ttls.append(max(ttl - age, 0))
+            return {**payload, "cached": True, "age_s": round(age),
+                    "as_of": time.strftime("%Y-%m-%d %H:%M UTC", time.gmtime(created)),
+                    **({"warnings": [w.as_dict() for w in res.warnings]} if res.warnings else {})}
+        job = self._jobs_runner().submit(res.sql, tables=res.tables, key=key, ttl=ttl,
+                                         warnings=[w.as_dict() for w in res.warnings])
+        return self._await(job.id)
+
+    def aws_query_result(self, job_id: str) -> dict[str, Any]:
+        self._require_live()
+        return self._await(job_id)
+
+    def _await(self, job_id: str) -> dict[str, Any]:
+        from ..ui import activity
+        from .sql_check import explain_error
+
+        runner = self._jobs_runner()
+        job = runner.jobs.get(job_id)
+        if job is None:
+            raise ToolError(f"unknown job_id {job_id}")
+        label = ", ".join(job.meta.get("tables", [])) or "AWS"
+        with activity(f"[bold]live query[/] {job_id} · {label}"):
+            out = runner.wait(job_id, self.cfg.llm.query_wait_s)
+        if out["status"] == "running":
+            return {**out, "row_count": None,
+                    "next": f"still running after {out['elapsed_s']}s: call aws_query_result with job_id {job_id}"}
+        if out["status"] == "error":
+            hint = explain_error(out["error"], job.meta.get("tables", []), self.catalog())
+            raise ToolError(f"Steampipe error: {out['error']}" + (f"\nHow to fix: {hint}" if hint else ""))
+        rows = out["rows"]
         truncated = len(rows) > self.cfg.llm.max_rows
         rows = rows[: self.cfg.llm.max_rows]
         cols = list(rows[0].keys()) if rows else []
-        return {"columns": cols, "rows": [[r[c] for c in cols] for r in rows], "row_count": len(rows),
-                "truncated": truncated}
-
-    def steampipe_tables(self, prefix: str) -> dict[str, Any]:
-        return self._sp_rows("select table_name from information_schema.tables where table_schema = %(s)s "
-                             "and table_name like %(p)s order by 1",
-                             {"s": self.cfg.steampipe.connection, "p": prefix.replace("%", "") + "%"})
-
-    def steampipe_columns(self, table: str) -> dict[str, Any]:
-        return self._sp_rows("select column_name, data_type from information_schema.columns where table_schema = %(s)s "
-                             "and table_name = %(t)s order by ordinal_position",
-                             {"s": self.cfg.steampipe.connection, "t": table})
-
-    def steampipe_query(self, sql: str) -> dict[str, Any]:
-        stmt = check_select(sql, "postgres")
-        return self._sp_rows(stmt)  # no params -> psycopg sends the text as-is (a LIKE 'x%' stays intact)
+        payload = {"columns": cols, "rows": [[r[c] for c in cols] for r in rows], "row_count": len(rows),
+                   "truncated": truncated, "tables": job.meta.get("tables", [])}
+        payload = json.loads(json.dumps(payload, default=str))  # cache-safe (dates, decimals, inet ...)
+        ttl = job.meta.get("ttl", 0)
+        if self.cache:
+            self.cache.put("query", job.meta["key"], payload, ttl, label=job.sql[:300])
+        self.live_ttls.append(ttl)
+        extra = {"warnings": job.meta["warnings"]} if job.meta.get("warnings") else {}
+        return {**payload, "cached": False, "elapsed_s": out["elapsed_s"],
+                "as_of": time.strftime("%Y-%m-%d %H:%M UTC", time.gmtime()), **extra}

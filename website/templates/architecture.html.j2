@@ -142,13 +142,32 @@
         <h2>Any AWS question,<br>read-only.</h2>
       </div>
       <div class="sc-copy">
-        <p>With <code>--live</code> the assistant can answer from any of the AWS plugin's tables, not only cost:
-          inventory, security groups, IAM, Lambda runtimes and more. It never calls AWS directly. It writes SQL,
-          and Steampipe turns that SQL into read-only AWS API calls with your credentials.</p>
-        <ul class="chips"><li>Hundreds of AWS tables</li><li>Your IAM role decides what it can see</li><li>Every query in the audit trail</li></ul>
+        <p>With <code>--live</code> the assistant can answer from any of the AWS plugin's 589 tables, not only cost:
+          inventory, security groups, IAM, Lambda runtimes and more. It looks up the real tables and columns first,
+          every query is checked before it reaches AWS, slow queries run as jobs it waits for, and recent results
+          are reused from the cache.</p>
+        <ul class="chips"><li>No guessed columns</li><li>Waits for slow queries</li><li>Cached by freshness</li><li>Your IAM role decides what it can see</li></ul>
       </div>
     </div>
     <div class="sc-media">{{ diagram("seq_ask_live") }}</div>
+  </div>
+</section>
+
+<section class="section showcase arch" id="ai-pipeline">
+  <div class="wrap sc stack">
+    <div class="sc-text">
+      <div class="sc-title">
+        <p class="t-eyebrow">AI query pipeline</p>
+        <h2>Right first time.<br>Never asked twice.</h2>
+      </div>
+      <div class="sc-copy">
+        <p>The <b>catalog</b> is built from the Steampipe AWS plugin's own source and docs: every table, column,
+          required filter and example, merged with the columns your installed plugin reports. The <b>checker</b>
+          passes 1,613 of the plugin's 1,620 documented examples; the 7 it rejects are mistakes in those examples.</p>
+        <ul class="chips"><li>589 tables · 12.7k columns</li><li>Offline checks in milliseconds</li><li><code>spendlens schema</code> for people too</li></ul>
+      </div>
+    </div>
+    <div class="sc-media">{{ diagram("ai_pipeline") }}</div>
   </div>
 </section>
 
@@ -162,19 +181,22 @@
       <div class="step"><h3>You ask</h3>
         <p>spendlens sends your question, the FinOps analyst instructions and the tool list to your AI provider:
           Bedrock, Anthropic, OpenAI, Azure OpenAI or any OpenAI-compatible server (Ollama, vLLM, GLM).</p></div>
-      <div class="step"><h3>It discovers</h3>
-        <p>It starts with your saved runs (<code>history_overview</code>). With <code>--live</code> it can also list
-          the AWS plugin's tables and read their columns, so it learns the schema instead of guessing.</p></div>
-      <div class="step"><h3>It queries</h3>
-        <p>It writes one <code>SELECT</code>. spendlens parses it, rejects anything that is not a single read, and
-          runs it on a read-only connection with a timeout and a row cap.</p></div>
-      <div class="step"><h3>Steampipe calls AWS</h3>
-        <p>The AWS plugin maps the table to <code>Describe*</code>, <code>List*</code> or <code>Get*</code> calls in
-          your configured regions, pages through the results and returns rows. Cost Explorer tables cost about
-          $0.01 per request.</p></div>
-      <div class="step"><h3>It repeats</h3>
-        <p>Rows go back to the model as data, never as instructions. It may refine the query or join another table,
-          up to <code>llm.max_steps</code> tool calls (12 by default).</p></div>
+      <div class="step"><h3>It learns the schema</h3>
+        <p>It starts with your saved runs. With <code>--live</code> it searches the AWS table catalog
+          (<code>aws_find_tables</code>) and reads the chosen table's columns, required filters and examples
+          (<code>aws_describe_table</code>), so it never guesses a column.</p></div>
+      <div class="step"><h3>Its query is checked</h3>
+        <p>Before anything reaches AWS, spendlens checks the <code>SELECT</code>: read-only, real tables and columns,
+          required filters present, JSON operators on JSON columns, a date range on Cost Explorer. A mistake comes
+          back with the exact fix.</p></div>
+      <div class="step"><h3>Steampipe calls AWS, patiently</h3>
+        <p>A fresh cached result is used if there is one. Otherwise the query runs as a background job: the AWS
+          plugin pages through <code>Describe*</code> / <code>List*</code> calls, and if that takes a while the model
+          waits for the job (<code>aws_query_result</code>) instead of failing.</p></div>
+      <div class="step"><h3>It repeats, then remembers</h3>
+        <p>Rows go back as data, never as instructions; it may refine or join, up to <code>llm.max_steps</code>.
+          The answer is cached: the same question on the same data costs no tokens until a new run is saved or the
+          live data's freshness window ends.</p></div>
       <div class="step"><h3>You check</h3>
         <p>The answer cites the SQL and numbers it used. <code>--show-tools</code> prints every call, and
           <code>--json</code> saves the full audit trail. Savings are proposals for you to review.</p></div>

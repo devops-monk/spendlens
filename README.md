@@ -215,7 +215,11 @@ Supported models:
 - **Claude** on Amazon Bedrock with your own AWS role, or on the Anthropic API (official Anthropic SDK).
 - **OpenAI, Azure OpenAI** or any **OpenAI-compatible** server (official OpenAI SDK).
 
-The assistant answers from saved history first, which is offline and free. It queries live AWS only with `--live`.
+The assistant answers from saved history first, which is offline and free. It queries live AWS only with `--live`, and then it can answer from any of the AWS plugin's 589 tables:
+- **Right first time:** it looks up the real tables, columns and required filters in a catalog built from the Steampipe AWS plugin's own source, and every query is checked before it reaches AWS. A wrong column comes back with "did you mean".
+- **Patient:** slow queries run as background jobs that the model waits for, instead of timing out.
+- **Cached:** live results are reused while fresh (15 min for resources, 5 for metrics, 6 h for Cost Explorer), and the same question on the same data costs no tokens. `--fresh` skips the cache.
+- **The same tools for you:** `spendlens schema find "unattached volumes"`, `spendlens schema show aws_cost_usage`, `spendlens schema check "<sql>"`.
 Configure it with `llm.*` in `finops.yaml`. See [the AI assistant guide](https://spendlens.devops-monk.com/docs/ai-assistant/).
 
 ## Scheduled. Notified. Hands-off.
@@ -292,7 +296,8 @@ Unknown keys, typos and out-of-range values are rejected, and the error names th
 | `savings hub` · `commitments` · `summary` | AWS recommendations, coverage, one de-duplicated total (`summary --refresh`: re-check now) |
 | `dashboard` | A self-contained HTML report with nine tabs, always covering every check (`--refresh`: re-run all now) |
 | `brief` | One page for managers: AI summary, key numbers, charts and a savings review checklist |
-| `ask` | Questions in plain English, read-only |
+| `ask` | Questions in plain English, read-only (`--live`: any AWS table, schema-checked and cached) |
+| `schema find` · `show` · `check` · `cache show` | The assistant's table catalog and query checker, offline; its cache |
 | `report` · `notify` | Run everything; post Slack or Teams summaries (`notify --refresh`: re-check first) |
 | `history list` · `diff` | Saved runs, and new or resolved alarms between them |
 | `init` · `doctor` · `params` · `config` | Set up, check, and inspect configuration |

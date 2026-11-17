@@ -118,3 +118,17 @@ def test_human_names():
     assert br._human("coh_rightsize", "Rightsize: m5.2xlarge -> m7g.xlarge") == "Rightsize"
     assert br._human("coh_migratetograviton", "MigrateToGraviton: db.r5 -> db.r7g") == "Migrate to graviton"
     assert br._short("arn:aws:ec2:us-east-1:1:volume/vol-1") == "vol-1" and br._short("i-0a11") == "i-0a11"
+
+
+def test_ai_summary_reused_for_the_same_data(tmp_path):
+    with StubLLM([("final", json.dumps(AI_JSON))]) as stub:
+        assert run("--source", "demo", "-o", str(tmp_path / "1.html"), *stub_sets(stub)).exit_code == 0
+    with StubLLM([("final", "unused")]) as stub:  # same facts + model: no tokens
+        r = run("--source", "demo", "-o", str(tmp_path / "2.html"), *stub_sets(stub))
+        assert r.exit_code == 0 and stub.requests == []
+    html = (tmp_path / "2.html").read_text()
+    assert AI_JSON["summary"] in html and "AI summary reused from" in html
+    with StubLLM([("final", json.dumps({**AI_JSON, "summary": "Regenerated."}))]) as stub:
+        run("--source", "demo", "--fresh", "-o", str(tmp_path / "3.html"), *stub_sets(stub))
+        assert stub.requests
+    assert "Regenerated." in (tmp_path / "3.html").read_text()

@@ -29,6 +29,7 @@ from ..render.html import render_template
 from .dashboard import FEATURES, Data, _periods, _totals, merged_savings, savings_category, view_model
 
 TOP_ACTIONS = 12
+ANALYSIS_TTL_S = 7 * 86400  # keyed by the exact facts: the same data always gets the same summary
 LEVELS = ("high", "medium", "low")
 AREAS = ("forecast", "anomaly", "savings", "governance")
 
@@ -330,15 +331,25 @@ def _extract_json(text: str) -> dict[str, Any]:
     return json.loads(t[start:end + 1])
 
 
-def ai_analysis(cfg: Config, db: Path, fx: dict[str, Any], max_steps: int | None) -> Analysis:
-    """Ask the configured LLM (FinOps analyst profile, read-only history tools). Raises on any failure."""
+def ai_analysis(cfg: Config, db: Path, fx: dict[str, Any], max_steps: int | None, *, fresh: bool = False) -> Analysis:
+    """Ask the configured LLM (FinOps analyst profile, read-only history tools). Raises on any failure.
+    Cached by the exact facts + model: regenerating the brief on unchanged data costs no tokens."""
     from ..ai.agent import Agent
+    from ..ai.cache import AICache, digest
     from ..ai.prompts import system_prompt
     from ..ai.provider import build_provider
     from ..ai.tools import Toolbox
     from ..ui import activity
 
     provider = build_provider(cfg)
+    cache = AICache.for_config(cfg, history_path(cfg))
+    key = digest("brief", fx, provider.label, cfg.llm.model, BRIEF_TASK)
+    if not fresh and (hit := cache.get("brief", key)):
+        cache.close()
+        a = Analysis.model_validate(hit[0])
+        a.notes.append(f"AI summary reused from {datetime.fromtimestamp(hit[1], UTC):%Y-%m-%d %H:%M UTC} "
+                       "(same data; --fresh to regenerate).")
+        return a
     toolbox = Toolbox(cfg, db, live=False)
     try:
         agent = Agent(provider, toolbox, system_prompt(cfg, False), max_steps or min(cfg.llm.max_steps, 6))
@@ -355,6 +366,8 @@ def ai_analysis(cfg: Config, db: Path, fx: dict[str, Any], max_steps: int | None
             act.est_monthly_saving = None
     a.by, a.model, a.notes = "ai", ans.model or cfg.llm.model, list(ans.notes)
     a.insights, a.actions, a.risks = a.insights[:6], a.actions[:6], a.risks[:4]
+    cache.put("brief", key, a.model_dump(mode="json"), ANALYSIS_TTL_S, label=a.headline)
+    cache.close()
     return a
 
 
@@ -461,6 +474,7 @@ def brief(
                          "no AWS calls; demo = bundled sample DB.")] = Source.live,
     refresh: Annotated[bool, typer.Option("--refresh", help="Re-run every section live now, even ones run today.")] = False,
     max_steps: Annotated[int | None, typer.Option("--max-steps", help="Tool calls the AI may make (default 6).")] = None,
+    fresh: Annotated[bool, typer.Option("--fresh", help="Write a new AI summary even if one exists for this data.")] = False,
     config: ConfigOpt = None,
     profile: ProfileOpt = None,
     sets: SetOpt = None,
@@ -496,7 +510,7 @@ def brief(
     analysis = rules(fx)
     if ai and data.runs:
         try:
-            analysis = ai_analysis(cfg, path, fx, max_steps)
+            analysis = ai_analysis(cfg, path, fx, max_steps, fresh=fresh)
         except Exception as e:  # noqa: BLE001 - the report must still be written
             msg = f"{type(e).__name__}: {str(e)[:300]}"
             err.print(f"[yellow]AI summary unavailable ({msg}); using the rule-based summary.[/]")

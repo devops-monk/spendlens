@@ -21,7 +21,8 @@ CATEGORIES: list[tuple[str, str, list[str]]] = [
     ("Reports, dashboard and notifications", "Run everything at once, build the branded dashboard, post summaries.",
      ["report", "dashboard", "brief", "notify"]),
     ("AI assistant", "Ask questions in plain English; answers come from your saved runs (and, with --live, read-only "
-     "Steampipe queries).", ["ask"]),
+     "Steampipe queries). The schema and cache commands are the assistant's own tools, for you.",
+     ["ask", "schema find", "schema show", "schema check", "cache show", "cache clear"]),
     ("History", "Every live run is saved locally, so you can compare runs and re-render reports without AWS calls.",
      ["history list", "history diff", "history path"]),
 ]
@@ -47,6 +48,8 @@ TASKS: list[tuple[str, str]] = [
     ("Run everything on a schedule in CI", "init"),
     ("Post a summary to Slack or Teams", "notify"),
     ("Ask a question about my costs", "ask"),
+    ("Find which AWS table answers a question", "schema find"),
+    ("Check a Steampipe query before running it", "schema check"),
     ("See what changed since the last run", "history diff"),
     ("See or change a threshold", "params"),
 ]
@@ -202,6 +205,27 @@ RECIPES: dict[str, list[tuple[str, str]]] = {
         ("A conversation with follow-up questions", "spendlens ask -i"),
         ("On sample data", "spendlens ask --source demo \"Summarise the waste findings\""),
         ("Machine-readable answer and audit trail", "spendlens ask \"Top savings?\" --json"),
+        ("Skip the cache: ask and query again", "spendlens ask --live --fresh \"How many instances are running?\""),
+    ],
+    "schema find": [
+        ("Which AWS tables can answer a question", "spendlens schema find \"unattached EBS volumes\""),
+        ("Top three only", "spendlens schema find \"monthly cost by service\" --limit 3"),
+    ],
+    "schema show": [
+        ("Columns, required filters and examples", "spendlens schema show aws_ebs_volume"),
+        ("Without the examples", "spendlens schema show aws_cost_usage --no-examples"),
+    ],
+    "schema check": [
+        ("Check a query without running it (exit 1 if it would fail)",
+         "spendlens schema check \"select volume_id, size from aws_ebs_volume\""),
+    ],
+    "cache show": [
+        ("What the assistant has cached", "spendlens cache show"),
+        ("…with the latest entries", "spendlens cache show --entries"),
+    ],
+    "cache clear": [
+        ("Forget everything", "spendlens cache clear"),
+        ("Only cached live query results", "spendlens cache clear --queries"),
     ],
     "history list": [
         ("Every saved run", "spendlens history list"),

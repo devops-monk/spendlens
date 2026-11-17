@@ -112,7 +112,7 @@ def c4_container() -> tuple[str, str]:
     b.append(_box(230, 200, 200, 72, "Engines", "cost · anomaly · forecast · savings", "Container"))
     b.append(_box(530, 200, 210, 72, "Steampipe (Postgres)", "aws plugin · read-only session", "Container"))
     b.append(_box(230, 340, 200, 72, "History store", "SQLite: runs · findings · cost", "Container"))
-    b.append(_box(530, 340, 210, 72, "AI agent + SQL guard", "tool loop · 3 read-only layers", "Container"))
+    b.append(_box(530, 340, 210, 72, "AI agent", "catalog · checker · jobs · cache", "Container"))
     b.append(_box(230, 430, 200, 58, "Renderers", "table · CSV · JSON · HTML", "Container"))
     # externals
     b.append(_box(830, 200, 160, 72, "AWS APIs", "role from terminal / OIDC", "External", ext=True))
@@ -237,38 +237,72 @@ def seq_ask() -> tuple[str, str]:
 
 
 def seq_ask_live() -> tuple[str, str]:
-    parts = [("user", "You"), ("sl", "spendlens ask"), ("llm", "LLM provider"), ("guard", "SQL guard"),
-             ("sp", "Steampipe"), ("plugin", "AWS plugin"), ("aws", "AWS APIs")]
+    parts = [("user", "You"), ("sl", "spendlens ask"), ("llm", "LLM provider"), ("cat", "Catalog · checker"),
+             ("cache", "Cache"), ("sp", "Steampipe + plugin"), ("aws", "AWS APIs")]
     steps = [
         ("msg", "user", "sl", "ask --live “Which EBS volumes are unattached?”", False),
-        ("msg", "sl", "llm", "system prompt + question + 5 tool schemas", False),
-        ("note", "sl", "guard", "1 · discover: which tables and columns exist?"),
-        ("msg", "llm", "sl", "steampipe_tables(prefix='aws_ebs')", True),
-        ("msg", "sl", "sp", "information_schema.tables (read-only)", False),
-        ("msg", "sp", "sl", "aws_ebs_volume, aws_ebs_snapshot, …", True),
-        ("msg", "sl", "llm", "tool_result: table names", False),
-        ("msg", "llm", "sl", "steampipe_columns('aws_ebs_volume')", True),
-        ("msg", "sl", "llm", "tool_result: columns + types", False),
-        ("note", "sl", "guard", "2 · query: one SELECT, checked, then run"),
-        ("msg", "llm", "sl", "steampipe_query(SELECT … WHERE state = 'available')", True),
-        ("msg", "sl", "guard", "parse: one read-only SELECT?", False),
-        ("msg", "guard", "sp", "read-only session · timeout", False),
-        ("msg", "sp", "plugin", "scan table (WHERE → filter)", False),
-        ("msg", "plugin", "aws", "DescribeVolumes · per region", False),
-        ("msg", "aws", "plugin", "JSON pages", True),
-        ("msg", "plugin", "sp", "rows (cached)", True),
-        ("msg", "sp", "sl", "rows (≤ llm.max_rows, truncated flag)", True),
-        ("msg", "sl", "llm", "tool_result (data, never instructions)", False),
-        ("note", "sl", "guard", "3 · repeat until it can answer (≤ llm.max_steps)"),
-        ("msg", "llm", "sl", "answer citing the SQL and numbers", True),
-        ("msg", "sl", "user", "answer + audit trail (--show-tools)", True),
+        ("msg", "sl", "llm", "question + workflow + 5 AWS tools", False),
+        ("note", "sl", "cat", "1 · learn the schema: no guessed tables or columns"),
+        ("msg", "llm", "sl", "aws_find_tables(question)", True),
+        ("msg", "sl", "cat", "search 589 tables", False),
+        ("msg", "cat", "sl", "aws_ebs_volume, … + required filters", True),
+        ("msg", "llm", "sl", "aws_describe_table(aws_ebs_volume)", True),
+        ("msg", "sl", "sp", "installed columns (once a day, no AWS call)", False),
+        ("msg", "sl", "llm", "columns + meaning · filters · examples", False),
+        ("note", "sl", "cat", "2 · every query is checked before it runs"),
+        ("msg", "llm", "sl", "aws_query(SELECT … size_gb …)", True),
+        ("msg", "sl", "cat", "tables · columns · required filters", False),
+        ("msg", "cat", "sl", "✗ size_gb → did you mean size?", True),
+        ("msg", "sl", "llm", "error + exact fix (nothing sent to AWS)", False),
+        ("msg", "llm", "sl", "aws_query(SELECT volume_id, size …)", True),
+        ("msg", "sl", "cache", "fresh result? (≤ 15 min)", False),
+        ("msg", "cache", "sl", "miss", True),
+        ("note", "sl", "sp", "3 · background job · read-only · waits, never times out early"),
+        ("msg", "sl", "sp", "SELECT … limit 501", False),
+        ("msg", "sp", "aws", "DescribeVolumes · per region", False),
+        ("msg", "aws", "sp", "pages", True),
+        ("msg", "sp", "sl", "rows (slow? job q1: aws_query_result)", True),
+        ("msg", "sl", "cache", "store (TTL by data class)", False),
+        ("msg", "sl", "llm", "rows + as_of", False),
+        ("msg", "llm", "sl", "answer citing the SQL", True),
+        ("msg", "sl", "cache", "answer (same question + data → 0 tokens)", False),
+        ("msg", "sl", "user", "answer + audit trail", True),
     ]
-    svg = _sequence("sal", parts, steps, "Sequence of a spendlens ask --live question answered through the Steampipe "
-                                        "AWS plugin", width=1040)
-    return svg, ("One live question. The model only sees table names, columns and rows: it discovers the tables, "
-                 "writes a SELECT, and spendlens checks and runs it. Steampipe's AWS plugin turns the SQL into "
-                 "read-only AWS API calls with your own credentials.")
+    svg = _sequence("sal", parts, steps, "Sequence of a spendlens ask --live question: schema lookup, query check, "
+                                         "cache, background job and answer", width=1100)
+    return svg, ("One live question. The model learns the real tables and columns from the plugin catalog, every query "
+                 "is checked before it reaches AWS, slow queries run as jobs it waits for, and fresh results and "
+                 "answers are reused from the cache.")
+
+
+def ai_pipeline() -> tuple[str, str]:
+    u = "aip"
+    b = []
+    b.append(_box(20, 70, 130, 70, "LLM", "plans, writes SQL", "Your provider", ext=True))
+    cols = [("Catalog", "589 tables · 12.7k columns", "required filters · examples"),
+            ("Checker", "tables · columns · filters", "JSON ops · cost guards"),
+            ("Runner", "background job · waits", "timeout · retry · cancel"),
+            ("Cache", "results by data class", "answers by data fingerprint")]
+    x = 200
+    for i, (title, a, c) in enumerate(cols):
+        b.append(f'<rect x="{x}" y="30" width="170" height="150" rx="14" fill="{ACCENT}" fill-opacity="0.08" '
+                 f'stroke="{ACCENT}" stroke-opacity="0.7" stroke-width="1.5"/>')
+        b.append(_t(x + 85, 58, f"{i + 1}", 12, weight=700, fill=ACCENT))
+        b.append(_t(x + 85, 84, title, 15, weight=700))
+        b.append(_t(x + 85, 112, a, 11, opacity=0.8))
+        b.append(_t(x + 85, 132, c, 11, opacity=0.8))
+        if i:
+            b.append(_arrow(u, x - 28, 105, x - 2, 105))
+        x += 200
+    b.append(_box(1000, 70, 130, 70, "Steampipe", "AWS plugin v1.35.0", "Read-only", ext=False))
+    b.append(_arrow(u, 150, 105, 198, 105))
+    b.append(_arrow(u, 972, 105, 998, 105))
+    b.append(_t(575, 214, "Built from the plugin's own source and docs · merged with the columns your installed plugin "
+                     "reports · nothing here can write to AWS", 11.5, opacity=0.7))
+    svg = _svg(u, 1150, 230, "The four layers between the model and AWS: catalog, checker, runner and cache", "".join(b))
+    return svg, ("Four layers sit between the model and AWS. A wrong table or column is caught by the checker in "
+                 "milliseconds instead of failing in AWS, and a repeated question is answered from the cache.")
 
 
 ALL = {"c4_context": c4_context, "c4_container": c4_container, "seq_report": seq_report, "seq_ask": seq_ask,
-       "seq_ask_live": seq_ask_live}
+       "seq_ask_live": seq_ask_live, "ai_pipeline": ai_pipeline}

@@ -97,7 +97,7 @@ def test_live_tools_only_with_flag():
     with StubLLM([("final", "ok")]) as stub:
         ask(stub, "x", "--live")
         live_tools = {t["function"]["name"] for t in stub.requests[0]["body"]["tools"]}
-    assert "steampipe_query" in live_tools
+    assert {"aws_find_tables", "aws_describe_table", "aws_query", "aws_query_result"} <= live_tools
 
 
 def test_interactive_session_keeps_context():
