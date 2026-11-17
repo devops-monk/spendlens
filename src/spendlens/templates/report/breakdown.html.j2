@@ -1,0 +1,97 @@
+{#- `cost diff -g X -b Y --format html`: per group (e.g. service), which second-level items (e.g. tag:Name values)
+    went up or down. Context: bd (render.html.breakdown_model). -#}
+{% extends "base.html.j2" %}
+{% block main %}
+<div class="bd">
+
+<section class="fr-summary" aria-label="Summary">
+  <div class="fr-kpis">
+    <div class="fr-kpi">
+      <div class="k">Spend</div>
+      <div class="v">{{ bd.total.compare }}</div>
+      <div class="d">was {{ bd.total.base }} · {{ bd.periods }}</div>
+    </div>
+    <div class="fr-kpi">
+      <div class="k">Change</div>
+      <div class="v chg {{ bd.total.dir }}">{{ bd.total.change or "$0.00" }}</div>
+      <div class="d">{{ bd.total.pct }}{% if bd.total.pct %} · {% endif %}{{ bd.groups|length }} {{ bd.g }} value(s)</div>
+    </div>
+    <div class="fr-kpi">
+      <div class="k">Biggest increase</div>
+      {% if bd.up %}<div class="v chg up">{{ bd.up.change }}</div>
+      <div class="d" title="{{ bd.up.name }}">{{ bd.up.name }} · {{ bd.up.group }}</div>
+      {% else %}<div class="v">none</div>{% endif %}
+    </div>
+    <div class="fr-kpi">
+      <div class="k">Biggest decrease</div>
+      {% if bd.down %}<div class="v chg down">{{ bd.down.change }}</div>
+      <div class="d" title="{{ bd.down.name }}">{{ bd.down.name }} · {{ bd.down.group }}</div>
+      {% else %}<div class="v">none</div>{% endif %}
+    </div>
+  </div>
+  <p class="fr-scope">{{ bd.periods }} · grouped by {{ bd.g }} → {{ bd.b }}{% if bd.metric %} · metric {{ bd.metric }}{% endif %}
+    {%- if bd.tagged %} · tags must be activated as cost allocation tags; spend before activation or on untagged
+    resources shows as "(untagged)"{% endif %}</p>
+</section>
+
+<section class="fr-overview" aria-label="{{ bd.g }} overview">
+  <h2>{{ bd.g|capitalize }} <span>{{ bd.groups|length }}</span></h2>
+  <ul class="ov">
+    {% for g in bd.groups %}
+    <li><a class="ov-row bd-row" href="#grp-{{ g.i }}" data-i="{{ g.i }}">
+      <span class="sdot {{ 'alarm' if g.dir == 'up' else 'ok' if g.dir == 'down' else 'skip' }}" aria-hidden="true"></span>
+      <span class="ov-title"><b>{{ g.name }}</b><span>{{ g.base }} → {{ g.compare }}{% if g.up or g.down %} · {{ g.up }} up · {{ g.down }} down{% endif %}{% if g.new %} · {{ g.new }} new{% endif %}{% if g.gone %} · {{ g.gone }} gone{% endif %}</span></span>
+      <span class="ov-fail chg {{ g.dir }}">{{ g.change or "no change" }}</span>
+      <span class="ov-saving chg {{ g.dir }}">{{ g.pct }}</span>
+    </a></li>
+    {% endfor %}
+  </ul>
+</section>
+
+<div class="fr-toolbar bd-toolbar" role="search" hidden>
+  <input class="fr-q bd-q" type="search" placeholder="Search {{ bd.b }} values and {{ bd.g }}" aria-label="Search">
+  <div class="fr-actions">
+    <button type="button" class="bd-expand">Expand all</button>
+    <button type="button" class="bd-collapse">Collapse all</button>
+  </div>
+  <p class="fr-count bd-count" aria-live="polite"></p>
+</div>
+
+<section class="bd-groups">
+  {% for g in bd.groups %}
+  <details class="ctl bd-grp {{ 'worst-alarm' if g.dir == 'up' else 'worst-ok' }}" id="grp-{{ g.i }}"{% if loop.index <= 3 %} open{% endif %}>
+    <summary>
+      <span class="sdot {{ 'alarm' if g.dir == 'up' else 'ok' if g.dir == 'down' else 'skip' }}" aria-hidden="true"></span>
+      <span class="ctl-title"><b>{{ g.name }}</b><code>{{ g.base }} → {{ g.compare }}</code></span>
+      <span class="ctl-meta">
+        <span class="ctl-fail">{{ g.up }} up · {{ g.down }} down</span>
+        <span class="ctl-saving chg {{ g.dir }}">{{ g.change or "no change" }}{% if g.pct %} ({{ g.pct }}){% endif %}</span>
+      </span>
+    </summary>
+    <div class="ctl-body">
+      <div class="tablewrap"><table>
+        <thead><tr><th>{{ bd.b }}</th><th class="num">Before</th><th class="num">After</th><th class="num">Change</th>
+          <th class="num">Change %</th><th>Status</th></tr></thead>
+        <tbody>
+          {% for r in g.rows %}
+          <tr data-q="{{ (r.name ~ ' ' ~ g.name)|lower }}">
+            <td class="res"><b>{{ r.name }}</b></td>
+            <td class="num">{{ r.base }}</td><td class="num">{{ r.compare }}</td>
+            <td class="num chg {{ r.dir }}">{{ r.change }}</td>
+            <td class="num chg {{ r.dir }}">{{ r.pct }}</td>
+            <td class="nw"><span class="sbadge {{ 'alarm' if r.dir == 'up' else 'ok' if r.dir == 'down' else 'info' }}">{{ r.status }}</span>{% if r.flagged %} <span class="pill">flagged</span>{% endif %}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="6" class="empty">No changed items.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table></div>
+      <div class="ctl-foot"><span>{{ g.shown }} item(s){% if g.more %} · showing the {{ g.rows|length }} largest changes; {{ g.more }} more in --format csv/json{% endif %}</span></div>
+    </div>
+  </details>
+  {% endfor %}
+  <p class="bd-none empty" hidden>Nothing matches the search.</p>
+</section>
+
+</div>
+{% endblock %}

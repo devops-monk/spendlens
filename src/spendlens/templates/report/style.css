@@ -194,3 +194,11 @@ details.ctl .tablewrap{border-top:0;margin-top:0}
 @media (max-width:760px){.ov-row{grid-template-columns:12px minmax(0,1fr) auto;row-gap:4px}.ov-row .failbar{display:none}
  .ov-saving{grid-column:2/4;text-align:left}.ctl-meta .failbar{display:none}.ctl-policy .lbl{width:auto}}
 @media print{.fr-overview{break-after:page}.ctl-foot button{display:none}}
+/* ---------- cost breakdown (cost diff -g X -b Y) ---------- */
+.chg.up{color:var(--critical)}.chg.down{color:var(--good-ink)}.chg.flat{color:var(--ink-2)}
+.bd .fr-kpi .v.chg{font-size:34px}
+.bd-row{grid-template-columns:12px minmax(0,1fr) 140px 84px}
+.bd .ov-fail{font-weight:700;font-size:13.5px}
+.bd details.ctl.worst-ok{border-left:4px solid var(--good)}
+tr.bd-hide,details.bd-grp.bd-hide{display:none}
+@media (max-width:760px){.bd-row{grid-template-columns:12px minmax(0,1fr) auto}}

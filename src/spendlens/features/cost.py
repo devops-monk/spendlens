@@ -38,6 +38,7 @@ TodayOpt = Annotated[str | None, typer.Option("--today", hidden=True, help="Over
 
 DIFF_COLUMNS = ["group", "base", "compare", "change", "change_pct", "status", "flagged", "currency"]
 SHOW = ("changed", "flagged", "increases", "decreases", "all")
+SEP = "\x1f"  # joins the two keys of a breakdown row in saved history
 
 
 def _today(override: str | None) -> date:
@@ -97,6 +98,10 @@ def diff_cmd(
     compare: Annotated[str | None, typer.Option("--to", help="Compare period: YYYY-MM or YYYY-MM..YYYY-MM.")] = None,
     mtd: Annotated[bool, typer.Option("--mtd", help="This month to date vs the same days last month.")] = False,
     group_by: GroupOpt = None,
+    breakdown: Annotated[str | None, typer.Option(
+        "--breakdown", "-b", help="Second level inside each group, e.g. -g service -b tag:Name: which tagged "
+        "resources/apps changed within each service. Any group-by value works. Uses ce:GetCostAndUsage directly "
+        "(read-only).")] = None,
     metric: MetricOpt = None,
     include_credits: CreditsOpt = False,
     show: Annotated[str, typer.Option("--show", help=f"Rows to show: {', '.join(SHOW)}.")] = "changed",
@@ -118,6 +123,7 @@ def diff_cmd(
       spendlens cost diff --mtd -g account
       spendlens cost diff --from 2026-07..2026-09 --to 2026-10..2026-12 -g tag:Team
       spendlens cost diff --show flagged --fail-on-flag
+      spendlens cost diff -g service -b tag:Name          # per service: which Name values went up or down
     """
     if show not in SHOW:
         raise typer.BadParameter(f"Use one of: {', '.join(SHOW)}", param_hint="--show")
@@ -136,6 +142,13 @@ def diff_cmd(
     except ValueError as e:
         raise typer.BadParameter(str(e), param_hint="--from/--to") from e
 
+    if breakdown:
+        second = _group(breakdown, cfg)
+        if (second.kind, second.key) == (group.kind, group.key):
+            raise typer.BadParameter("--breakdown must differ from --group-by", param_hint="--breakdown")
+        _breakdown_diff(cfg, group, second, periods, m, include_credits, show, top, total, fail_on_flag, source,
+                        fmt, out)
+        return
     run_meta = {"periods": [p.as_dict() for p in periods], "group_by": group.label, "metric": m,
                 "include_credits": include_credits}
     rows, meta_saved, meta = costs_from_source(
@@ -168,6 +181,105 @@ def diff_cmd(
               + (" · periods differ in length, see change_pct_daily (json/csv)" if p0.days != p1.days else ""))
     if group.kind == "tag":
         err.print("[dim]Tag grouping cannot exclude credits/refunds (Cost Explorer limitation).[/]")
+    if fail_on_flag and flagged:
+        raise typer.Exit(3)
+
+
+# ------------------------------------------------------------------ diff with a second level (service -> tag)
+
+
+def _query_breakdown(cfg: Config, group: ce.GroupBy, second: ce.GroupBy, periods: list[ce.Period], metric: str,
+                     include_credits: bool) -> list[dict[str, Any]]:
+    from .. import aws_ce
+
+    excluded = [] if include_credits else list(cfg.cost.exclude_record_types)
+    pairs = [(group.kind, group.key), (second.kind, second.key)]
+    rows: list[dict[str, Any]] = []
+    try:
+        with activity(f"Querying Cost Explorer: [bold]{group.label} → {second.label}[/] "
+                      f"[dim](ce:GetCostAndUsage, read-only)[/]"):
+            client = aws_ce.client(cfg.aws.profile)
+            for i, p in enumerate(periods):
+                for r in aws_ce.grouped_costs(client, pairs, p.start.isoformat(), p.end.isoformat(), metric,
+                                              excluded):
+                    k1, k2 = (r["keys"] + ["", ""])[:2]
+                    rows.append({"kind": f"p{i}", "period": p.label, "dimension": f"{group.label}>{second.label}",
+                                 "grp": f"{k1}{SEP}{k2}", "amount": r["amount"], "currency": r["currency"]})
+    except aws_ce.CostExplorerError as e:
+        err.print(f"[red]Cost Explorer query failed:[/] {e}")
+        raise typer.Exit(1) from e
+    return rows
+
+
+def breakdown_rows(result: list[dict[str, Any]], show: str, top: int | None) -> tuple[list[dict[str, Any]],
+                                                                                         list[dict[str, Any]]]:
+    """Split composite rows into (group, item); return (rows ordered by group change then item change, group
+    summaries). `show` filters items; `top` keeps the N largest item changes per group."""
+    groups: dict[str, dict[str, Any]] = {}
+    for r in result:
+        g, item = (r["group"].split(SEP, 1) + [""])[:2]
+        s = groups.setdefault(g, {"group": g, "base": 0.0, "compare": 0.0, "items": [], "up": 0, "down": 0,
+                                  "new": 0, "gone": 0, "flagged": 0, "currency": r.get("currency", "USD")})
+        s["base"] += r["base"]
+        s["compare"] += r["compare"]
+        s["up"] += r["change"] > 0
+        s["down"] += r["change"] < 0
+        s["new"] += r["status"] == "new"
+        s["gone"] += r["status"] == "gone"
+        s["flagged"] += bool(r["flagged"])
+        s["items"].append({**r, "group": g, "item": item})
+    keep = {
+        "all": lambda r: True, "changed": lambda r: r["status"] != "flat", "flagged": lambda r: r["flagged"],
+        "increases": lambda r: r["change"] > 0, "decreases": lambda r: r["change"] < 0,
+    }[show]
+    ordered: list[dict[str, Any]] = []
+    summaries = []
+    for s in groups.values():
+        s["base"], s["compare"] = round(s["base"], 2), round(s["compare"], 2)
+        s["change"] = round(s["compare"] - s["base"], 2)
+        s["change_pct"] = round(100 * s["change"] / s["base"], 1) if s["base"] else None
+    for s in sorted(groups.values(), key=lambda s: (-abs(s["change"]), s["group"])):
+        items = sorted((r for r in s.pop("items") if keep(r)), key=lambda r: (-abs(r["change"]), r["item"]))
+        s["shown"], s["total_items"] = len(items[: top or None]), len(items)
+        ordered += items[: top or None]
+        summaries.append(s)
+    return ordered, summaries
+
+
+def _breakdown_diff(cfg: Config, group: ce.GroupBy, second: ce.GroupBy, periods: list[ce.Period], m: str,
+                    include_credits: bool, show: str, top: int | None, total: bool, fail_on_flag: bool,
+                    source: Source, fmt: Format, out: Any) -> None:
+    run_meta = {"periods": [p.as_dict() for p in periods], "group_by": group.label, "breakdown": second.label,
+                "metric": m, "include_credits": include_credits}
+    rows, meta_saved, meta = costs_from_source(
+        "cost_breakdown", source, cfg,
+        lambda: (_query_breakdown(cfg, group, second, periods, m, include_credits), run_meta))
+    if source is not Source.live:
+        periods = [ce.Period.from_dict(d) for d in meta_saved.get("periods", [])] or periods
+    g_label, b_label = meta_saved.get("group_by", group.label), meta_saved.get("breakdown", second.label)
+    (p0, base_totals), (p1, cmp_totals) = _split(rows, periods)
+    currency = _currency(rows, cfg)
+    t = ce.DiffThresholds(cfg.cost.change_alarm_abs, cfg.cost.change_alarm_pct, cfg.cost.min_amount)
+    result = ce.diff(base_totals, cmp_totals, t, currency, p0.days, p1.days)
+    tot = ce.diff_total(result, currency)
+    ordered, summaries = breakdown_rows(result, show, top)
+    cols = [g_label, b_label, "base", "compare", "change", "change_pct", "status", "flagged", "currency"]
+    shown = [{g_label: r["group"], b_label: r["item"], **{k: r.get(k) for k in cols[2:]}} for r in ordered]
+    if total:
+        shown.append({g_label: "TOTAL", b_label: "", **{k: tot.get(k) for k in cols[2:]}})
+    meta.title = f"Cost diff by {g_label} → {b_label}: {p0.label} → {p1.label}"
+    meta.extra.update({"view": "breakdown", "group_label": g_label, "breakdown_label": b_label,
+                       "base": p0.as_dict(), "compare": p1.as_dict(), "metric": meta_saved.get("metric", m),
+                       "total": tot, "groups": summaries})
+    emit(shown, fmt, out, meta.title, columns=cols, meta=meta)
+    flagged = [r for r in result if r["flagged"]]
+    sign = "+" if tot["change"] >= 0 else ""
+    pct = f" ({sign}{tot['change_pct']}%)" if tot["change_pct"] is not None else ""
+    err.print(f"[bold]Total {currency} {tot['base']:,.2f} → {tot['compare']:,.2f}: {sign}{tot['change']:,.2f}{pct}[/]"
+              f" · {len(summaries)} {g_label} value(s) · {len(flagged)} flagged change(s)")
+    if second.kind == "tag" or group.kind == "tag":
+        err.print("[dim]Tags must be activated as cost allocation tags in Billing; spend before activation, or on "
+                  f"untagged resources, shows as {chr(39)}(untagged){chr(39)}.[/]")
     if fail_on_flag and flagged:
         raise typer.Exit(3)
 

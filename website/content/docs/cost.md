@@ -38,6 +38,34 @@ New and removed groups only need the absolute threshold. When the two periods di
 | `--show` | `changed` (default), `flagged`, `increases`, `decreases` or `all` |
 | `--top`, `--total/--no-total` | Limit rows; append a TOTAL row |
 
+## Inside each service: which resources or apps changed (`--breakdown`)
+
+```bash
+spendlens cost diff -g service -b tag:Name                     # per service: which Name values went up or down
+spendlens cost diff -g service -b "tag:Service Owner" --mtd    # per service: which teams, month to date
+spendlens cost diff -g account -b service --from 2026-07..2026-09 --to 2026-10..2026-12
+spendlens cost diff -g service -b tag:Name -f html -o breakdown.html
+```
+
+`-b/--breakdown` adds a second level inside each group:
+- It works with any `--group-by` value: service, account, region, usage type, or a tag.
+- Results are ordered by each group's total change, then by each item's change within it.
+- `--top N` keeps the N largest changes per group.
+
+The HTML report contains:
+- the total change, and the biggest single increase and decrease;
+- a one-line overview per service;
+- a section per service listing its items with before, after, change, change % and status (`increase`, `decrease`, `new`, `gone`);
+- search across everything.
+
+How it works:
+- Steampipe's cost tables can't group by a service and a tag together, so this command calls Cost Explorer's read-only `GetCostAndUsage` API directly. It needs `ce:GetCostAndUsage`, which is already in the IAM policy.
+- It makes one request per period, plus pagination. AWS charges $0.01 per request.
+- Credits and refunds are excluded, as with `cost diff`.
+- Each run is saved, so `--source last` replays it offline.
+
+Tags need to be **activated as cost allocation tags** in the Billing console. Spend from before activation, and spend on resources without the tag, appears as `(untagged)`. A tag that's unique per resource, such as `Name`, gives a near per-resource view across any months, without the 14-day limit of `cost resources`.
+
 ## cost trend: the last N months
 
 ```bash

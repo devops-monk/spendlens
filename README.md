@@ -95,6 +95,7 @@ spendlens cost diff --mtd -g account                  # month to date vs the sam
 spendlens cost diff --from 2026-07..2026-09 --to 2026-10..2026-12 -g tag:Team
 spendlens cost trend -n 6                            # monthly pivot with month-over-month change
 spendlens cost showback -t Team                      # spend per team, untagged share called out
+spendlens cost diff -g service -b tag:Name           # inside each service: which tagged resources changed
 ```
 
 ## One number. Every dollar explained.

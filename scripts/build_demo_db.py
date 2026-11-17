@@ -300,6 +300,34 @@ def demo_costs(store: HistoryStore, rng: random.Random) -> None:
                    account_id=ACCOUNT, caller_arn=CALLER, started_at=started,
                    meta={**meta_base, "periods": [p.as_dict() for p in diff_periods], "group_by": "service",
                          "metric": "net_unblended", "include_credits": False})
+    # cost diff with a breakdown: service -> tag:Name. Each service's demo spend is split across a few Name values
+    # (+ an untagged share), so the service totals match the cost_diff run above.
+    from spendlens.features.cost import SEP
+
+    apps = ["checkout-api", "search-api", "payments-api", "data-pipeline", "platform-core", "batch-reports"]
+    names_for = {svc: random.Random(f"names:{svc}").sample(apps, k=3) for svc in {*per_month[-2], *per_month[-1]}}
+
+    def split(values, month):
+        out = {}
+        for svc, amount in values.items():
+            r = random.Random(f"split:{svc}:{month}")
+            names = list(names_for[svc]) + ["(untagged)"]
+            if month == 1 and r.random() < 0.3:
+                names[0] = "new-" + names[0]                     # some items appear only in the newer month
+            base = random.Random(f"weights:{svc}")                # stable shares, small monthly jitter
+            weights = [base.uniform(0.4, 2.0) * r.uniform(0.85, 1.15) for _ in names[:-1]]
+            weights.append(base.uniform(0.05, 0.25) * r.uniform(0.85, 1.15))
+            total = sum(weights)
+            for n, w in zip(names, weights, strict=True):
+                out[f"{svc}{SEP}{n}"] = round(amount * w / total, 2)
+        return out
+
+    store.save_run("cost_breakdown",
+                   cost_rows=rows_for(zip(diff_periods, [split(per_month[-2], 0), split(per_month[-1], 1)],
+                                          strict=True), "service>tag:Name"),
+                   account_id=ACCOUNT, caller_arn=CALLER, started_at=started,
+                   meta={**meta_base, "periods": [p.as_dict() for p in diff_periods], "group_by": "service",
+                         "breakdown": "tag:Name", "metric": "net_unblended", "include_credits": False})
     # trend: 6 months by service
     trend_periods = months[-6:]
     store.save_run("cost_trend", cost_rows=rows_for(zip(trend_periods, per_month[-6:], strict=True), "service"),

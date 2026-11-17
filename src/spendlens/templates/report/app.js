@@ -99,3 +99,22 @@
  apply();
  if(location.hash.startsWith('#check-')){const s=document.querySelector(location.hash);if(s){s.open=true;draw(s);}}
 })();
+(function(){ // cost breakdown: search across groups, expand/collapse, overview jump
+ const bd=document.querySelector('.bd');if(!bd)return;
+ const bar=bd.querySelector('.bd-toolbar');if(bar)bar.hidden=false;
+ const q=bd.querySelector('.bd-q'),groups=[...bd.querySelectorAll('details.bd-grp')],count=bd.querySelector('.bd-count'),none=bd.querySelector('.bd-none');
+ const total=groups.reduce((n,g)=>n+g.querySelectorAll('tbody tr[data-q]').length,0);
+ function apply(){const t=(q&&q.value||'').trim().toLowerCase();let shown=0,gs=0;
+  groups.forEach(g=>{let n=0;g.querySelectorAll('tbody tr[data-q]').forEach(tr=>{const ok=!t||tr.dataset.q.includes(t);tr.classList.toggle('bd-hide',!ok);if(ok)n++;});
+   g.classList.toggle('bd-hide',!!t&&n===0);if(n){shown+=n;gs++;}if(t&&n)g.open=true;});
+  if(count)count.textContent=t?'Showing '+shown+' of '+total+' items in '+gs+' groups':total+' items in '+groups.length+' groups';
+  if(none)none.hidden=!t||shown>0;}
+ let tq;if(q)q.addEventListener('input',()=>{clearTimeout(tq);tq=setTimeout(apply,150);});
+ const ex=bd.querySelector('.bd-expand'),co=bd.querySelector('.bd-collapse');
+ if(ex)ex.addEventListener('click',()=>groups.forEach(g=>{if(!g.classList.contains('bd-hide'))g.open=true;}));
+ if(co)co.addEventListener('click',()=>groups.forEach(g=>g.open=false));
+ bd.addEventListener('click',e=>{const a=e.target.closest&&e.target.closest('.bd-row');if(!a)return;e.preventDefault();
+  const g=document.getElementById('grp-'+a.dataset.i);if(g){g.classList.remove('bd-hide');g.open=true;g.scrollIntoView({behavior:'smooth',block:'start'});}});
+ addEventListener('beforeprint',()=>groups.forEach(g=>g.open=true));
+ apply();
+})();
