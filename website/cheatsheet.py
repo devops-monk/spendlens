@@ -179,11 +179,30 @@ SECTIONS: list[tuple[str, str, str, list[tuple[str, str, str]]]] = [
         ("Any AWS question, schema-checked, cached", "spendlens ask --live \"Which security groups allow port 22 from anywhere?\"",
          "ai"),
         ("Skip the cache and ask again", "spendlens ask --live --fresh \"How many instances are running?\"", "ai"),
+    ]),
+    ("schema", "AWS tables and the AI cache", "The assistant's own tools, for you: find the table, read its columns, "
+     "check SQL before it runs, and see what's cached. All offline: no AWS calls, no Steampipe needed.", [
         ("Which AWS table answers a question?", "spendlens schema find \"unattached EBS volumes\"", "offline"),
-        ("A table's columns, required filters, examples", "spendlens schema show aws_cost_usage", "offline"),
-        ("Check a Steampipe query before running it", "spendlens schema check \"select volume_id, size from aws_ebs_volume\"",
+        ("…just the best three", "spendlens schema find \"monthly cost by service\" --limit 3", "offline"),
+        ("…as JSON, table names only", "spendlens schema find \"IAM users without MFA\" --json | jq -r '.[].table'",
          "offline"),
-        ("What the assistant has cached", "spendlens cache show --entries", "offline"),
+        ("A table's columns, required filters and examples", "spendlens schema show aws_ebs_volume", "offline"),
+        ("…without the example queries", "spendlens schema show aws_cost_usage --no-examples", "offline"),
+        ("…only the required filters", "spendlens schema show aws_cost_usage --json | jq -r .required_filters",
+         "offline"),
+        ("Check a query before running it (exit 1 if it would fail)",
+         "spendlens schema check \"select volume_id, size from aws_ebs_volume where state = 'available'\"", "offline"),
+        ("Catch a wrong column, with \"did you mean\"",
+         "spendlens schema check \"select volume_id, size_gb from aws_ebs_volume\"", "offline"),
+        ("Catch a missing required filter, with the fix",
+         "spendlens schema check \"select dimension_1 from aws_cost_usage\"", "offline"),
+        ("The check result as JSON", "spendlens schema check \"select * from aws_ec2_instance\" --json", "offline"),
+        ("What the assistant has cached", "spendlens cache show", "offline"),
+        ("…with the latest answers and queries", "spendlens cache show --entries", "offline"),
+        ("Forget cached live query results", "spendlens cache clear --queries", "offline"),
+        ("Forget cached answers and brief summaries", "spendlens cache clear --answers", "offline"),
+        ("Clear the whole cache", "spendlens cache clear", "offline"),
+        ("A new AI summary for the brief, even on unchanged data", "spendlens brief --fresh -o brief.html", "ai"),
     ]),
     ("scope", "Scope and settings", "Change what's checked without editing files.", [
         ("Query two regions for one run",
@@ -205,4 +224,5 @@ KINDS = {
 # Short labels for the sticky section bar.
 NAV = {"start": "First run", "changed": "Bill changes", "trends": "Trends", "spikes": "Spikes & budget",
        "waste": "Waste", "hunt": "One check", "tags": "Tags", "savings": "Savings", "fresh": "Fresh reports", "share": "Sharing", "ci": "CI gates",
-       "replay": "History", "ai": "AI", "scope": "Settings"}
+       "replay": "History", "ai": "AI", "schema": "Schema & cache",
+       "scope": "Settings"}
