@@ -54,6 +54,13 @@ docker run --rm --network none spendlens tags --source demo --summary
 docker run --rm --network none -v "$PWD:/work" spendlens report --source demo --out demo-report
 ```
 
+`schema find|show|check` and `cache show|clear` never start Steampipe either:
+
+```bash
+docker run --rm --network none spendlens schema check "select volume_id, size from aws_ebs_volume"
+docker run --rm -v spendlens-data:/data spendlens cache show   # ai-cache.db lives in /data with the history
+```
+
 `make docker-build docker-smoke` builds the image and runs these offline checks with networking disabled.
 
 ## Run against your account

@@ -17,6 +17,7 @@ Commands that read data accept `--source`:
 - **Location:** `~/.local/share/spendlens/spendlens.db` by default. Change it with `history.path` or `SPENDLENS__HISTORY__PATH`.
 - **Contents:** each run's findings, cost rows, the parameters used, the caller identity and CI metadata.
 - **Retention:** old runs are pruned per feature after `history.keep_runs` (default 200).
+- **AI cache:** `spendlens ask` and `brief` keep a separate `ai-cache.db` in the same folder. It never holds findings, only reusable answers and live results; `spendlens cache clear` empties it (see [Cache commands](../ai-assistant/#cache-commands)).
 
 ```bash
 spendlens history list

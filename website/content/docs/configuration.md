@@ -46,7 +46,7 @@ spendlens config                    # the merged config plus the Powerpipe varia
 | `anomaly` | lookback, threshold, minimum increase | anomalies |
 | `budgets` | `monthly_total`, `per_tag`, `warn_pct` | forecast, showback |
 | `savings` | commitment coverage target, Savings Plan expiry warning | savings |
-| `llm` | provider, model, region, effort, step limit | ask |
+| `llm` | provider, model, region, effort, step limit, live query waits, AI cache (`llm.cache`, see [Cache commands](../ai-assistant/#cache-commands)) | ask, brief |
 | `notifications` | names of the webhook environment variables | notify |
 | `dashboard` | title, organisation, brand colours, font | dashboard, `--format html` |
 | `steampipe`, `powerpipe` | connection, port, parallelism, timeouts | all live commands |
