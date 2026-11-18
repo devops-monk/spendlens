@@ -81,6 +81,11 @@ FEATURES = [
      "every command."), "spendlens dashboard -o report.html", "dashboard"),
     ("bell", "Scheduled & notified", ("One-command runs in GitLab or GitHub on a read-only OIDC role, with Slack and "
      "Teams summaries of what changed."), "spendlens init --ci gitlab", "report-notify"),
+    ("terminal", "AWS tables, explained", ("Find the table for any question, read its columns and required filters, "
+     "and check a query before it runs. Offline, from the AWS plugin's own source."),
+     'spendlens schema find "unattached volumes"', "ai-assistant"),
+    ("clock", "Cached, never stale", ("Live results and answers are reused only while fresh, per account, region and "
+     "identity. See what's cached, or clear it."), "spendlens cache show --entries", "ai-assistant"),
     ("sliders", "Your standards, your rules", ("Every threshold is a parameter in one finops.yaml, overridable per run. "
      "Plugins add controls, commands and AI tools."), "spendlens params", "configuration"),
 ]
@@ -496,6 +501,11 @@ def build() -> list[Path]:
                                                             **common, **ctx))
         written.append(target)
 
+    tree = _cli_tree()  # every home-page command must exist, with real options
+    problems = [x for *_, c, _ in FEATURES for x in check_command(c, tree)]
+    problems += [x for *_, c in CASES for line in c.splitlines() for x in check_command(line, tree)]
+    if problems:
+        raise SystemExit("home page is out of date:\n  " + "\n  ".join(problems))
     write("", "home.html.j2", title="spendlens: FinOps for AWS, from your terminal", section="home",
           description="Read-only FinOps CLI for AWS: tag compliance, rightsizing, waste, cost diff, anomalies, "
                       "forecast, savings and an AI assistant.",

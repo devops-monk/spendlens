@@ -66,18 +66,18 @@ spendlens brief --source last --no-ai -o brief.html</code></pre>
         <p>Fresh results are reused: resources 15 min, metrics 5, Cost Explorer 6 h. The same question on the same
           data costs no tokens.</p>
       </article>
-      <article class="tile">
+      <article class="tile t-wide">
         <span class="tile-ico" aria-hidden="true">{{ icons["terminal"]|safe }}</span>
         <p class="t-eyebrow">For you too</p>
         <h3>The assistant's tools, offline.</h3>
-        <p><code>schema find</code> picks the table, <code>schema show</code> explains it, <code>schema check</code>
-          validates your SQL.</p>
-      </article>
-      <article class="tile">
-        <span class="tile-ico" aria-hidden="true">{{ icons["key"]|safe }}</span>
-        <p class="t-eyebrow">Still read-only</p>
-        <h3>Checked, scoped, audited.</h3>
-        <p>Read-only sessions, results scoped to your account and regions, and every query in the audit trail.</p>
+        <p><code>schema find</code> picks the table, <code>schema show</code> explains its columns and required
+          filters, <code>schema check</code> validates your SQL before it reaches AWS. <code>cache</code> shows what's
+          cached and clears it.</p>
+        <pre class="t-code"><code>spendlens schema find "unattached EBS volumes"
+spendlens schema check "select size_gb from aws_ebs_volume"
+spendlens cache show --entries
+spendlens cache clear --queries</code></pre>
+        <p class="t-foot">Still read-only · results scoped to your account, regions and identity · every query audited</p>
       </article>
     </div>
     <div class="ctas new-ctas">
