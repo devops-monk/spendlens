@@ -504,8 +504,13 @@ def build() -> list[Path]:
     tree = _cli_tree()  # every home-page command must exist, with real options
     problems = [x for *_, c, _ in FEATURES for x in check_command(c, tree)]
     problems += [x for *_, c in CASES for line in c.splitlines() for x in check_command(line, tree)]
+    for tpl in ("home.html.j2", "architecture.html.j2"):  # commands in the pages' code blocks
+        for block in re.findall(r"<pre[^>]*><code>(.*?)</code></pre>", (SITE / "templates" / tpl).read_text(), re.DOTALL):
+            for line in html_lib.unescape(block).splitlines():
+                if line.startswith("spendlens ") and "{{" not in line:
+                    problems += [f"{tpl}: {x}" for x in check_command(line.split("  #")[0].strip(), tree)]
     if problems:
-        raise SystemExit("home page is out of date:\n  " + "\n  ".join(problems))
+        raise SystemExit("home or architecture page is out of date:\n  " + "\n  ".join(problems))
     write("", "home.html.j2", title="spendlens: FinOps for AWS, from your terminal", section="home",
           description="Read-only FinOps CLI for AWS: tag compliance, rightsizing, waste, cost diff, anomalies, "
                       "forecast, savings and an AI assistant.",

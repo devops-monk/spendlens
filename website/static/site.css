@@ -428,6 +428,10 @@ main:has(.localnav) section[id] { scroll-margin-top: 104px; }
 .tile-ico { width: 44px; height: 44px; border-radius: 12px; background: var(--grad); color: #fff; display: grid; place-items: center; margin-bottom: 18px; flex: none; }
 .tile-ico svg { width: 23px; height: 23px; }
 .arch-bento { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.tools-bento { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.tools-bento .tile { grid-row: auto; }
+.tools-bento .t-code { font-size: 12px; }
+@media (max-width: 640px) { .tools-bento { grid-template-columns: 1fr; } }
 .arch-bento .t-wide { grid-row: auto; }
 .arch-bento .tile h3 { font-size: 24px; }
 .arch-bento .tile p:not(.t-eyebrow) { line-height: 1.5; }

@@ -14,6 +14,7 @@
       <a href="#ask">Ask</a>
       <a href="#ask-live">Live AI</a>
       <a href="#ai-pipeline">AI pipeline</a>
+      <a href="#schema-cache">Schema &amp; cache</a>
       <a href="#safety">Safety</a>
     </div>
   </div>
@@ -168,10 +169,64 @@
         <p>The <b>catalog</b> is built from the Steampipe AWS plugin's own source and docs: every table, column,
           required filter and example, merged with the columns your installed plugin reports. The <b>checker</b>
           passes 1,613 of the plugin's 1,620 documented examples; the 7 it rejects are mistakes in those examples.</p>
-        <ul class="chips"><li>589 tables · 12.7k columns</li><li>Offline checks in milliseconds</li><li><code>spendlens schema</code> for people too</li></ul>
+        <ul class="chips"><li>589 tables · 12.7k columns</li><li>Offline checks in milliseconds</li><li><a href="#schema-cache">Each layer is a command ›</a></li></ul>
       </div>
     </div>
     <div class="sc-media">{{ diagram("ai_pipeline") }}</div>
+  </div>
+</section>
+
+<section class="section alt" id="schema-cache">
+  <div class="wrap">
+    <p class="t-eyebrow center">Schema &amp; cache commands</p>
+    <h2 class="h2">The assistant's tools.<br>Yours too.</h2>
+    <p class="sub">Each layer of the pipeline is also a command. The schema commands run offline from the bundled
+      catalog: no AWS calls, no Steampipe and no AI provider. They see exactly what the model sees.</p>
+    <div class="bento tools-bento">
+      <article class="tile">
+        <span class="tile-ico" aria-hidden="true">{{ icons["book"]|safe }}</span>
+        <p class="t-eyebrow">1 · Catalog</p>
+        <h3>Find the table. Read its rules.</h3>
+        <p><code>schema find</code> runs the search behind <code>aws_find_tables</code>; <code>schema show</code>
+          prints what <code>aws_describe_table</code> returns: columns and their meaning, required filters with valid
+          values, fast filters, cost and time notes, examples.</p>
+        <pre class="t-code"><code>spendlens schema find "unattached EBS volumes"
+spendlens schema show aws_cost_usage --no-examples
+spendlens schema show aws_ebs_volume --json</code></pre>
+      </article>
+      <article class="tile">
+        <span class="tile-ico" aria-hidden="true">{{ icons["list"]|safe }}</span>
+        <p class="t-eyebrow">2 · Checker</p>
+        <h3>Check SQL before AWS sees it.</h3>
+        <p><code>schema check</code> is <code>aws_check_query</code>: the same check that runs before every live
+          query. Exit code 1 when the query would fail, so it works as a CI gate for your own Steampipe SQL.</p>
+        <pre class="t-code"><code>spendlens schema check "select size_gb from aws_ebs_volume"
+# ✗ column size_gb does not exist in aws_ebs_volume
+#   did you mean: size</code></pre>
+      </article>
+      <article class="tile">
+        <span class="tile-ico" aria-hidden="true">{{ icons["clock"]|safe }}</span>
+        <p class="t-eyebrow">3 · Runner</p>
+        <h3>Waits, within limits you set.</h3>
+        <p>Live queries run only through <code>ask --live</code>, as background jobs on read-only connections.
+          <code>llm.query_wait_s</code> sets how long each call waits before the model waits again;
+          <code>llm.query_timeout_s</code> cancels the query.</p>
+        <pre class="t-code"><code>spendlens ask --live --show-tools "Idle NAT gateways?"
+spendlens ask --live --set llm.query_timeout_s=600 "…"</code></pre>
+      </article>
+      <article class="tile">
+        <span class="tile-ico" aria-hidden="true">{{ icons["coins"]|safe }}</span>
+        <p class="t-eyebrow">4 · Cache</p>
+        <h3>See what's reused. Clear it.</h3>
+        <p><code>ai-cache.db</code> sits next to the history: live results by data class, answers by data
+          fingerprint, brief summaries by their figures. Scoped to your connection, regions and AWS identity.
+          <code>--fresh</code> skips it once.</p>
+        <pre class="t-code"><code>spendlens cache show --entries
+spendlens cache clear --queries
+spendlens cache clear --answers
+spendlens brief --fresh -o brief.html</code></pre>
+      </article>
+    </div>
   </div>
 </section>
 

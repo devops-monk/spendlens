@@ -284,22 +284,27 @@ def ai_pipeline() -> tuple[str, str]:
             ("Runner", "background job · waits", "timeout · retry · cancel"),
             ("Cache", "results by data class", "answers by data fingerprint")]
     x = 200
-    for i, (title, a, c) in enumerate(cols):
+    cmds = ["schema find · show", "schema check", "ask --live", "cache show · clear"]
+    b.append(_t(85, 209, "Run it yourself:", 11, weight=600, opacity=0.75))
+    for i, ((title, a, c), cmd) in enumerate(zip(cols, cmds)):
         b.append(f'<rect x="{x}" y="30" width="170" height="150" rx="14" fill="{ACCENT}" fill-opacity="0.08" '
                  f'stroke="{ACCENT}" stroke-opacity="0.7" stroke-width="1.5"/>')
         b.append(_t(x + 85, 58, f"{i + 1}", 12, weight=700, fill=ACCENT))
         b.append(_t(x + 85, 84, title, 15, weight=700))
         b.append(_t(x + 85, 112, a, 11, opacity=0.8))
         b.append(_t(x + 85, 132, c, 11, opacity=0.8))
+        b.append(f'<rect x="{x + 10}" y="192" width="150" height="26" rx="13" fill="{ACCENT}" fill-opacity="0.16"/>')
+        b.append(_t(x + 85, 209, cmd, 11, weight=600, fill=ACCENT))
         if i:
             b.append(_arrow(u, x - 28, 105, x - 2, 105))
         x += 200
     b.append(_box(1000, 70, 130, 70, "Steampipe", "AWS plugin v1.35.0", "Read-only", ext=False))
     b.append(_arrow(u, 150, 105, 198, 105))
     b.append(_arrow(u, 972, 105, 998, 105))
-    b.append(_t(575, 214, "Built from the plugin's own source and docs · merged with the columns your installed plugin "
+    b.append(_t(575, 254, "Built from the plugin's own source and docs · merged with the columns your installed plugin "
                      "reports · nothing here can write to AWS", 11.5, opacity=0.7))
-    svg = _svg(u, 1150, 230, "The four layers between the model and AWS: catalog, checker, runner and cache", "".join(b))
+    svg = _svg(u, 1150, 270, ("The four layers between the model and AWS: catalog, checker, runner and cache, each with the "
+               "spendlens command that exposes it"), "".join(b))
     return svg, ("Four layers sit between the model and AWS. A wrong table or column is caught by the checker in "
                  "milliseconds instead of failing in AWS, and a repeated question is answered from the cache.")
 
