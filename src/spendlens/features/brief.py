@@ -165,6 +165,8 @@ def _human(control: str | None, reason: str | None = None) -> str:
 
 def _effort(control: str | None) -> str:
     c = control or ""
+    if re.search(r"purchase|savingsplan|reserv|commitment", c):
+        return "high"  # a 1 or 3 year financial commitment
     return "low" if re.search(r"unattached|unused|idle|old|orphan|snapshot|retention|stopped|eip", c) else "medium"
 
 

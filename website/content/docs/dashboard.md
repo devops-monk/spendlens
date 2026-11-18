@@ -77,6 +77,50 @@ How the charts behave:
 
 `spendlens report` runs every check and then builds the dashboard from those runs (`--source last`), writing each check's JSON as well.
 
+## spendlens review: the full review
+
+```bash
+spendlens review -o review.html                          # AI analysis; reuses today's runs, runs the rest live
+spendlens review --source last -o review.html            # saved runs only, no AWS calls
+spendlens review --source last --no-ai -o review.html    # nothing sent to an AI provider
+spendlens review --refresh -o review.html                # re-run every section live first
+spendlens review --source demo -o review.html            # sample data
+```
+
+One command for the whole FinOps review. The FinOps AI analyst explains your AWS spend, flags the anomalies and suggests savings, then you decide what happens to each one. It's one self-contained, printable HTML page in light and dark, with a menu that stays at the top:
+
+| Section | What it shows |
+|---|---|
+| **Summary** | The analyst's headline and summary, five headline numbers, and how the review is made: AWS data, spendlens checks, computed figures, the AI's explanation, your decision. |
+| **Key insights** | Up to six, ranked by impact. |
+| **Spend** | Monthly spend against the budget with this month's forecast; a **spend bridge** from last month's total through each big change to this month's; the trend of the top services; the largest services; a **service → workload flow** with the biggest movers (when `spendlens cost breakdown` has run); spend by every showback tag; every service in a sortable table. |
+| **Anomalies** | **Usual vs on the day** for each spike: the baseline, what was spent and the extra, with severity and the likely cause. |
+| **Savings** | The total by source and by service; an **effort × value matrix** (start with low effort, high value); the kind of each change (configuration change, removal or commitment); a **flow** from the check that found each saving to the service it saves on; the analyst's next steps. |
+| **Review queue** | Every proposal, largest first, with its reason, resource, region, owner tag, saving per month and year, effort and kind. |
+| **Budget & tags** | Forecast and tag-compliance meters, tag alarms by resource type, risks to watch. |
+| **Method** | Which saved run each section used, and what spend, anomaly, saving and effort mean. |
+
+[[shot:review|The top of the review, from the bundled demo data (rule-based summary).]]
+
+### Decide, then export
+
+In the review queue, each proposal has **✓ approve**, **⏸ defer** and **✕ reject** buttons and a note:
+- **Totals:** the counts and the monthly total for each decision update as you go. Click a decision again to undo it.
+- **Filters:** search, or filter by service, effort or decision.
+- **Export decisions (CSV):** one row per proposal, with the decision, when it was made, your name, the note, the saving, the resource and the reason. Use it for tickets or a change board.
+
+Decisions are kept in your browser, for that AWS account, so they're still there when you regenerate the review next week. Nothing is sent anywhere and nothing changes in AWS. **Clear decisions** forgets them.
+
+[[shot:review-queue|The review queue: approve, defer or reject each proposal and add a note.]]
+
+### How it's built
+
+Every number is computed by spendlens from your saved runs, exactly as in the dashboard: savings are de-duplicated across spendlens and AWS Cost Optimization Hub, so each resource counts once. The AI writes only the words, with the same read-only analyst as `spendlens brief`, and the two share one cached analysis. Running both on the same data asks the AI once. `--no-ai`, or an AI that isn't set up, uses the built-in rule-based summary.
+
+The kind of change comes from the check: a removal deletes or releases something unused (hard to undo, so back it up first), a commitment is a 1 or 3 year purchase, and anything else is a reversible configuration change. Owners come from the resource's tags: the first `cost.showback_tag_keys` entry, then `Owner` or `Team`.
+
+`spendlens report` also writes `review.html` (rule-based; add `--ai` for the AI analysis).
+
 ## spendlens brief: one page for managers
 
 ```bash

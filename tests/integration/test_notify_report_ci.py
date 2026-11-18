@@ -81,11 +81,12 @@ def test_report_demo_writes_everything(tmp_path):
     r = runner.invoke(app, ["report", "--source", "demo", "--out", str(out)])
     assert r.exit_code == 0, r.output
     steps = json.loads((out / "report-steps.json").read_text())
-    assert {s["step"] for s in steps} >= {"tags", "waste", "cost_diff", "forecast", "dashboard", "savings_summary", "brief"}
+    assert {s["step"] for s in steps} >= {"tags", "waste", "cost_diff", "forecast", "dashboard", "savings_summary", "brief", "review"}
     assert all(s["result"] in ("ok", "alarms") for s in steps), steps
     assert json.loads((out / "waste.json").read_text())["rows"]
     assert (out / "report.html").read_text().startswith("<!doctype html>")
     assert "executive brief" in (out / "brief.html").read_text() and "Automatic summary" in (out / "brief.html").read_text()
+    assert "Review queue" in (out / "review.html").read_text()
 
 
 def test_report_continues_past_failures(tmp_path):

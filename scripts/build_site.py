@@ -446,7 +446,7 @@ def doc_shots(html: str, root: str) -> str:
             f'alt="{caption}" loading="lazy">' for t in ("light", "dark"))
         return f'<figure class="doc-shot">{imgs}<figcaption>{caption}</figcaption></figure>'
 
-    return re.sub(r"<p>\[\[shot:([a-z]+)\|(.*?)\]\]</p>", fig, html)
+    return re.sub(r"<p>\[\[shot:([a-z-]+)\|(.*?)\]\]</p>", fig, html)
 
 
 def pygments_css() -> str:

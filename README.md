@@ -192,6 +192,24 @@ spendlens anomalies --fail-on-anomaly
 spendlens forecast --fail-on-risk
 ```
 
+## One command. The whole review.
+
+```bash
+spendlens review -o review.html
+```
+
+The FinOps AI analyst explains your AWS spend, flags the anomalies and lays out every saving. Then you decide what happens to each one. One printable HTML page:
+- **Spend, explained:** monthly spend against the budget, a bridge from last month's total through each big change to this month's, the trend of the top services, a service → workload flow, spend by owner, and every service in a table.
+- **Anomalies:** usual vs actual for each spike, with its severity and likely cause.
+- **Savings, mapped:** the total by source and service, an effort × value matrix, whether each change is reversible, a removal or a commitment, and a flow from the check that found it to the service it saves on.
+- **For human review:** approve, defer or reject every proposal with a note, watch the approved total update, and export the decisions as CSV. Decisions stay in your browser; nothing changes in AWS.
+
+<img src="website/static/shots/review-light.webp" width="100%" alt="The review: the analyst's summary, five headline numbers and the steps from AWS data to your decision">
+
+spendlens computes every number; the AI only writes the words (`--no-ai` uses a built-in rule-based summary). It shares one cached analysis with `spendlens brief`, so running both asks the AI once. `spendlens report` writes `review.html` too.
+
+<img src="website/static/shots/review-queue-light.webp" width="100%" alt="The review queue: approve, defer or reject each proposal, add a note, export the decisions as CSV">
+
 ## One page for managers.
 
 ```bash
@@ -336,6 +354,7 @@ Unknown keys, typos and out-of-range values are rejected, and the error names th
 | `anomalies` · `forecast` | Daily spikes; month-end projection against budgets |
 | `savings hub` · `commitments` · `summary` | AWS recommendations, coverage, one de-duplicated total (`summary --refresh`: re-check now) |
 | `dashboard` | A self-contained HTML report with nine tabs, always covering every check (`--refresh`: re-run all now) |
+| `review` | The whole review in one page: AI analysis, spend bridge and flows, anomalies, savings, and a queue to approve, defer or reject each saving (CSV export) |
 | `brief` | One page for managers: AI summary, key numbers, charts and a savings review checklist |
 | `ask` | Questions in plain English, read-only (`--live`: any AWS table, schema-checked and cached) |
 | `schema find` · `show` · `check` | Find the AWS table for a question, read its columns and filters, check a query before it runs (offline) |

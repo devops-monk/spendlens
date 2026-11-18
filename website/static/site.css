@@ -524,3 +524,22 @@ main:has(.localnav) .cs-section[id] { scroll-margin-top: 104px; }
 .new-ctas { margin-top: 40px; }
 @media (max-width: 1000px) { .new-bento { grid-template-columns: repeat(2, minmax(0, 1fr)); } .new-bento .t-wide { grid-column: span 2; } }
 @media (max-width: 640px) { .new-bento { grid-template-columns: 1fr; } .new-bento .t-wide { grid-column: auto; } }
+
+/* spendlens review: hero command + home section */
+.one-cmd { display: inline-grid; gap: 6px; margin: 30px auto 0; padding: 16px 22px; border-radius: 18px; text-align: left;
+  background: var(--bg-alt); border: 1px solid var(--line); color: var(--ink); max-width: min(100%, 620px); }
+.one-cmd:hover { text-decoration: none; border-color: var(--accent); }
+.one-cmd .oc-label { font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--accent); }
+.one-cmd code { font-size: clamp(15px, 2.2vw, 19px); background: none; padding: 0; color: var(--ink); overflow-wrap: anywhere; }
+.one-cmd code .p { color: var(--ink-2); margin-right: 8px; }
+.one-cmd .oc-sub { font-size: 13.5px; color: var(--ink-2); }
+.review-sec .eyebrow.center, .review-sec .h2, .review-sec .sub { text-align: center; }
+.review-sec .sub { margin-left: auto; margin-right: auto; }
+.review-cmd { max-width: 420px; margin: 0 auto; text-align: center; }
+.review-shot { margin-top: 44px; }
+.review-bento { margin-top: 56px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.review-bento .t-wide { grid-column: auto; grid-row: auto; }
+.review-bento .t-full { grid-column: 1 / -1; }
+.tile-shot { margin-top: 18px; border-radius: 12px; overflow: hidden; border: 1px solid var(--line); }
+.center-chips { justify-content: center; margin: 32px 0 28px; }
+@media (max-width: 640px) { .review-bento { grid-template-columns: 1fr; } .one-cmd { padding: 14px 16px; } }

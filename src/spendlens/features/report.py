@@ -45,18 +45,18 @@ def report(
     profile: ProfileOpt = None,
     sets: SetOpt = None,
     timeout: Annotated[int, typer.Option("--step-timeout", help="Seconds per step.")] = 1800,
-    ai: Annotated[bool, typer.Option("--ai", help="Write brief.html's summary with your AI provider (llm.*); "
+    ai: Annotated[bool, typer.Option("--ai", help="Write the analysis in brief.html and review.html with your AI provider (llm.*); "
                                                   "default: the rule-based summary, nothing sent to an AI.")] = False,
 ) -> None:
-    """Run all checks, write <out>/*.json, the savings summary, <out>/report.html and the executive <out>/brief.html.
+    """Run all checks, write <out>/*.json, the savings summary, <out>/report.html, <out>/brief.html and <out>/review.html.
 
     Steps: tags, rightsize, waste, cost_diff, cost_trend, cost_showback, anomalies, forecast, savings_hub,
-    savings_commitments (then savings summary, dashboard and brief from the saved runs).
+    savings_commitments (then savings summary, dashboard, brief and the full review from the saved runs).
     Examples:
       spendlens report --out reports
       spendlens report --skip savings_hub --skip cost_showback
       spendlens report --source demo --out /tmp/demo-report
-      spendlens report --ai          # brief.html with an AI-written summary
+      spendlens report --ai          # brief.html and review.html with an AI-written analysis
     """
     names = [n for n, _ in STEPS]
     for opt, vals in (("--only", only or []), ("--skip", skip or [])):
@@ -73,7 +73,7 @@ def report(
         common += ["--set", s]
     selected = [(n, a) for n, a in STEPS if (not only or n in only) and n not in (skip or [])]
     results = []
-    total = len(selected) + 3  # + savings summary + dashboard + brief
+    total = len(selected) + 4  # + savings summary + dashboard + brief + review
     for i, (name, args) in enumerate(selected, 1):
         cmd = [sys.executable, "-m", "spendlens", *args, *common, "--source", source.value, "-f", "json",
                "-o", str(out / f"{name}.json")]
@@ -86,12 +86,16 @@ def report(
     results.append(_run("savings_summary", [sys.executable, "-m", "spendlens", "savings", "summary", "--by", "none",
                                             "--top", "500", "--source", hist, *cfg_args, "-f", "json",
                                             "-o", str(out / "savings_summary.json")], timeout,
-                        step=f"{total - 2}/{total}"))
+                        step=f"{total - 3}/{total}"))
     results.append(_run("dashboard", [sys.executable, "-m", "spendlens", "dashboard", "--source", hist, *cfg_args,
-                                      "-o", str(out / "report.html")], timeout, step=f"{total - 1}/{total}"))
+                                      "-o", str(out / "report.html")], timeout, step=f"{total - 2}/{total}"))
     set_args = [a for s in sets or [] for a in ("--set", s)]
     results.append(_run("brief", [sys.executable, "-m", "spendlens", "brief", "--source", hist, *cfg_args, *set_args,
                                   "--ai" if ai else "--no-ai", "-o", str(out / "brief.html")], timeout,
+                        step=f"{total - 1}/{total}"))
+    # the full review reuses the brief's AI analysis from the cache (same data), so it costs no extra tokens
+    results.append(_run("review", [sys.executable, "-m", "spendlens", "review", "--source", hist, *cfg_args, *set_args,
+                                   "--ai" if ai else "--no-ai", "-o", str(out / "review.html")], timeout,
                         step=f"{total}/{total}"))
     (out / "report-steps.json").write_text(json.dumps(results, indent=2))
 

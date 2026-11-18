@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import itertools
 import math
+from collections import defaultdict
 from html import escape
 from typing import Any
 
@@ -23,7 +24,8 @@ LABEL_W = 230  # left label column
 VALUE_W = 92  # space reserved for value labels at the bar tip
 
 
-__all__ = ["Markup", "columns", "diverging_hbars", "esc", "hbars", "legend", "lines", "meter", "money", "segmented"]
+__all__ = ["Markup", "columns", "count", "diverging_hbars", "dumbbell", "esc", "flow", "hbars", "legend", "lines", "matrix",
+           "meter", "money", "segmented", "waterfall"]
 
 
 def esc(v: Any) -> str:
@@ -43,6 +45,11 @@ def money(v: float | None, cur: str = "USD", compact: bool = True) -> str:
     else:
         s = f"{a:,.0f}" if a >= 100 else f"{a:,.2f}"
     return f"{sign}{sym}{s}" + ("" if sym else f" {cur}")
+
+
+def count(v: float | None, cur: str = "") -> str:
+    """Plain number (a formatter for hbars when the values are counts, not money)."""
+    return "–" if v is None else f"{v:,.0f}"
 
 
 def signed_money(v: float, cur: str = "USD") -> str:
@@ -296,3 +303,218 @@ def legend(series: list[dict[str, Any]]) -> str:
     return '<div class="legend">' + "".join(
         f'<span class="key"><i class="line-key" style="background:var(--series-{s["slot"]})"></i>{esc(s["name"])}</span>'
         for s in series) + "</div>"
+
+
+def waterfall(start: dict[str, Any], steps: list[dict[str, Any]], end: dict[str, Any], *, label: str,
+              width: int = 1080, cur: str = "USD") -> str:
+    """Spend bridge, one row per step: the start total (--neutral), a floating bar per change (increase --div-pos, decrease
+    --div-neg) from the running total, then the end total. start/end/steps: {label, value, tip?}.
+    The axis starts near the lowest running total so changes stay visible; the start value is printed under it."""
+    if not steps:
+        return '<p class="empty">No changes.</p>'
+    run, pts = start["value"], [start["value"]]
+    for st in steps:
+        run += st["value"]
+        pts.append(run)
+    lo_raw, hi = min([*pts, end["value"]]), max([*pts, end["value"]])
+    span = (hi - lo_raw) or abs(hi) or 1
+    ticks = _nice_ticks(span * 1.6)
+    step = ticks[1] - ticks[0] if len(ticks) > 1 else span
+    lo = max(0.0, math.floor((lo_raw - span * 0.6) / step) * step)
+    hi = math.ceil(hi / step) * step
+    lw = _label_w(width)
+    plot = width - lw - VALUE_W - 10
+    row = BAR + 2 * GAP
+
+    def X(v: float) -> float:
+        return lw + plot * (v - lo) / ((hi - lo) or 1)
+
+    rows_n = len(steps) + 2
+    h = rows_n * row + 30
+    parts = []
+    for t in [lo + step * i for i in range(round((hi - lo) / step) + 1)]:
+        parts.append(f'<line class="grid" x1="{X(t):.1f}" x2="{X(t):.1f}" y1="0" y2="{rows_n * row}"/>'
+                     f'<text class="tick" x="{X(t):.1f}" y="{rows_n * row + 16}" text-anchor="middle">{_tick(t)}</text>')
+
+    def total_row(k: int, it: dict[str, Any]) -> str:
+        y = GAP + k * row
+        tip = it.get("tip") or f"{it['label']}: {money(it['value'], cur)}"
+        return (f'<g class="mark" tabindex="0" data-tip="{esc(tip)}" aria-label="{esc(tip)}">'
+                f'<rect class="hit" x="0" y="{y - GAP}" width="{width}" height="{row}"/>'
+                f'<text class="lbl strong" x="{lw - 10}" y="{y + BAR - 4}" text-anchor="end">{esc(_truncate(it["label"], _chars(lw)))}</text>'
+                f'<path d="{_bar_path(X(lo), y, X(it["value"]) - X(lo), BAR)}" fill="var(--neutral)"/>'
+                f'<text class="val strong" x="{X(it["value"]) + 6:.1f}" y="{y + BAR - 4}">{esc(money(it["value"], cur))}</text></g>')
+
+    parts.append(total_row(0, start))
+    run = start["value"]
+    for k, st in enumerate(steps, 1):
+        y = GAP + k * row
+        v = st["value"]
+        a, b = sorted((X(run), X(run + v)))
+        color = "var(--div-pos)" if v > 0 else "var(--div-neg)"
+        tip = st.get("tip") or f"{st['label']}: {signed_money(v, cur)}"
+        parts.append(f'<line class="link" x1="{X(run):.1f}" x2="{X(run):.1f}" y1="{y - 2 * GAP + BAR:.1f}" y2="{y:.1f}"/>')
+        parts.append(f'<g class="mark" tabindex="0" data-tip="{esc(tip)}" aria-label="{esc(tip)}">'
+                     f'<rect class="hit" x="0" y="{y - GAP}" width="{width}" height="{row}"/>'
+                     f'<text class="lbl" x="{lw - 10}" y="{y + BAR - 4}" text-anchor="end">{esc(_truncate(st["label"], _chars(lw)))}</text>'
+                     f'<rect x="{a:.1f}" y="{y}" width="{max(b - a, 2):.1f}" height="{BAR}" rx="3" fill="{color}"/>'
+                     f'<text class="val" x="{b + 6:.1f}" y="{y + BAR - 4}">{esc(signed_money(v, cur))}</text></g>')
+        run += v
+    y_end = GAP + (len(steps) + 1) * row
+    parts.append(f'<line class="link" x1="{X(run):.1f}" x2="{X(run):.1f}" y1="{y_end - 2 * GAP + BAR:.1f}" y2="{y_end:.1f}"/>')
+    parts.append(total_row(len(steps) + 1, end))
+    return (f'<svg class="chart" style="max-width:{width}px" viewBox="0 0 {width} {h}" role="img" aria-label="{esc(label)}">'
+            f'{"".join(parts)}</svg>'
+            + (f'<p class="note">The axis starts at {esc(money(lo, cur))} so the changes are visible.</p>' if lo > 0 else ""))
+
+
+def flow(links: list[dict[str, Any]], *, label: str, left: str = "", right: str = "", width: int = 1080,
+         cur: str = "USD", max_nodes: int = 8) -> str:
+    """Two-column flow (Sankey) diagram: bands from left nodes to right nodes, thickness = value.
+    links: {source, target, value}. Up to max_nodes per side; the rest are grouped as "Other". The four largest
+    left nodes take series colours 1-4, the rest a muted fill; every band and node has a tooltip."""
+    links = [x for x in links if (x.get("value") or 0) > 0]
+    if not links:
+        return '<p class="empty">No data.</p>'
+
+    def top(key: str) -> list[str]:
+        acc: dict[str, float] = defaultdict(float)
+        for x in links:
+            acc[x[key]] += x["value"]
+        names = sorted(acc, key=lambda n: -acc[n])
+        return names if len(names) <= max_nodes else [*names[: max_nodes - 1], "Other"]
+
+    lefts, rights = top("source"), top("target")
+    agg: dict[tuple[str, str], float] = defaultdict(float)
+    for x in links:
+        s = x["source"] if x["source"] in lefts else "Other"
+        t = x["target"] if x["target"] in rights else "Other"
+        agg[(s, t)] += x["value"]
+    total = sum(agg.values())
+    lt = {n: sum(v for (s, _), v in agg.items() if s == n) for n in lefts}
+    rt = {n: sum(v for (_, t), v in agg.items() if t == n) for n in rights}
+    lefts = [n for n in lefts if lt[n] > 0]
+    rights = [n for n in rights if rt[n] > 0]
+    top_pad, gap, node_w, slot = 34, 6, 12, 30  # slot: the least height a node takes, so labels never overlap
+    n_max = max(len(lefts), len(rights))
+    plot_h = max(240, n_max * 40)
+    k = (plot_h - gap * (n_max - 1)) / total
+    lw = min(250, int(width * 0.26))
+    x1, x2 = lw, width - lw - node_w
+
+    def stack(names: list[str], totals: dict[str, float]) -> tuple[dict[str, float], float]:
+        y, pos = float(top_pad), {}
+        for n in names:
+            pos[n] = y
+            y += max(totals[n] * k, slot) + gap
+        return pos, y - gap
+
+    (ly, l_end), (ry, r_end) = stack(lefts, lt), stack(rights, rt)
+    for pos, end in ((ly, l_end), (ry, r_end)):  # centre the shorter side
+        shift = (max(l_end, r_end) - end) / 2
+        for n in pos:
+            pos[n] += shift
+    plot_h = max(l_end, r_end) - top_pad
+    color = {n: (f"var(--series-{i + 1})" if i < 4 and n != "Other" else "var(--muted-fill)") for i, n in enumerate(lefts)}
+    parts = [f'<text class="tick strong" x="{x1}" y="16">{esc(left)}</text>',
+             f'<text class="tick strong" x="{x2 + node_w}" y="16" text-anchor="end">{esc(right)}</text>']
+    l_off = dict(ly)
+    r_off = dict(ry)
+    xm = (x1 + node_w + x2) / 2
+    for s in lefts:
+        for t in rights:
+            v = agg.get((s, t), 0)
+            if v <= 0:
+                continue
+            hh = max(v * k, 1)
+            a, b = l_off[s], r_off[t]
+            l_off[s] += v * k
+            r_off[t] += v * k
+            tip = f"{s} → {t}: {money(v, cur)} ({v / total * 100:.1f}%)"
+            d = (f"M{x1 + node_w},{a:.1f} C{xm:.1f},{a:.1f} {xm:.1f},{b:.1f} {x2},{b:.1f} V{b + hh:.1f} "
+                 f"C{xm:.1f},{b + hh:.1f} {xm:.1f},{a + hh:.1f} {x1 + node_w},{a + hh:.1f} Z")
+            parts.append(f'<path class="band" d="{d}" fill="{color[s]}" tabindex="0" data-tip="{esc(tip)}" '
+                         f'aria-label="{esc(tip)}"/>')
+    for names, pos, totals, x, side in ((lefts, ly, lt, x1, "l"), (rights, ry, rt, x2, "r")):
+        for n in names:
+            hh = max(totals[n] * k, 2)
+            tip = f"{n}: {money(totals[n], cur)} ({totals[n] / total * 100:.1f}%)"
+            fill = color[n] if side == "l" else "var(--ink-2)"
+            tx, anchor = (x - 8, "end") if side == "l" else (x + node_w + 8, "start")
+            ty = pos[n] + hh / 2
+            parts.append(f'<g class="mark" tabindex="0" data-tip="{esc(tip)}" aria-label="{esc(tip)}">'
+                         f'<rect x="{x}" y="{pos[n]:.1f}" width="{node_w}" height="{hh:.1f}" rx="3" fill="{fill}"/>'
+                         f'<text class="lbl" x="{tx}" y="{ty - 1:.1f}" text-anchor="{anchor}">{esc(_truncate(n, 30))}</text>'
+                         f'<text class="tick" x="{tx}" y="{ty + 12:.1f}" text-anchor="{anchor}">{esc(money(totals[n], cur))}</text></g>')
+    h = top_pad + plot_h + 12
+    return (f'<svg class="chart flow" style="max-width:{width}px" viewBox="0 0 {width} {h}" role="img" '
+            f'aria-label="{esc(label)}">{"".join(parts)}</svg>')
+
+
+def matrix(rows: list[str], cols: list[str], cells: dict[tuple[str, str], dict[str, float]], *, label: str,
+           row_title: str = "", cur: str = "USD", fill: str = "var(--series-3)") -> str:
+    """Heat-map table: one cell per (row, column) with a count and a total; cell shade = share of the largest total.
+    cells: {(row, col): {count, total}}. Rendered as a real table, so it reads without colour too."""
+    vmax = max((c.get("total") or 0 for c in cells.values()), default=0) or 1
+    head = f'<th scope="col">{esc(row_title)}</th>' + "".join(f'<th scope="col" class="num">{esc(c)}</th>' for c in cols)
+    body = []
+    for r in rows:
+        tds = []
+        for c in cols:
+            cell = cells.get((r, c)) or {}
+            n, tot = int(cell.get("count") or 0), cell.get("total") or 0
+            if not n:
+                tds.append('<td class="mx-cell empty-cell">–</td>')
+                continue
+            share = max(8, round(tot / vmax * 70))
+            tip = f"{r} effort, {c}: {n} proposal(s), {money(tot, cur)}/month"
+            tds.append(f'<td class="mx-cell" tabindex="0" data-tip="{esc(tip)}" '
+                       f'style="background:color-mix(in srgb, {fill} {share}%, transparent)">'
+                       f'<b>{esc(money(tot, cur))}</b><span>{n} item{"s" if n != 1 else ""}</span></td>')
+        body.append(f'<tr><th scope="row">{esc(r)}</th>{"".join(tds)}</tr>')
+    return (f'<div class="tablewrap"><table class="mx" aria-label="{esc(label)}"><thead><tr>{head}</tr></thead>'
+            f'<tbody>{"".join(body)}</tbody></table></div>')
+
+
+SEV_FILL = {"critical": "var(--div-pos)", "high": "var(--div-pos)", "medium": "var(--series-4)", "low": "var(--series-1)"}
+
+
+def dumbbell(items: list[dict[str, Any]], *, label: str, width: int = 1080, cur: str = "USD") -> str:
+    """Usual vs actual, one row per item: a muted dot at the baseline, a coloured dot (by severity) at the value,
+    joined by a line whose length is the excess. items: {label, base, value, severity?, tip?}."""
+    if not items:
+        return '<p class="empty">No data.</p>'
+    vmax = max(max(i["value"], i["base"]) for i in items) or 1
+    ticks = _nice_ticks(vmax)
+    lw = _label_w(width)
+    plot = width - lw - 150
+    row = BAR + 2 * GAP
+
+    def X(v: float) -> float:
+        return lw + plot * v / ticks[-1]
+
+    h = len(items) * row + 46
+    parts = [(f'<g transform="translate({lw},12)"><circle r="5" cx="5" cy="-4" fill="var(--muted-fill)"/>'
+              '<text class="tick" x="15" y="0">usual (baseline)</text><circle r="5" cx="140" cy="-4" fill="var(--div-pos)"/>'
+              '<text class="tick" x="150" y="0">on the day</text></g>')]
+    y0 = 28
+    for t in ticks:
+        parts.append(f'<line class="grid" x1="{X(t):.1f}" x2="{X(t):.1f}" y1="{y0}" y2="{y0 + len(items) * row}"/>'
+                     f'<text class="tick" x="{X(t):.1f}" y="{y0 + len(items) * row + 16}" text-anchor="middle">{_tick(t)}</text>')
+    for k, it in enumerate(items):
+        cy = y0 + k * row + row / 2
+        fill = SEV_FILL.get(it.get("severity", ""), "var(--div-pos)")
+        excess = it["value"] - it["base"]
+        pct_s = f" ({excess / it['base'] * 100:+.0f}%)" if it["base"] else ""
+        tip = it.get("tip") or f"{it['label']}: {money(it['value'], cur)} vs usual {money(it['base'], cur)}"
+        parts.append(f'<g class="mark" tabindex="0" data-tip="{esc(tip)}" aria-label="{esc(tip)}">'
+                     f'<rect class="hit" x="0" y="{cy - row / 2:.1f}" width="{width}" height="{row}"/>'
+                     f'<text class="lbl" x="{lw - 10}" y="{cy + 4:.1f}" text-anchor="end">{esc(_truncate(it["label"], _chars(lw)))}</text>'
+                     f'<line x1="{X(it["base"]):.1f}" x2="{X(it["value"]):.1f}" y1="{cy:.1f}" y2="{cy:.1f}" '
+                     f'stroke="{fill}" stroke-opacity=".45" stroke-width="4" stroke-linecap="round"/>'
+                     f'<circle cx="{X(it["base"]):.1f}" cy="{cy:.1f}" r="5.5" fill="var(--muted-fill)"/>'
+                     f'<circle cx="{X(it["value"]):.1f}" cy="{cy:.1f}" r="6.5" fill="{fill}" stroke="var(--surface)" stroke-width="2"/>'
+                     f'<text class="val" x="{max(X(it["value"]), X(it["base"])) + 12:.1f}" y="{cy + 4:.1f}">'
+                     f'{esc(signed_money(excess, cur))}{esc(pct_s)}</text></g>')
+    return (f'<svg class="chart" style="max-width:{width}px" viewBox="0 0 {width} {h}" role="img" aria-label="{esc(label)}">'
+            f'{"".join(parts)}</svg>')

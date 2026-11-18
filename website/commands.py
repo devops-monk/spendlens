@@ -19,7 +19,7 @@ CATEGORIES: list[tuple[str, str, list[str]]] = [
     ("Savings", "AWS's own recommendations, commitment coverage, and one de-duplicated savings total.",
      ["savings hub", "savings commitments", "savings summary"]),
     ("Reports, dashboard and notifications", "Run everything at once, build the branded dashboard, post summaries.",
-     ["report", "dashboard", "brief", "notify"]),
+     ["report", "review", "dashboard", "brief", "notify"]),
     ("AI assistant", "Ask questions in plain English; answers come from your saved runs (and, with --live, read-only "
      "Steampipe queries). The schema and cache commands are the assistant's own tools, for you.",
      ["ask", "schema find", "schema show", "schema check", "cache show", "cache clear"]),
@@ -44,6 +44,7 @@ TASKS: list[tuple[str, str]] = [
     ("Get one savings number I can defend", "savings summary"),
     ("Check Savings Plan and RI coverage", "savings commitments"),
     ("Produce one shareable HTML report", "dashboard"),
+    ("Review all spend, anomalies and savings on one page, and decide each saving", "review"),
     ("Give managers a one-page summary with AI insights", "brief"),
     ("Run everything on a schedule in CI", "init"),
     ("Post a summary to Slack or Teams", "notify"),
@@ -176,6 +177,15 @@ RECIPES: dict[str, list[tuple[str, str]]] = {
         ("Skip steps (e.g. no Cost Optimization Hub opt-in)", "spendlens report --skip savings_hub --out reports"),
         ("Everything on sample data: no AWS account needed", "spendlens report --source demo --out demo-report"),
         ("Longer timeout per step for large accounts", "spendlens report --out reports --step-timeout 3600"),
+    ],
+    "review": [
+        ("The full FinOps review: AI analysis, spend, anomalies, savings and a review queue",
+         "spendlens review -o review.html"),
+        ("From saved runs only, no AWS calls", "spendlens review --source last -o review.html"),
+        ("Rule-based analysis: nothing sent to an AI provider", "spendlens review --source last --no-ai -o review.html"),
+        ("Re-run every section now, then write the review", "spendlens review --refresh -o review.html"),
+        ("A new AI analysis even on unchanged data", "spendlens review --fresh -o review.html"),
+        ("The review on sample data", "spendlens review --source demo -o demo-review.html"),
     ],
     "brief": [
         ("One page for managers, with an AI-written summary", "spendlens brief -o brief.html"),

@@ -122,3 +122,53 @@
   try{cb.checked=localStorage.getItem(k)==='1';}catch(e){}mark();
   cb.addEventListener('change',()=>{mark();try{cb.checked?localStorage.setItem(k,'1'):localStorage.removeItem(k);}catch(e){}});});
 })();
+
+(function(){ // review queue: approve / defer / reject + note per proposal, kept in this browser, exported as CSV
+ const q=document.querySelector('.rv-queue');if(!q)return;
+ let P={};try{P=JSON.parse(document.getElementById('spendlens-data').textContent)||{};}catch(e){}
+ const KEY='spendlens-decisions:'+(q.dataset.key||'local'),WHO='spendlens-reviewer';
+ let S={};try{S=JSON.parse(localStorage.getItem(KEY)||'{}')||{};}catch(e){S={};}
+ const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}};
+ const rows=[...q.querySelectorAll('tbody tr[data-id]')];
+ const tools=q.querySelector('.rv-tools');if(tools)tools.hidden=false;
+ const cur=P.currency||'USD',sym={USD:'$',GBP:'£',EUR:'€'}[cur]||'';
+ const money=v=>{const a=Math.abs(v);const s=a>=10000?(a/1000).toFixed(1)+'K':a>=100?Math.round(a).toLocaleString('en-US'):a.toFixed(2);return (v<0?'-':'')+sym+s+(sym?'':' '+cur);};
+ const who=q.querySelector('.rv-who');try{if(who)who.value=localStorage.getItem(WHO)||'';}catch(e){}
+ if(who)who.addEventListener('input',()=>{try{localStorage.setItem(WHO,who.value);}catch(e){}});
+ function paint(tr){const st=S[tr.dataset.id]||{},d=st.d||'';
+  tr.querySelectorAll('.rv-dec button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.d===d?'true':'false'));
+  tr.classList.remove('d-approve','d-defer','d-reject');if(d)tr.classList.add('d-'+d);
+  tr.cells[0].dataset.v={approve:1,defer:2,reject:3}[d]||0;
+  const n=tr.querySelector('.rv-note');if(n&&document.activeElement!==n)n.value=st.n||'';}
+ function totals(){const c={approve:0,defer:0,reject:0,pending:0},m={approve:0,defer:0,reject:0,pending:0};let all=0;
+  rows.forEach(tr=>{const d=(S[tr.dataset.id]||{}).d||'pending',a=+tr.dataset.amt||0;c[d]++;m[d]+=a;all+=a;});
+  for(const k in c){const b=q.querySelector('[data-s="'+k+'"]'),e=q.querySelector('[data-m="'+k+'"]');if(b)b.textContent=c[k];if(e)e.textContent=money(m[k]);}
+  ['approve','defer','reject'].forEach(k=>{const i=q.querySelector('.rv-bar .'+k);if(i)i.style.width=(all?m[k]/all*100:0)+'%';});}
+ rows.forEach(tr=>{paint(tr);
+  tr.querySelectorAll('.rv-dec button').forEach(b=>b.addEventListener('click',()=>{const id=tr.dataset.id,st=S[id]||{};
+   if(st.d===b.dataset.d){delete st.d;}else{st.d=b.dataset.d;st.t=new Date().toISOString();}
+   if(st.d||st.n)S[id]=st;else delete S[id];save();paint(tr);totals();filter();}));
+  const n=tr.querySelector('.rv-note');if(n)n.addEventListener('input',()=>{const id=tr.dataset.id,st=S[id]||{};st.n=n.value;
+   if(st.d||st.n)S[id]=st;else delete S[id];save();});});
+ const fq=q.querySelector('.rv-q'),fs=q.querySelector('.rv-svc'),fe=q.querySelector('.rv-eff'),fd=q.querySelector('.rv-dec-f'),shown=q.querySelector('.rv-shown');
+ function filter(){const t=(fq&&fq.value||'').trim().toLowerCase(),sv=fs?fs.value:'',ef=fe?fe.value:'',dc=fd?fd.value:'';let n=0;
+  rows.forEach(tr=>{const d=(S[tr.dataset.id]||{}).d||'pending';
+   const ok=(!t||tr.dataset.q.includes(t))&&(!sv||tr.dataset.svc===sv)&&(!ef||tr.dataset.eff===ef)&&(!dc||d===dc);
+   tr.classList.toggle('rv-hide',!ok);if(ok)n++;});
+  if(shown)shown.textContent=n===rows.length?'':'Showing '+n+' of '+rows.length+' proposals.';}
+ let tq;if(fq)fq.addEventListener('input',()=>{clearTimeout(tq);tq=setTimeout(filter,150);});
+ [fs,fe,fd].forEach(x=>{if(x)x.addEventListener('change',filter);});
+ const clr=q.querySelector('.rv-clear');
+ if(clr)clr.addEventListener('click',()=>{if(!confirm('Clear every decision and note for this account in this browser?'))return;S={};save();rows.forEach(paint);totals();filter();});
+ const csv=q.querySelector('.rv-csv');
+ if(csv)csv.addEventListener('click',()=>{const items=P.review||[];
+  const cols=['decision','decided_at','reviewer','note','est_monthly_saving','est_yearly_saving','proposal','service','resource','region','owner','effort','kind','found_by','control','reason'];
+  const q2=v=>{if(v==null)return'';const s=String(v);return /[",\n\r]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;};
+  const name=who?who.value:'';
+  const lines=items.map(r=>{const st=S[r.id]||{};return [st.d||'pending',st.t||'',st.d?name:'',st.n||'',r.amount,(r.amount*12).toFixed(2),r.what,r.service,r.full,r.region,r.owner,r.effort,r.kind_label,r.source,r.control,r.reason].map(q2).join(',');});
+  const out=[cols.join(',')].concat(lines).join('\r\n')+'\r\n';
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([out],{type:'text/csv'}));
+  a.download='spendlens-review-decisions-'+(q.dataset.key||'local')+'-'+new Date().toISOString().slice(0,10)+'.csv';
+  document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},0);});
+ totals();filter();
+})();

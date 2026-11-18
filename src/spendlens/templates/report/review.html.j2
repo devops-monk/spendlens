@@ -1,0 +1,230 @@
+{#- `spendlens review`: the full FinOps review. Context: vm (features/review.py review_page()), charts.
+    Every figure is computed by spendlens; vm.a (the analysis) is narrative from the AI or the rule-based summary. -#}
+{% extends "base.html.j2" %}
+{% from "macros.html.j2" import card, missing, data_table %}
+{% block main %}
+{% set a = vm.a %}{% set cur = vm.currency %}{% set s = vm.cost_diff %}
+
+<nav class="rv-nav" aria-label="Review sections">
+  <a href="#summary">Summary</a><a href="#spend">Spend</a><a href="#anomalies">Anomalies</a><a href="#savings">Savings</a>
+  <a href="#queue">Review queue{% if vm.review %} <span class="rv-count">{{ vm.review|length }}</span>{% endif %}</a>
+  <a href="#governance">Budget &amp; tags</a><a href="#method">Method</a>
+</nav>
+
+<section class="br-top" id="summary">
+  <div class="br-ai {{ 'is-ai' if a.by == 'ai' else 'is-rules' }}">
+    <div class="br-ai-head">
+      <span class="br-badge">{% if a.by == 'ai' %}<span aria-hidden="true">✦</span> FinOps AI analyst · {{ a.model }}{% else %}Automatic summary{% endif %}</span>
+      <span class="br-ai-note">{% if a.by == 'ai' %}Written by AI from the figures below. Read-only; verify before acting.{% else %}Rule-based, from the figures below. Run with --ai for an AI-written analysis.{% endif %}</span>
+    </div>
+    <h2 class="br-headline">{{ a.headline }}</h2>
+    {% if a.summary %}<p class="br-summary">{{ a.summary }}</p>{% endif %}
+    {% for n in a.notes %}<p class="note">· {{ n }}</p>{% endfor %}
+  </div>
+  {% if vm.kpis %}
+  <div class="br-kpis">{% for k in vm.kpis %}
+    <div class="br-kpi tone-{{ k.tone }}"><div class="k">{{ k.k }}</div><div class="v">{{ k.v }}</div><div class="d">{{ k.d }}</div></div>
+  {% endfor %}</div>
+  {% endif %}
+</section>
+
+<section class="br-section">
+  <ol class="rv-how" aria-label="How this review is made">
+    <li><b>AWS</b><span>Cost Explorer, Cost Optimization Hub and read-only resource checks</span></li>
+    <li><b>spendlens checks</b><span>cost diff, trend, anomalies, forecast, tags, rightsizing, waste</span></li>
+    <li><b>Figures</b><span>computed and de-duplicated by spendlens, never by the AI</span></li>
+    <li><b>{{ "AI analyst" if a.by == "ai" else "Summary" }}</b><span>{{ "explains the figures in plain English" if a.by == "ai" else "rule-based explanation of the figures" }}</span></li>
+    <li class="you"><b>You decide</b><span>approve, defer or reject each saving, then export</span></li>
+  </ol>
+</section>
+
+{% if a.insights %}
+<section class="br-section">
+  <h2 class="br-h">Key insights</h2>
+  <div class="br-insights">{% for i in a.insights %}
+    <article class="br-insight area-{{ i.area }}">
+      <div class="br-insight-top"><span class="br-area">{{ i.area }}</span><span class="br-impact imp-{{ i.impact }}">{{ i.impact }} impact</span></div>
+      <h3>{{ i.title }}</h3><p>{{ i.detail }}</p>
+    </article>
+  {% endfor %}</div>
+</section>
+{% endif %}
+
+<section class="br-section" id="spend">
+  <h2 class="br-h">Spend</h2>
+  <div class="grid2">
+    {% call card("Monthly spend vs budget", "Total per month; the hatched column is this month's forecast") %}
+      {% if vm.months %}{{ charts.columns(vm.months, label="Monthly spend", cur=cur, width=520, height=300, budget=vm.budget) }}
+      {% else %}{{ missing("cost trend") }}{% endif %}
+    {% endcall %}
+    {% call card("Where the money goes" ~ (" in " ~ s.p1 if s else ""), "Largest " ~ (s.group_by if s else "services") ~ " by spend") %}
+      {% if s and s.spend_bars %}{{ charts.hbars(s.spend_bars[:8], label="Spend by service", cur=cur, width=520) }}{% else %}{{ missing("cost diff") }}{% endif %}
+    {% endcall %}
+  </div>
+  {% set b = vm.bridge %}
+  {% call card("From " ~ (b.p0 if b else "last month") ~ " to " ~ (b.p1 if b else "this month") ~ ": what moved the total", "Start with last period's total, add each change, arrive at this period's total. Red adds spend, blue removes it.") %}
+    {% if b %}{{ charts.waterfall(b.start, b.steps, b.end, label="Spend bridge", cur=cur) }}
+    <p class="rule"><b>Flagged</b> = {{ s.rule }}.</p>
+    {% else %}{{ missing("cost diff") }}{% endif %}
+  {% endcall %}
+  {% if vm.trend %}
+  {% call card("Trend of the top services", vm.trend.x_labels[0] ~ " to " ~ vm.trend.x_labels[-1] ~ "; hover a month for every value") %}
+    {{ charts.legend(vm.trend.series) }}{{ charts.lines(vm.trend.series, vm.trend.x_labels, label="Monthly cost, top services", cur=cur, width=1080, height=320) }}
+  {% endcall %}
+  {% endif %}
+  {% set bd = vm.breakdown %}
+  {% call card("Service → " ~ (bd.sub if bd else "workload") ~ (" · " ~ bd.period if bd else ""), "Each band is the spend of one " ~ (bd.sub if bd else "workload") ~ " in one service; thicker means more") %}
+    {% if bd and bd.links %}{{ charts.flow(bd.links, label="Spend by service and " ~ bd.sub, left="Service", right=bd.sub|capitalize, cur=cur) }}
+    {% if bd.movers %}
+    <h3 class="rv-h3">Biggest movers by {{ bd.sub }} ({{ bd.p0 }} → {{ bd.period }})</h3>
+    <div class="tablewrap"><table class="sortable"><thead><tr><th>Service</th><th>{{ bd.sub|capitalize }}</th><th class="num">{{ bd.p0 }}</th><th class="num">{{ bd.period }}</th><th class="num">Change</th><th class="num">%</th></tr></thead><tbody>
+    {% for m in bd.movers %}<tr><td>{{ m.service }}</td><td>{{ m.item }}</td><td class="num">{{ m.before }}</td><td class="num">{{ m.after }}</td><td class="num {{ 'up' if m.change > 0 else 'down' }}" data-v="{{ m.change }}">{{ m.change_s }}</td><td class="num">{{ m.pct }}</td></tr>{% endfor %}
+    </tbody></table></div>
+    {% endif %}
+    {% else %}<p class="empty">Run <code>spendlens cost breakdown -b tag:Name</code> to see which workloads drive each service's spend.</p>{% endif %}
+  {% endcall %}
+  {% if vm.showback_all %}
+  <div class="grid2">{% for sb in vm.showback_all %}
+    {% call card("Spend by " ~ sb.key, "Who owns the spend (grey: no " ~ sb.key ~ " tag)") %}
+      {{ charts.hbars(sb.bars[:8], label="Spend by " ~ sb.key, cur=cur, width=520) }}
+      {% if sb.untagged_pct %}<p class="note">{{ sb.untagged_pct }} of spend has no <b>{{ sb.key }}</b> tag and cannot be charged back.</p>{% endif %}
+    {% endcall %}
+  {% endfor %}</div>
+  {% endif %}
+  {% if vm.cost_table %}
+  {% call card("Every " ~ s.group_by ~ ": " ~ s.p0 ~ " → " ~ s.p1, "Click a column to sort") %}{{ data_table(vm.cost_table) }}{% endcall %}
+  {% endif %}
+</section>
+
+<section class="br-section" id="anomalies">
+  <h2 class="br-h">Anomalies</h2>
+  {% call card("Usual vs on the day", "Each row is one unusual day: the grey dot is the normal daily spend, the coloured dot what was spent") %}
+    {% if not vm.anomalies_run %}{{ missing("anomalies") }}
+    {% elif vm.dumbbell %}{{ charts.dumbbell(vm.dumbbell, label="Anomalies: usual vs actual daily spend", cur=cur) }}
+    <div class="tablewrap"><table class="sortable"><thead><tr><th>Date</th><th>Service</th><th class="num">Spent</th><th class="num">Usual</th><th class="num">Extra</th><th class="num">%</th><th>Severity</th><th>Likely cause{% if a.by == 'ai' %} (AI){% endif %}</th></tr></thead><tbody>
+    {% for r in vm.anomaly_rows %}<tr><td class="nw">{{ r.date }}</td><td>{{ r.group }}</td><td class="num">{{ r.cost_s }}</td><td class="num">{{ r.baseline_s }}</td><td class="num" data-v="{{ r.delta }}">{{ r.delta_s }}</td><td class="num">{{ r.pct_s }}</td>
+      <td><span class="br-sev sev-{{ r.severity }}">{{ r.severity }}</span></td><td>{{ r.note or "Check what was launched or changed that day (spendlens cost resources)" }}</td></tr>{% endfor %}
+    </tbody></table></div>
+    <p class="note">An anomaly is a day well above its trailing baseline (z-score and minimum increase from <code>anomaly.*</code> in finops.yaml).</p>
+    {% else %}<p class="empty">No anomalies in the last check. Spend is within its normal range.</p>{% endif %}
+  {% endcall %}
+</section>
+
+<section class="br-section" id="savings">
+  <h2 class="br-h">Savings</h2>
+  {% set sv = vm.savings %}{% set x = vm.sv %}
+  {% if not sv %}{% call card("Savings") %}{{ missing("rightsize / waste / savings hub") }}{% endcall %}
+  {% else %}
+  <div class="grid2">
+    {% call card("Potential saving", sv.count ~ " proposals, de-duplicated across sources") %}
+      <div class="br-big">{{ sv.total }}<span>/month</span></div><p class="note">{{ sv.yearly }} a year if every proposal is accepted.
+        {% if x.quick_count %}<b>{{ x.quick_total }}/month</b> of it is {{ x.quick_count }} low-effort item{{ "s" if x.quick_count != 1 }}.{% endif %}</p>
+      {{ charts.segmented(sv.parts, label="Potential saving by source", cur=cur) }}
+      <h3 class="rv-h3">By service</h3>
+      {{ charts.hbars(vm.by_service_named, label="Saving by service", fill="var(--series-3)", cur=cur, width=520) }}
+    {% endcall %}
+    {% call card("Effort vs value", "Proposals by effort and monthly saving: start top left (low effort, high value)") %}
+      {{ charts.matrix(x.efforts, x.bands, x.cells, label="Savings by effort and size", row_title="Effort", cur=cur) }}
+      <div class="rv-kinds">{% for k in x.kinds %}<div class="rv-kind k-{{ k.key }}"><b>{{ k.label }}</b> · {{ k.count }} · {{ k.total }}/mo<span>{{ k.explain }}</span></div>{% endfor %}</div>
+    {% endcall %}
+  </div>
+  {% call card("Where the savings come from", "From the check that found them to the service they save on") %}
+    {{ charts.flow(x.flow, label="Savings by source and service", left="Found by", right="Service", cur=cur) }}
+    {% for n in vm.savings_notes %}<p class="note">· {{ n }}</p>{% endfor %}
+  {% endcall %}
+  {% if a.actions %}
+  {% call card("Recommended next steps", "Prioritised by the " ~ ("AI analyst" if a.by == "ai" else "estimated saving") ~ "; each needs an owner's review") %}
+    <ol class="br-actions">{% for y in a.actions %}
+      <li><div class="br-act-main"><b>{{ y.action }}</b>{% if y.why %}<span>{{ y.why }}</span>{% endif %}</div>
+        <div class="br-act-meta">{% if y.est_monthly_saving is not none %}<span class="br-amt">{{ charts.money(y.est_monthly_saving, cur) }}/mo</span>{% endif %}
+          <span class="br-effort eff-{{ y.effort }}">{{ y.effort }} effort</span>{% if y.owner %}<span class="br-owner">{{ y.owner }}</span>{% endif %}</div></li>
+    {% endfor %}</ol>
+  {% endcall %}
+  {% endif %}
+  {% endif %}
+</section>
+
+<section class="br-section" id="queue">
+  <h2 class="br-h">Review queue</h2>
+  {% if not vm.review %}{% call card("Review queue") %}{{ missing("rightsize / waste / savings hub") }}{% endcall %}
+  {% else %}
+  <div class="card rv-queue" data-key="{{ vm.review_key }}">
+    <h2>{{ vm.review|length }} proposals to decide</h2>
+    <p class="hint">Approve, defer or reject each one and add a note. Decisions are saved in this browser (for account {{ vm.review_key }}) and nothing changes in AWS. Export the CSV to share them or open tickets.</p>
+    <div class="rv-sum" aria-live="polite">
+      <div class="rv-bar" aria-hidden="true"><i class="approve"></i><i class="defer"></i><i class="reject"></i></div>
+      <div class="rv-stats">
+        <span class="st approve"><b data-s="approve">0</b> approved · <em data-m="approve">$0</em>/mo</span>
+        <span class="st defer"><b data-s="defer">0</b> deferred · <em data-m="defer">$0</em>/mo</span>
+        <span class="st reject"><b data-s="reject">0</b> rejected · <em data-m="reject">$0</em>/mo</span>
+        <span class="st pending"><b data-s="pending">{{ vm.review|length }}</b> to decide · <em data-m="pending">{{ sv.total }}</em>/mo</span>
+      </div>
+    </div>
+    <div class="rv-tools" hidden>
+      <input type="search" class="rv-q" placeholder="Search resource, service, owner, reason…" aria-label="Search proposals">
+      <select class="rv-svc" aria-label="Service"><option value="">All services</option>{% for v in x.services %}<option>{{ v }}</option>{% endfor %}</select>
+      <select class="rv-eff" aria-label="Effort"><option value="">Any effort</option>{% for e in x.efforts %}<option value="{{ e }}">{{ e|capitalize }} effort</option>{% endfor %}</select>
+      <select class="rv-dec-f" aria-label="Decision"><option value="">Any decision</option><option value="pending">To decide</option><option value="approve">Approved</option><option value="defer">Deferred</option><option value="reject">Rejected</option></select>
+      <input type="text" class="rv-who" placeholder="Your name (for the export)" aria-label="Reviewer name">
+      <button type="button" class="rv-csv">Export decisions (CSV)</button>
+      <button type="button" class="rv-clear ghost">Clear decisions</button>
+    </div>
+    <p class="note rv-legend">✓ approve · ⏸ defer · ✕ reject. Click again to undo.</p>
+    <noscript><p class="note">Turn on JavaScript to record decisions; the list below is complete without it.</p></noscript>
+    <div class="tablewrap"><table class="sortable rv-table"><thead><tr><th>Decision</th><th>Proposal</th><th>Service · owner</th><th class="num">Saving</th><th>Effort · kind</th><th>Note</th></tr></thead><tbody>
+    {% for r in vm.review %}<tr data-id="{{ r.id }}" data-amt="{{ r.amount }}" data-svc="{{ r.service }}" data-eff="{{ r.effort }}" data-q="{{ (r.what ~ ' ' ~ r.full ~ ' ' ~ r.service ~ ' ' ~ r.owner ~ ' ' ~ r.reason)|lower }}">
+      <td data-v="0"><div class="rv-dec" role="group" aria-label="Decision for {{ r.resource }}"><button type="button" data-d="approve" aria-pressed="false" title="Approve" aria-label="Approve">✓</button><button type="button" data-d="defer" aria-pressed="false" title="Defer" aria-label="Defer">⏸</button><button type="button" data-d="reject" aria-pressed="false" title="Reject" aria-label="Reject">✕</button></div></td>
+      <td class="rv-prop"><b>{{ r.what }}</b> <code title="{{ r.full }}">{{ r.resource }}</code><div class="br-why">{{ r.reason }}</div>
+        <div class="rv-meta">{{ r.source }}{% if r.region %} · {{ r.region }}{% endif %}{% if r.also %} · also flagged by spendlens: {{ r.also }}{% endif %}</div></td>
+      <td>{{ r.service }}<div class="br-why">{{ r.owner or "no owner tag" }}</div></td>
+      <td class="num" data-v="{{ r.amount }}"><b>{{ r.monthly }}</b><div class="br-why">{{ r.yearly }}/yr</div></td>
+      <td><span class="br-effort eff-{{ r.effort }}">{{ r.effort }}</span><div class="rv-kk"><span class="rv-k k-{{ r.kind }}">{{ r.kind_label }}</span></div></td>
+      <td><input type="text" class="rv-note" placeholder="Note" aria-label="Note for {{ r.resource }}"></td></tr>{% endfor %}
+    </tbody></table></div>
+    <p class="note rv-shown"></p>
+    <p class="note">Every check in detail: <code>spendlens waste -f html</code> · <code>spendlens rightsize -f html</code> · <code>spendlens savings summary</code>.</p>
+  </div>
+  {% endif %}
+</section>
+
+<section class="br-section" id="governance">
+  <h2 class="br-h">Budget and governance</h2>
+  <div class="grid2">
+    {% call card("Month-end forecast vs budgets") %}
+      {% if vm.forecast %}{% for m in vm.forecast.meters %}{{ charts.meter(m.name, m.pct, m.status, m.detail) }}{% endfor %}
+      {% else %}{{ missing("forecast") }}{% endif %}
+    {% endcall %}
+    {% call card("Tag compliance", "Share of resources passing each tagging check") %}
+      {% if vm.tags %}{% for m in vm.tags.meters %}{{ charts.meter(m.name, m.pct, m.status, m.detail) }}{% endfor %}
+      {% else %}{{ missing("tags") }}{% endif %}
+    {% endcall %}
+  </div>
+  {% if vm.tags_by_type %}
+  {% call card("Where tags are missing", "Tag alarms by resource type") %}{{ charts.hbars(vm.tags_by_type, label="Tag alarms by resource type", fill="var(--series-2)", width=1080, fmt=charts.count) }}{% endcall %}
+  {% endif %}
+  {% if a.risks %}
+  {% call card("Risks to watch") %}<ul class="br-risks">{% for r in a.risks %}<li>{{ r }}</li>{% endfor %}</ul>{% endcall %}
+  {% endif %}
+</section>
+
+<section class="br-section" id="method">
+  <h2 class="br-h">Data and method</h2>
+  <div class="grid2">
+    {% call card("Where each figure comes from", "Latest saved run of each check, " ~ vm.oldest ~ " to " ~ vm.freshest) %}
+      <div class="tablewrap"><table><thead><tr><th>Section</th><th>Run</th><th>Saved (UTC)</th></tr></thead><tbody>
+      {% for r in vm.ages %}<tr><td>{{ r.section }}</td><td>#{{ r.run }}</td><td>{{ r.date }}</td></tr>{% endfor %}
+      {% if vm.breakdown %}<tr><td>cost breakdown</td><td>#{{ vm.breakdown.run }}</td><td>–</td></tr>{% endif %}
+      </tbody></table></div>
+    {% endcall %}
+    {% call card("How to read this review") %}
+      <dl class="rv-gloss">
+        <dt>Spend</dt><dd>AWS Cost Explorer, {{ vm.metric }} cost, credits and refunds excluded by default.</dd>
+        <dt>Anomaly</dt><dd>A day well above its trailing baseline for that service.</dd>
+        <dt>Saving</dt><dd>An estimate from your finops.yaml price book or AWS's own figure, counted once per resource.</dd>
+        <dt>Effort</dt><dd>Low: remove or release something unused. Medium: a change to a running resource. High: a purchase commitment.</dd>
+        <dt>{{ "AI analysis" if a.by == "ai" else "Summary" }}</dt><dd>{% if a.by == 'ai' %}Written by {{ a.model }} from these figures with read-only tools; it cannot change anything in AWS.{% else %}Built-in rules; nothing was sent to an AI provider.{% endif %}</dd>
+      </dl>
+    {% endcall %}
+  </div>
+</section>
+{% endblock %}

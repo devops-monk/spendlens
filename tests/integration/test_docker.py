@@ -80,6 +80,7 @@ def test_live_commands_start_and_stop_steampipe(fakebin: Path, args: list[str]) 
     ["schema", "find", "unattached volumes"],
     ["cache", "show"],
     ["brief", "--source", "last", "--no-ai"],
+    ["review", "--source", "demo", "--no-ai"],
     ["params"],
     ["init"],
 ])

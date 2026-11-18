@@ -15,6 +15,11 @@
     <a class="btn primary" href="#install">Install</a>
     <a class="btn ghost" href="#screenshots">Take the tour ›</a>
   </div>
+  <a class="one-cmd" href="#review" aria-label="One command for the whole review: spendlens review">
+    <span class="oc-label">One command, the whole review</span>
+    <code><span class="p">$</span> spendlens review -o review.html</code>
+    <span class="oc-sub">AWS spend, anomalies and savings explained, then approve, defer or reject each saving ›</span>
+  </a>
   <figure class="product">
     <div class="window">
       <div class="window-bar"><i></i><i></i><i></i><span>report.html · spendlens dashboard</span></div>
@@ -22,6 +27,50 @@
     </div>
     <figcaption>One self-contained HTML report. Works offline, in CI artifacts, and in print. Shown with demo data.</figcaption>
   </figure>
+</section>
+
+<section class="section alt review-sec" id="review">
+  <div class="wrap">
+    <p class="eyebrow center">spendlens review</p>
+    <h2 class="h2">One command.<br><span class="grad">The whole review.</span></h2>
+    <p class="sub">The FinOps AI analyst explains your AWS spend, flags the anomalies and lays out every saving.
+      Then you decide: approve, defer or reject each one with a note, and export the decisions. spendlens
+      computes every number; the AI only writes the words; nothing changes in AWS.</p>
+    <pre class="cta-code review-cmd"><code>spendlens review -o review.html</code></pre>
+    <figure class="product review-shot">
+      <div class="window">
+        <div class="window-bar"><i></i><i></i><i></i><span>review.html · spendlens review</span></div>
+        {{ shot("review", "The review's summary: spend of $55.4K up 1.8%, forecast $59.1K over a $55.0K budget, $4,613 a month of savings, 3 anomalies and 92.2% tag compliance, then the five steps from AWS data to your decision") }}
+      </div>
+    </figure>
+    <div class="bento review-bento">
+      <article class="tile t-wide">
+        <p class="t-eyebrow">Spend, explained</p>
+        <h3>What moved the total.</h3>
+        <p>Last month's total, every big change, this month's total. Plus the trend, spend by owner and which
+          workloads drive each service.</p>
+        <div class="tile-shot">{{ shot("review-bridge", "Spend bridge from $54.5K in September to $55.4K in October: Redshift −$3,710, EC2 +$3,698, Bedrock +$1,660") }}</div>
+      </article>
+      <article class="tile t-wide">
+        <p class="t-eyebrow">Savings, mapped</p>
+        <h3>Where the savings come from.</h3>
+        <p>From the check that found each saving to the service it saves on, an effort × value matrix, and whether
+          a change is reversible, a removal or a commitment.</p>
+        <div class="tile-shot">{{ shot("review-flow", "Savings flow from spendlens rightsizing and waste ($2,984) and AWS Cost Optimization Hub ($1,629) to EBS, Savings Plans, EC2, RDS and more") }}</div>
+      </article>
+      <article class="tile t-full">
+        <p class="t-eyebrow">For human review</p>
+        <h3>Approve, defer or reject. Then export.</h3>
+        <p>Every proposal with its reason, owner, saving, effort and kind. Search and filter, add a note, see the
+          approved total update, and export the decisions as CSV for tickets or a change board. Decisions stay in
+          your browser.</p>
+        <div class="tile-shot">{{ shot("review-queue", "The review queue: 41 proposals with approve, defer and reject buttons, a note per proposal, filters and Export decisions (CSV)") }}</div>
+      </article>
+    </div>
+    <ul class="chips center-chips"><li>AI analysis or <code>--no-ai</code></li><li>Spend bridge</li><li>Service → workload flow</li><li>Usual vs actual anomalies</li><li>Effort × value</li><li>Review queue + CSV</li><li>Light and dark · printable</li></ul>
+    <div class="ctas"><a class="btn primary" href="{{ root }}docs/dashboard/#spendlens-review-the-full-review">How the review works</a>
+      <a class="btn ghost" href="{{ root }}cheatsheet/#share">More recipes ›</a></div>
+  </div>
 </section>
 
 <section class="section new-in" id="new">
