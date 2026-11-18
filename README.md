@@ -46,7 +46,7 @@
 - **Patient and cached.** Slow live queries run as jobs the assistant waits for. Fresh results are reused (15 min for resources, 5 for metrics, 6 h for Cost Explorer), and the same question on the same data costs no tokens. `--fresh` skips the cache.
 - **The assistant's tools, for you.** `spendlens schema find | show | check` searches the catalog and checks a query offline; `spendlens cache show | clear` inspects the cache.
 - **`spendlens report` also writes `brief.html`** (rule-based; add `--ai` for the AI summary).
-- **The [cheat sheet](https://spendlens.devops-monk.com/cheatsheet/)** now has 136 commands.
+- **The [cheat sheet](https://spendlens.devops-monk.com/cheatsheet/)** now has 148 commands, with a section for schema and cache.
 
 **Heads-up:** the assistant's live tools are renamed (`steampipe_query` is now `aws_query`, plus `aws_find_tables`, `aws_describe_table`, `aws_check_query`, `aws_query_result`), and a live query may now run for up to 5 minutes (`llm.query_timeout_s`, was 60 s). Full notes: [release v0.3.0](https://github.com/devops-monk/spendlens/releases/tag/v0.3.0).
 
@@ -230,8 +230,38 @@ The assistant answers from saved history first, which is offline and free. It qu
 - **Right first time:** it looks up the real tables, columns and required filters in a catalog built from the Steampipe AWS plugin's own source, and every query is checked before it reaches AWS. A wrong column comes back with "did you mean".
 - **Patient:** slow queries run as background jobs that the model waits for, instead of timing out.
 - **Cached:** live results are reused while fresh (15 min for resources, 5 for metrics, 6 h for Cost Explorer), and the same question on the same data costs no tokens. `--fresh` skips the cache.
-- **The same tools for you:** `spendlens schema find "unattached volumes"`, `spendlens schema show aws_cost_usage`, `spendlens schema check "<sql>"`.
+
 Configure it with `llm.*` in `finops.yaml`. See [the AI assistant guide](https://spendlens.devops-monk.com/docs/ai-assistant/).
+
+### The assistant's tools, for you
+
+The table search, table description and query checker the assistant uses also work as commands. They run offline from the bundled catalog: no AWS calls, no Steampipe and no AI provider.
+
+```bash
+spendlens schema find "unattached EBS volumes"          # which tables answer this? (-n 3, --json)
+spendlens schema show aws_cost_usage                    # columns, required filters, fast filters, examples
+spendlens schema check "select volume_id, size_gb from aws_ebs_volume"
+```
+
+```text
+✗ column size_gb does not exist in aws_ebs_volume
+  did you mean: size
+```
+
+`schema check` exits with 1 when a query would fail: an unknown table or column, a missing required filter, or a JSON operator on a text column. It warns when a Cost Explorer query has no date range, a metric query has no time range, or a wide table is read with `select *`. Use it in scripts and CI to catch mistakes before your queries reach AWS.
+
+### The cache
+
+Live results, answers and brief summaries are kept in `ai-cache.db`, next to the history database. Each kind is reused only while fresh, and only for the same Steampipe connection, regions and AWS identity.
+
+```bash
+spendlens cache show --entries     # what's cached, how old it is, when it expires
+spendlens cache clear --queries    # forget live results; --answers for answers and brief summaries
+spendlens cache clear              # everything
+spendlens ask --live --fresh "How many instances are running right now?"   # skip the cache once
+```
+
+Tune the freshness, or turn the cache off, with `llm.cache.*` in `finops.yaml` (see [Cache commands](https://spendlens.devops-monk.com/docs/ai-assistant/#cache-commands)).
 
 ## Scheduled. Notified. Hands-off.
 
@@ -308,7 +338,8 @@ Unknown keys, typos and out-of-range values are rejected, and the error names th
 | `dashboard` | A self-contained HTML report with nine tabs, always covering every check (`--refresh`: re-run all now) |
 | `brief` | One page for managers: AI summary, key numbers, charts and a savings review checklist |
 | `ask` | Questions in plain English, read-only (`--live`: any AWS table, schema-checked and cached) |
-| `schema find` · `show` · `check` · `cache show` | The assistant's table catalog and query checker, offline; its cache |
+| `schema find` · `show` · `check` | Find the AWS table for a question, read its columns and filters, check a query before it runs (offline) |
+| `cache show` · `clear` | What the AI assistant has cached and when it expires; forget it |
 | `report` · `notify` | Run everything; post Slack or Teams summaries (`notify --refresh`: re-check first) |
 | `history list` · `diff` | Saved runs, and new or resolved alarms between them |
 | `init` · `doctor` · `params` · `config` | Set up, check, and inspect configuration |
