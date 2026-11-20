@@ -208,6 +208,7 @@ SECTIONS: list[tuple[str, str, str, list[tuple[str, str, str]]]] = [
         ("Any AWS question, schema-checked, cached", "spendlens ask --live \"Which security groups allow port 22 from anywhere?\"",
          "ai"),
         ("Skip the cache and ask again", "spendlens ask --live --fresh \"How many instances are running?\"", "ai"),
+        ("Who did it? CloudTrail, last 90 days", "spendlens ask --live \"Who deleted the old-reports bucket?\"", "ai"),
     ]),
     ("schema", "AWS tables and the AI cache", "The assistant's own tools, for you: find the table, read its columns, "
      "check SQL before it runs, and see what's cached. All offline: no AWS calls, no Steampipe needed.", [

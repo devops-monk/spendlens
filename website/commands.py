@@ -268,6 +268,7 @@ RECIPES: dict[str, list[tuple[str, str]]] = {
         ("Ask a question (answers from your saved runs)", "spendlens ask \"What are my top 5 savings opportunities?\""),
         ("Show every query behind the answer", "spendlens ask \"Why did EC2 cost go up last month?\" --show-tools"),
         ("Allow read-only live AWS queries too", "spendlens ask --live \"Which running instances are outside the allowed families?\""),
+        ("Who did it? CloudTrail events of the last 90 days", "spendlens ask --live \"Who deleted the old-reports bucket?\""),
         ("A conversation with follow-up questions", "spendlens ask -i"),
         ("Start a session, then follow up in later commands", "spendlens ask --new \"Which ECS services are over-provisioned?\""),
         ("…a follow-up that remembers the earlier answers", "spendlens ask -C \"List them by cluster\""),

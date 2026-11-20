@@ -28,7 +28,7 @@ STOPWORDS = {"a", "an", "and", "any", "are", "as", "at", "be", "by", "can", "do"
 # question words -> table-name tokens (plural/singular are handled by _stem)
 SYNONYMS = {
     "volume": ["ebs"], "disk": ["ebs", "volume"], "snapshot": ["snapshot"], "bucket": ["s3"], "object": ["s3"],
-    "server": ["ec2", "instance"], "vm": ["ec2", "instance"], "machine": ["ec2", "instance"],
+    "instance": ["ec2", "instance"], "server": ["ec2", "instance"], "vm": ["ec2", "instance"], "machine": ["ec2", "instance"],
     "database": ["rds", "dynamodb"], "db": ["rds"], "postgres": ["rds"], "mysql": ["rds"], "aurora": ["rds"],
     "function": ["lambda"], "serverless": ["lambda", "serverless"],
     "acu": ["rds", "cluster", "serverless", "capacity"], "acus": ["rds", "cluster", "serverless", "capacity"], "container": ["ecs", "eks"], "kubernetes": ["eks"],
@@ -55,12 +55,41 @@ SYNONYMS = {
 }
 
 
+# "Who did what, when" questions are CloudTrail questions, whatever resource they name: "who deleted the bucket"
+# must find the event tables, not aws_s3_bucket.
+# Strong: clearly about activity. Weak: a verb that may also be inventory ("instances created last week" can be
+# answered from launch_time), so the event tables are offered alongside the resource's own table.
+# Deleted resources are gone and inventory shows only the current state, so deletions and changes are activity too.
+ACTIVITY = re.compile(
+    r"\b(who|whom|whose|cloudtrail|audit|activity|api calls?|log ?ins?|logged in|sign ?ins?|signed in|"
+    r"events? (?:history|log)|deleted?|deleting|deletion|removed|terminated|modified|changed|updated|attached|"
+    r"detached|authorized|revoked|assumed)\b", re.IGNORECASE)
+ACTIVITY_VERB = re.compile(r"\b(created|creating|launched|rebooted)\b", re.IGNORECASE)  # not "stopped": that is a state
+EVENT_TABLES = ("aws_cloudtrail_lookup_event", "aws_cloudtrail_trail_event")
+PREFER = {"acu": "aws_rds_db_cluster", "acus": "aws_rds_db_cluster"}  # (stemmed word -> table)
+CLOUDTRAIL_NOTES = {
+    "aws_cloudtrail_lookup_event": (
+        "CloudTrail LookupEvents: management events of the last 90 days, no setup needed. ALWAYS set "
+        "start_time = <from> AND end_time = <to> (both '=': they are sent to the API; a filter on event_time is not, "
+        "and AWS would page through 90 days at 2 calls/second). Add one of event_name, resource_name, username, "
+        "event_source, resource_type or read_only with '=' to narrow it. No data events (S3 object reads/writes)."),
+    "aws_cloudtrail_trail_event": (
+        "The trail's CloudWatch Logs log group: longer history, error codes, source IPs. Needs log_group_name (read it "
+        "from aws_cloudtrail_trail.log_group_arn) and a timestamp range, e.g. timestamp >= now() - interval '24 hours'."),
+}
+
+
 def _stem(word: str) -> str:
+    """Plural to singular, so 'instances' matches aws_ec2_instance: policies->policy, addresses->address,
+    boxes->box, instances->instance (only -ches/-shes/-xes/-zes/-sses lose 'es'; other words lose just 's')."""
     w = word.lower()
-    for suf, rep in (("ies", "y"), ("sses", "ss"), ("es", ""), ("s", "")):
-        if len(w) > 4 and w.endswith(suf) and not w.endswith("ss"):
-            return w[: -len(suf)] + rep
-    return w
+    if len(w) <= 3 or not w.endswith("s") or w.endswith(("ss", "us", "is")):
+        return w
+    if w.endswith("ies") and len(w) > 4:
+        return w[:-3] + "y"
+    if w.endswith(("sses", "ches", "shes", "xes", "zes")):
+        return w[:-2]
+    return w[:-1]
 
 
 def tokens(text: str) -> list[str]:
@@ -156,6 +185,8 @@ class Catalog:
             query[w] = max(query.get(w, 0), 1.0)
             for s in SYNONYMS.get(w, []):
                 query[_stem(s)] = max(query.get(_stem(s), 0), 0.7)
+        activity, verb = bool(ACTIVITY.search(text)), bool(ACTIVITY_VERB.search(text))
+        prefer = {PREFER[w] for w in query if w in PREFER}
         wants_metric = any(w in query for w in ("metric", "cpu", "utilization", "memory", "idle"))
         wants_cost = "cost" in query
         scored = []
@@ -174,6 +205,10 @@ class Catalog:
                     score += 0.8 * wt
             if name in exact:
                 score += 100
+            if name in prefer:  # a setting that lives on one table (ACU min/max: the Aurora cluster)
+                score += 6
+            if name in EVENT_TABLES and (activity or verb):  # LookupEvents first: it needs no setup
+                score += (20 if name == EVENT_TABLES[0] else 16) if activity else (3 if name == EVENT_TABLES[0] else 2)
             if score <= 0:
                 continue
             score -= 0.15 * max(len(ntok) - 2, 0)  # prefer the general table over narrow child tables
@@ -190,7 +225,9 @@ class Catalog:
         out: dict[str, Any] = {"table": name, "service": t.service, "description": t.summary or t.description}
         if t.required or t.any_of:
             out["required_filters"] = t.required_text()
-        if t.cost_explorer:
+        if name in CLOUDTRAIL_NOTES:
+            out["note"] = CLOUDTRAIL_NOTES[name]
+        elif t.cost_explorer:
             out["note"] = "Cost Explorer: about $0.01 per request; always bound period_start/period_end"
         elif t.time_series:
             out["note"] = "time series: filter on a time range"

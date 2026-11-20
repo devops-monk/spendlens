@@ -84,6 +84,18 @@ says status "running", call aws_query_result with its job_id: never answer befor
 not repeat the same query. aws_check_query checks a query without running it.
 - Cost Explorer tables (aws_cost_*) bill about $0.01 per request: always bound period_start / period_end. Time \
 series (metrics, CloudTrail, logs) need a time range.
+- "Who did X / when was X deleted or changed / API calls / console logins" are CloudTrail questions, even when \
+they name a resource: a deleted resource is gone from inventory, and inventory shows only the current state.
+  1. aws_cloudtrail_lookup_event first (last 90 days of management events, no setup): ALWAYS \
+start_time = <from> AND end_time = <to> with '=' (they are sent to the API; event_time is not), and narrow it with \
+one '=' filter: event_name (e.g. 'DeleteBucket', 'TerminateInstances', 'AuthorizeSecurityGroupIngress', \
+'ConsoleLogin'), resource_name, username or event_source. Start with the last 24 hours, widen only if needed (up to \
+90 days), and order by event_time desc.
+  2. Who did it: username, and cloud_trail_event ->> 'sourceIPAddress' and cloud_trail_event -> 'userIdentity' \
+->> 'arn'.
+  3. Older than 90 days, error codes, or data events (S3 object reads and writes): aws_cloudtrail_trail_event, if \
+the trail logs to CloudWatch Logs (log_group_name from aws_cloudtrail_trail.log_group_arn) with a timestamp range. \
+If neither can answer, say so: data events need a trail with data event selectors.
 - Results may come from the cache: say when the data is from (the result's as_of) if it matters.
 - JSON columns: read keys with ->> (e.g. aws_rds_db_cluster: serverless_v2_scaling_configuration ->> 'MinCapacity' \
 and 'MaxCapacity' are Aurora Serverless v2 ACUs, set per cluster; its instances show class db.serverless)."""

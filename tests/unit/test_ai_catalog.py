@@ -17,6 +17,8 @@ KNOWN_BAD_EXAMPLES = {
     ("aws_bedrock_foundation_model", "model_lifecycle_status"),  # the column is model_lifecycle
     ("aws_bedrock_imported_model", "model_arn"),  # the column is arn
     ("aws_iam_action", "could not parse"),  # SQLite glob() in a Postgres example
+    # filters on event_time, which is not sent to LookupEvents (only start_time/end_time '=' are): 90 days are paged
+    ("aws_cloudtrail_lookup_event", "needs a time range"),
 }
 
 

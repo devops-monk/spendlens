@@ -120,6 +120,30 @@ spendlens ask --live "Which security groups allow 0.0.0.0/0 on port 22?"
 spendlens ask --live --fresh "How many instances are running right now?"   # skip the cache
 ```
 
+## CloudTrail: who did what, when
+
+With `--live`, the assistant answers activity questions from CloudTrail:
+- who deleted, created or changed something;
+- when it happened;
+- API calls by a user or role;
+- console logins.
+
+```bash
+spendlens ask --live "Who deleted the old-reports bucket?"
+spendlens ask --live "Which security group rules changed in the last 24 hours, and by whom?"
+spendlens ask --live "Show console logins this week, with source IPs"
+```
+
+**How it searches:**
+- **LookupEvents first.** It uses `aws_cloudtrail_lookup_event`, the last 90 days of management events with no setup. It always sets `start_time` and `end_time`, starts with the last 24 hours and widens only if needed. It narrows with one filter such as the event name (`DeleteBucket`, `TerminateInstances`, `ConsoleLogin`), the resource name or the user.
+- **Time ranges are enforced.** Before any query reaches AWS, a CloudTrail query without a time range that AWS receives is refused, with the exact fix. A filter on `event_time` alone doesn't count: AWS would page through 90 days at about two calls a second.
+- **Older or more detailed events** (error codes, source IPs beyond 90 days) come from the trail's CloudWatch Logs log group (`aws_cloudtrail_trail_event`), if your trail sends logs there.
+- **What CloudTrail can't answer.** S3 object reads and writes are data events: they are recorded only by a trail with data event selectors. If nothing can answer, the assistant says so.
+
+Questions that only *sound* like activity still use inventory, because the current state answers them: "which instances are stopped", "list my buckets".
+
+Permissions: `cloudtrail:LookupEvents`, plus `logs:FilterLogEvents` for the CloudWatch Logs table. Both are in `ReadOnlyAccess`.
+
 ## Schema commands: the assistant's tools, for you
 
 `spendlens schema` gives you the same table search, table description and query checker the assistant uses. All three work offline from the bundled catalog: no AWS calls, no Steampipe and no AI provider needed. Use them to write your own Steampipe queries, or to see why the assistant chose a table.

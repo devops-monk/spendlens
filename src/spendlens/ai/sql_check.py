@@ -34,6 +34,16 @@ JSON_NODES = tuple(getattr(exp, n) for n in ("JSONExtract", "JSONExtractScalar",
 TIME_COLUMNS = ("timestamp", "period_start", "period_end", "event_time", "start_time", "end_time", "timestamp_ms",
                 "search_start_time", "search_end_time")
 WIDE_TABLE = 30
+# CloudTrail event tables must be bounded in time, with a filter the API receives (error, not warning: an unbounded
+# LookupEvents query pages through 90 days at about 2 calls a second)
+TIME_REQUIRED = {
+    "aws_cloudtrail_lookup_event": ({"start_time": {"="}}, "start_time = now() - interval '24 hours' AND end_time = now()",
+                                    ("start_time and end_time are sent to the LookupEvents API only as '=' filters; a "
+                                    "filter on event_time is applied after AWS has returned up to 90 days of events")),
+    "aws_cloudtrail_trail_event": ({"timestamp": set(), "timestamp_ms": set()},
+                                   "timestamp >= now() - interval '24 hours'",
+                                   "timestamp is sent to CloudWatch Logs; without it every log stream is read"),
+}
 
 
 @dataclass
@@ -218,7 +228,7 @@ def _filtered_columns(scope: Scope, alias: str, single: bool, owners: dict[str, 
                       table: Table | None = None) -> dict[str, set[str]]:
     """{column: {operators}} constrained in WHERE / JOIN ON for this table alias (AND-ed terms only)."""
     ops = {exp.EQ: "=", exp.GT: ">", exp.GTE: ">=", exp.LT: "<", exp.LTE: "<=", exp.In: "=", exp.Like: "like",
-           exp.ILike: "ilike", exp.NEQ: "<>", exp.Is: "is"}
+           exp.ILike: "ilike", exp.NEQ: "<>", exp.Is: "is", exp.Between: "between"}
     found: dict[str, set[str]] = {}
 
     def terms(e: exp.Expression) -> list[exp.Expression]:
@@ -265,6 +275,12 @@ def _check_required(scope: Scope, alias: str, t: Table, single: bool, res: Check
 
 def _check_bounds(scope: Scope, alias: str, t: Table, single: bool, res: CheckResult,
                   owners: dict[str, int]) -> None:
+    if t.name in TIME_REQUIRED:
+        cols, example, why = TIME_REQUIRED[t.name]
+        have = _filtered_columns(scope, alias, single, owners, t)
+        if not any(c in have and (not ops or ops & have[c]) for c, ops in cols.items()):
+            res.errors.append(Problem(f"{t.name} needs a time range the AWS API receives", f"add {example} ({why})"))
+        return
     if not (t.cost_explorer or t.time_series):
         return
     have = _filtered_columns(scope, alias, single, owners, t)
