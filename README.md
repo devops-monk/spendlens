@@ -36,8 +36,13 @@
 <p align="center"><sub>One self-contained HTML report, shown with the bundled demo data.</sub></p>
 
 > [!NOTE]
-> v0.4.0. spendlens is tested end to end through Steampipe against an AWS emulator. Verification against a live
+> v0.4.1. spendlens is tested end to end through Steampipe against an AWS emulator. Verification against a live
 > account with a read-only role is next (see [PLAN.md](PLAN.md)).
+
+## New in 0.4.1
+
+- **Ask CloudTrail who did what.** `spendlens ask --live "Who deleted the old-reports bucket?"` now finds the CloudTrail event tables for "who / deleted / changed / API calls / console logins" questions. It uses LookupEvents (the last 90 days, no setup) with a time range AWS receives, and falls back to the trail's CloudWatch Logs for older or more detailed events. A CloudTrail query without such a range is refused before it reaches AWS, with the exact fix. [More](https://spendlens.devops-monk.com/docs/ai-assistant/#cloudtrail-who-did-what-when)
+- **Better table search for plurals.** Questions like "how many running instances" now find the right table first.
 
 ## New in 0.4.0
 
