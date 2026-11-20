@@ -10,11 +10,16 @@
       <a href="#context">Context</a>
       <a href="#containers">Containers</a>
       <a href="#principles">Principles</a>
+      <a href="#cli">A command</a>
+      <a href="#flags">Flags</a>
       <a href="#report-run">Report run</a>
       <a href="#ask">Ask</a>
+      <a href="#ai-tools">AI tools</a>
       <a href="#ask-live">Live AI</a>
       <a href="#ai-pipeline">AI pipeline</a>
       <a href="#schema-cache">Schema &amp; cache</a>
+      <a href="#sessions">Sessions</a>
+      <a href="#ask-flags">Ask flags</a>
       <a href="#safety">Safety</a>
     </div>
   </div>
@@ -105,7 +110,67 @@
   </div>
 </section>
 
-<section class="section showcase arch alt" id="report-run">
+<section class="section showcase arch alt" id="cli">
+  <div class="wrap sc stack">
+    <div class="sc-text">
+      <div class="sc-title">
+        <p class="t-eyebrow">How a command runs</p>
+        <h2>Five stages.<br>One flag family each.</h2>
+      </div>
+      <div class="sc-copy">
+        <p>Every command, from <code>tags</code> to <code>report</code>, works the same way. It <b>resolves settings</b>
+          from four layers, <b>picks a data source</b>, <b>runs</b> controls or cost SQL, <b>saves</b> the run to the
+          local history, and <b>prints or writes</b> the result. Learn the flags for one command and you know them for
+          all.</p>
+        <ul class="chips"><li>Same flags everywhere</li><li>AWS only with --source live</li><li>Every run saved</li></ul>
+      </div>
+    </div>
+    <div class="sc-media">{{ diagram("cli_flow") }}</div>
+  </div>
+</section>
+
+<section class="section" id="flags">
+  <div class="wrap">
+    <p class="t-eyebrow center">Common flags</p>
+    <h2 class="h2">What each flag changes.</h2>
+    <p class="sub">These work on every check and cost command. Run any command with <code>--help</code> for its own
+      filters.</p>
+    <div class="arch-table-wrap"><table class="arch-table">
+      <thead><tr><th>Stage</th><th>Flag</th><th>What it does</th><th>Example</th></tr></thead>
+      <tbody>
+        <tr><td>1 · Config</td><td><code>-c, --config</code></td><td>The policy file with your company standards. Default
+          <code>./finops.yaml</code>, then <code>~/.config/spendlens/finops.yaml</code>.</td>
+          <td><code>-c prod/finops.yaml</code></td></tr>
+        <tr><td>1 · Config</td><td><code>-s, --set</code></td><td>Override one setting for this run only; it beats the
+          file and <code>SPENDLENS__</code> environment variables. Repeatable.</td>
+          <td><code>--set sizing.ec2_cpu_low=10</code></td></tr>
+        <tr><td>1 · Config</td><td><code>--var</code></td><td>A raw Powerpipe mod variable that has no
+          <code>finops.yaml</code> key.</td><td><code>--var my_threshold=5</code></td></tr>
+        <tr><td>2 · Source</td><td><code>--source live</code></td><td>Query AWS now through Steampipe (read-only) and save
+          the run. The default for checks.</td><td><code>spendlens waste</code></td></tr>
+        <tr><td>2 · Source</td><td><code>--source last</code></td><td>Reuse the latest saved run. No AWS calls, instant.
+          The default for <code>ask</code>.</td><td><code>spendlens tags --source last</code></td></tr>
+        <tr><td>2 · Source</td><td><code>--source demo</code></td><td>Bundled sample data, to try spendlens without an AWS
+          account.</td><td><code>spendlens review --source demo</code></td></tr>
+        <tr><td>2 · Source</td><td><code>-p, --profile</code></td><td>Which AWS profile Steampipe uses. Default: the
+          credentials already in your terminal or CI.</td><td><code>-p finops-readonly</code></td></tr>
+        <tr><td>3 · Run</td><td><code>--check</code>, <code>--status</code>, <code>-g</code>, <code>--skip</code></td>
+          <td>Narrow what runs or what is shown: one tag check, only alarms, cost grouped by service, a dashboard
+          without the tag section.</td><td><code>spendlens cost diff -g service</code></td></tr>
+        <tr><td>5 · Output</td><td><code>-f, --format</code></td><td><code>table</code> (default), <code>csv</code>,
+          <code>json</code> or <code>html</code>.</td><td><code>-f csv -o tags.csv</code></td></tr>
+        <tr><td>5 · Output</td><td><code>-o, --out</code></td><td>Write to a file instead of the screen.</td>
+          <td><code>-o review.html</code></td></tr>
+        <tr><td>5 · Output</td><td><code>--fail-on-alarm</code></td><td>Exit with code 3 if anything is in alarm, to fail
+          a CI job.</td><td><code>spendlens tags --fail-on-alarm</code></td></tr>
+      </tbody>
+    </table></div>
+    <p class="arch-note">See the effective settings and where each came from with <code>spendlens params</code>; check
+      your setup with <code>spendlens doctor</code>.</p>
+  </div>
+</section>
+
+<section class="section showcase arch" id="report-run">
   <div class="wrap sc stack">
     <div class="sc-text">
       <div class="sc-title">
@@ -122,7 +187,7 @@
   </div>
 </section>
 
-<section class="section showcase arch" id="ask">
+<section class="section showcase arch alt" id="ask">
   <div class="wrap sc stack">
     <div class="sc-text">
       <div class="sc-title">
@@ -139,7 +204,95 @@
   </div>
 </section>
 
-<section class="section showcase arch alt" id="ask-live">
+<section class="section showcase arch" id="ai-tools">
+  <div class="wrap sc stack">
+    <div class="sc-text">
+      <div class="sc-title">
+        <p class="t-eyebrow">How the AI knows the data</p>
+        <h2>It looks things up.<br>It never guesses.</h2>
+      </div>
+      <div class="sc-copy">
+        <p>The model doesn't come with your account in its head. Every question is sent with instructions and a list
+          of <b>tools</b>; the model replies "call this tool", spendlens runs it and returns the result, and the model
+          decides the next step. Without <code>--live</code> it has three tools over your saved runs. With
+          <code>--live</code> it gets five more that cover the whole Steampipe AWS plugin.</p>
+        <ul class="chips"><li>8 tools</li><li>All read-only</li><li>Schema from the plugin's source</li></ul>
+      </div>
+    </div>
+    <div class="sc-media">{{ diagram("ai_tools") }}</div>
+  </div>
+</section>
+
+<section class="section alt" id="ai-knowledge">
+  <div class="wrap">
+    <p class="t-eyebrow center">Where its knowledge comes from</p>
+    <h2 class="h2">Four sources. No guessing.</h2>
+    <p class="sub">The model sees none of these all at once. It reads only the part it needs, one tool call at a
+      time, so a question costs a few thousand tokens, not the whole AWS plugin.</p>
+    <div class="bento tools-bento">
+      <article class="tile">
+        <span class="tile-ico" aria-hidden="true">{{ icons["clock"]|safe }}</span>
+        <p class="t-eyebrow">1 · History schema</p>
+        <h3>Your saved runs.</h3>
+        <p>The <code>history_query</code> tool description includes the history database's tables and columns.
+          <code>history_overview</code> adds which runs exist, their periods and dimensions, and the exact service
+          names. <code>history_cost</code> returns one service's whole cost story in one call, for
+          "why did RDS go up?".</p>
+      </article>
+      <article class="tile">
+        <span class="tile-ico" aria-hidden="true">{{ icons["book"]|safe }}</span>
+        <p class="t-eyebrow">2 · AWS table catalog</p>
+        <h3>Built from the plugin itself.</h3>
+        <p>At release time spendlens reads the Steampipe AWS plugin's Go source and docs (v1.35.0, the version it
+          installs) and ships <code>aws_catalog.json.gz</code>: for each of 589 tables its columns with meanings,
+          required and fast filters, up to 3 examples, and cost or time-range notes.</p>
+      </article>
+      <article class="tile">
+        <span class="tile-ico" aria-hidden="true">{{ icons["list"]|safe }}</span>
+        <p class="t-eyebrow">3 · Your installed plugin</p>
+        <h3>The real column list.</h3>
+        <p>With <code>--live</code>, spendlens reads <code>information_schema.columns</code> from your local Steampipe
+          once a day. That describes the installed plugin, not AWS, so it's free. If your plugin version differs, its
+          columns win and the catalog adds descriptions and filter rules.</p>
+      </article>
+      <article class="tile">
+        <span class="tile-ico" aria-hidden="true">{{ icons["spark"]|safe }}</span>
+        <p class="t-eyebrow">4 · The model + the checker</p>
+        <h3>General SQL, checked.</h3>
+        <p>The model brings general SQL and Postgres knowledge. Anything it writes goes through the checker first: a
+          wrong column comes back as "did you mean…", a missing required filter with the exact fix, before anything
+          reaches AWS.</p>
+      </article>
+    </div>
+    <div class="arch-table-wrap"><table class="arch-table">
+      <thead><tr><th>Tool</th><th>When</th><th>What the model gets back</th></tr></thead>
+      <tbody>
+        <tr><td><code>history_overview</code></td><td>always</td><td>The latest run per feature (time, account, totals),
+          each cost run's periods and dimensions, service names by spend, the history schema.</td></tr>
+        <tr><td><code>history_cost</code></td><td>always</td><td>One service's saved cost in every cost run, any
+          breakdown inside it, and its rightsizing, waste, savings and tag findings. Short names work:
+          <code>rds</code>, <code>ec2</code>, <code>nat</code>.</td></tr>
+        <tr><td><code>history_query</code></td><td>always</td><td>Rows from one read-only SQLite <code>SELECT</code> over
+          runs, findings and cost rows.</td></tr>
+        <tr><td><code>aws_find_tables</code></td><td><code>--live</code></td><td>The best ~8 of 589 tables for the
+          question, by name, service, description and column, with synonyms (volume → EBS, ACU → RDS cluster).</td></tr>
+        <tr><td><code>aws_describe_table</code></td><td><code>--live</code></td><td>One table's columns and their
+          meaning, required filters with valid values, fast filters, examples, cost notes.</td></tr>
+        <tr><td><code>aws_check_query</code></td><td><code>--live</code></td><td>Problems in a <code>SELECT</code> and how
+          to fix them, without calling AWS.</td></tr>
+        <tr><td><code>aws_query</code></td><td><code>--live</code></td><td>Rows with an "as of" time: checked, then from
+          the cache if fresh, else run as a read-only job.</td></tr>
+        <tr><td><code>aws_query_result</code></td><td><code>--live</code></td><td>The rows of a slow query that was still
+          running, after waiting again.</td></tr>
+      </tbody>
+    </table></div>
+    <p class="arch-note">Look up exactly what the model sees: <code>spendlens schema find "aurora capacity"</code>,
+      <code>spendlens schema show aws_rds_db_cluster</code>. One limit: the catalog knows a column holds JSON, but not
+      every key inside it, so for those the model relies on descriptions and examples.</p>
+  </div>
+</section>
+
+<section class="section showcase arch" id="ask-live">
   <div class="wrap sc stack">
     <div class="sc-text">
       <div class="sc-title">
@@ -158,7 +311,7 @@
   </div>
 </section>
 
-<section class="section showcase arch" id="ai-pipeline">
+<section class="section showcase arch alt" id="ai-pipeline">
   <div class="wrap sc stack">
     <div class="sc-text">
       <div class="sc-title">
@@ -176,7 +329,7 @@
   </div>
 </section>
 
-<section class="section alt" id="schema-cache">
+<section class="section" id="schema-cache">
   <div class="wrap">
     <p class="t-eyebrow center">Schema &amp; cache commands</p>
     <h2 class="h2">The assistant's tools.<br>Yours too.</h2>
@@ -230,6 +383,100 @@ spendlens brief --fresh -o brief.html</code></pre>
   </div>
 </section>
 
+<section class="section showcase arch alt" id="sessions">
+  <div class="wrap sc stack">
+    <div class="sc-text">
+      <div class="sc-title">
+        <p class="t-eyebrow">Sequence · Sessions</p>
+        <h2>Follow-ups that<br>remember.</h2>
+      </div>
+      <div class="sc-copy">
+        <p>A plain <code>spendlens ask</code> forgets everything when it ends. Start a <b>session</b> and each question
+          and answer is saved to a small JSON file next to the history. The next <code>ask -C</code> replays the
+          last 12 exchanges to the model, so "those" and "the second one" make sense, even in a new terminal on
+          another day.</p>
+        <ul class="chips"><li>Any provider</li><li>Named or automatic</li><li>Save as a page</li></ul>
+      </div>
+    </div>
+    <div class="sc-media">{{ diagram("seq_session") }}</div>
+  </div>
+</section>
+
+<section class="section" id="session-how">
+  <div class="wrap">
+    <p class="t-eyebrow center">Sessions in practice</p>
+    <h2 class="h2">Start, continue, switch, save.</h2>
+    <p class="sub">Three flags on <code>ask</code> and one <code>session</code> command cover everything.</p>
+    <div class="steps two">
+      <div class="step"><h3>Start a new one</h3>
+        <p><code>--new</code> starts a fresh session with an automatic name like <code>s-20261120-101500</code>. Add
+          <code>-S NAME</code> to name it; <code>--new -S NAME</code> starts that name over.</p>
+        <pre><code>spendlens ask --new "Oversized ECS services?"
+spendlens ask --new -S ecs "Oversized ECS services?"</code></pre></div>
+      <div class="step"><h3>Continue it</h3>
+        <p><code>-C</code> continues the last session you used. <code>-S NAME</code> continues that session, or creates
+          it if it doesn't exist yet.</p>
+        <pre><code>spendlens ask -C "List them by cluster"
+spendlens ask -S ecs "Which have no autoscaling?"</code></pre></div>
+      <div class="step"><h3>Keep topics apart</h3>
+        <p>Each name is its own conversation. Switching to <code>-S rds</code> doesn't mix RDS into the ECS thread, and
+          <code>-C</code> then follows the one you used last.</p>
+        <pre><code>spendlens ask -S rds "Why did RDS go up?"
+spendlens session list</code></pre></div>
+      <div class="step"><h3>Review, save, tidy</h3>
+        <p>Show a session in the terminal, save the whole conversation as one page or Markdown, or delete it. These
+          commands work offline.</p>
+        <pre><code>spendlens session show ecs
+spendlens session show ecs -o ecs.html
+spendlens session delete ecs
+spendlens session clear --yes</code></pre></div>
+    </div>
+    <p class="arch-note">What is replayed: the last 12 questions and final answers (each answer up to 4,000 characters),
+      not the earlier tool results, so follow-ups stay cheap. A follow-up is never served from the answer cache, because
+      its meaning depends on the conversation. <code>-i</code> is different: it keeps a conversation in memory for one
+      terminal and saves nothing unless you also pass <code>--new</code> or <code>-S</code>.</p>
+  </div>
+</section>
+
+<section class="section alt" id="ask-flags">
+  <div class="wrap">
+    <p class="t-eyebrow center">spendlens ask flags</p>
+    <h2 class="h2">Every way to ask.</h2>
+    <p class="sub">Combine them freely, e.g. <code>ask --live -S ecs --show-tools "…" -o ecs.html</code>.</p>
+    <div class="arch-table-wrap"><table class="arch-table">
+      <thead><tr><th>Flag</th><th>What it does</th><th>Example</th></tr></thead>
+      <tbody>
+        <tr><td><i>(none)</i></td><td>Answer from your latest saved runs only. No AWS calls.</td>
+          <td><code>spendlens ask "Top 5 savings?"</code></td></tr>
+        <tr><td><code>--live</code></td><td>Also allow read-only live AWS queries through Steampipe: inventory and
+          configuration, not only what was saved.</td><td><code>ask --live "Unattached EBS volumes?"</code></td></tr>
+        <tr><td><code>--source demo</code></td><td>Answer from the bundled sample history.</td>
+          <td><code>ask --source demo "What changed?"</code></td></tr>
+        <tr><td><code>--new</code></td><td>Start a new session (with <code>-S NAME</code>: start that one over).</td>
+          <td><code>ask --new "…"</code></td></tr>
+        <tr><td><code>-S, --session</code></td><td>Continue or create a named session.</td>
+          <td><code>ask -S ecs "…"</code></td></tr>
+        <tr><td><code>-C, --continue</code></td><td>Continue the last session used.</td><td><code>ask -C "…"</code></td></tr>
+        <tr><td><code>-i, --interactive</code></td><td>Keep asking in one terminal (type <code>exit</code> to stop).</td>
+          <td><code>ask -i</code></td></tr>
+        <tr><td><code>--show-tools</code></td><td>Print each tool call as it runs: the tool, its SQL, row count, time and
+          first rows.</td><td><code>ask --show-tools "…"</code></td></tr>
+        <tr><td><code>-o, --out</code></td><td>Also save the answer as a styled page (<code>.html</code>, with the tool
+          calls) or <code>.md</code>.</td><td><code>ask "…" -o answer.html</code></td></tr>
+        <tr><td><code>--json</code></td><td>Machine-readable answer, token usage and full audit trail.</td>
+          <td><code>ask --json "…"</code></td></tr>
+        <tr><td><code>--max-steps</code></td><td>Tool-call limit for this question (default <code>llm.max_steps</code>,
+          12). At the limit the model still answers from what it found, marked as possibly incomplete.</td>
+          <td><code>ask --max-steps 20 "…"</code></td></tr>
+        <tr><td><code>--fresh</code></td><td>Skip cached answers and live results this time (new results are still
+          cached).</td><td><code>ask --live --fresh "…"</code></td></tr>
+        <tr><td><code>-c</code>, <code>-p</code>, <code>--set</code></td><td>Same as every command: policy file, AWS
+          profile, and one-off settings such as the model.</td><td><code>--set llm.model=claude-sonnet-5-5</code></td></tr>
+      </tbody>
+    </table></div>
+  </div>
+</section>
+
 <section class="section" id="agent-loop">
   <div class="wrap">
     <p class="t-eyebrow center">How the AI works</p>
@@ -254,7 +501,7 @@ spendlens brief --fresh -o brief.html</code></pre>
           waits for the job (<code>aws_query_result</code>) instead of failing.</p></div>
       <div class="step"><h3>It repeats, then remembers</h3>
         <p>Rows go back as data, never as instructions; it may refine or join, up to <code>llm.max_steps</code>.
-          The answer is cached: the same question on the same data costs no tokens until a new run is saved or the
+          At the limit it is asked for its best answer from what it found. The answer is cached: the same question on the same data costs no tokens until a new run is saved or the
           live data's freshness window ends.</p></div>
       <div class="step"><h3>You check</h3>
         <p>The answer cites the SQL and numbers it used. <code>--show-tools</code> prints every call, and

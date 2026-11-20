@@ -309,5 +309,123 @@ def ai_pipeline() -> tuple[str, str]:
                  "milliseconds instead of failing in AWS, and a repeated question is answered from the cache.")
 
 
+def _stage(x: float, y: float, w: float, h: float, n: int, title: str, lines: list[str], chip: str) -> str:
+    """A numbered pipeline stage with a flag chip underneath."""
+    out = [(f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="14" fill="{ACCENT}" fill-opacity="0.08" '
+            f'stroke="{ACCENT}" stroke-opacity="0.7" stroke-width="1.5"/>'),
+           _t(x + w / 2, y + 26, str(n), 12, weight=700, fill=ACCENT),
+           _t(x + w / 2, y + 50, title, 15, weight=700)]
+    for i, s in enumerate(lines):
+        out.append(_t(x + w / 2, y + 76 + i * 19, s, 11, opacity=0.8))
+    out.append(f'<rect x="{x + 8}" y="{y + h + 12}" width="{w - 16}" height="26" rx="13" fill="{ACCENT}" fill-opacity="0.16"/>')
+    out.append(_t(x + w / 2, y + h + 29, chip, 11, weight=600, fill=ACCENT))
+    return "".join(out)
+
+
+def cli_flow() -> tuple[str, str]:
+    u = "cli"
+    b = [_box(20, 60, 120, 80, "You / CI", "spendlens <cmd>", "Caller", ext=True)]
+    stages = [
+        ("Config", ["built-in defaults", "→ finops.yaml", "→ SPENDLENS__ env", "→ --set (wins)"], "-c · --set · --var"),
+        ("Source", ["live: ask AWS now", "last: latest saved run", "demo: sample data", "-p picks the AWS profile"],
+         "--source · -p"),
+        ("Run", ["controls in Powerpipe", "or bounded cost SQL", "via Steampipe, read-only", "filters narrow the run"],
+         "--check · --status · -g"),
+        ("Save", ["every live run → history", "findings · cost rows", "params · CI metadata", "SQLite, local"],
+         "history list · diff"),
+        ("Output", ["table · csv · json · html", "to screen or a file", "exit 3 on alarm in CI", "notify: Slack / Teams"],
+         "-f · -o · --fail-on-alarm"),
+    ]
+    x, w = 180, 172
+    for i, (title, lines, chip) in enumerate(stages):
+        b.append(_stage(x, 20, w, 160, i + 1, title, lines, chip))
+        b.append(_arrow(u, x - 38 if i == 0 else x - 26, 100, x - 2, 100))
+        x += w + 28
+    b.append(_t(600, 262, "Reports read the history, so dashboard, brief, review, notify and ask never need to call "
+                          "AWS again", 11.5, opacity=0.7))
+    svg = _svg(u, 1180, 276, "Every spendlens command runs the same five stages: config, source, run, save and output, "
+                             "each controlled by its own flags", "".join(b))
+    return svg, ("Every command follows the same five stages. Flags change one stage each: where settings come from, "
+                 "where data comes from, what runs, and how the result is shown. AWS is only called in stage 3, and only "
+                 "with --source live.")
+
+
+def _pill(x: float, y: float, name: str, what: str, w: float = 400) -> str:
+    return (f'<rect x="{x}" y="{y}" width="{w}" height="30" rx="9" fill="currentColor" fill-opacity="0.05" '
+            f'stroke="currentColor" stroke-opacity="0.3"/>'
+            + _t(x + 12, y + 20, name, 12, anchor="start", weight=600)
+            + _t(x + 168, y + 20, what, 11, anchor="start", opacity=0.75))
+
+
+def ai_tools() -> tuple[str, str]:
+    u = "ait"
+    b = [_box(20, 175, 140, 90, "LLM", "plans · writes SQL", "Your provider", ext=True)]
+    # history tools
+    b.append(f'<rect x="220" y="20" width="440" height="160" rx="16" fill="none" stroke="{ACCENT}" stroke-opacity="0.8" '
+             f'stroke-width="1.5"/>')
+    b.append(_t(240, 44, "Always · your saved runs (offline, free)", 12, anchor="start", weight=700, fill=ACCENT))
+    for i, (n, wht) in enumerate([("history_overview", "what was run, when · DB schema"),
+                                  ("history_cost", "one service's cost story"),
+                                  ("history_query", "any read-only SQLite SELECT")]):
+        b.append(_pill(240, 58 + i * 38, n, wht))
+    # live tools
+    b.append(f'<rect x="220" y="200" width="440" height="240" rx="16" fill="none" stroke="{ACCENT}" stroke-opacity="0.8" '
+             f'stroke-width="1.5" stroke-dasharray="7 5"/>')
+    b.append(_t(240, 224, "Added by --live · read-only AWS", 12, anchor="start", weight=700, fill=ACCENT))
+    for i, (n, wht) in enumerate([("aws_find_tables", "search 589 tables"),
+                                  ("aws_describe_table", "columns · filters · examples"),
+                                  ("aws_check_query", "check SQL, no AWS call"),
+                                  ("aws_query", "check · cache · run as a job"),
+                                  ("aws_query_result", "wait for a slow query")]):
+        b.append(_pill(240, 238 + i * 38, n, wht))
+    b.append(_arrow(u, 160, 205, 218, 110, "tool calls", 186, 150, anchor="middle"))
+    b.append(_arrow(u, 160, 235, 218, 320, "", None, None))
+    # sources
+    b.append(_box(740, 65, 190, 70, "History DB", "runs · findings · cost", "SQLite, read-only"))
+    b.append(_box(740, 210, 190, 70, "AWS table catalog", "589 tables · 12.7k columns", "Bundled with spendlens",
+                  accent=True))
+    b.append(_box(740, 350, 190, 70, "Steampipe", "AWS plugin · read-only", "Local Postgres"))
+    b.append(_box(990, 210, 170, 70, "Plugin source", "Go code + docs v1.35.0", "Built at release", ext=True))
+    b.append(_box(990, 350, 170, 70, "AWS APIs", "Describe* · List*", "Your IAM role", ext=True))
+    b.append(_arrow(u, 662, 100, 738, 100))
+    b.append(_arrow(u, 662, 260, 738, 245))
+    b.append(_arrow(u, 662, 390, 738, 385))
+    b.append(_arrow(u, 988, 245, 932, 245))
+    b.append(_arrow(u, 835, 348, 835, 282, "installed columns, daily", 845, 318, anchor="start"))
+    b.append(_arrow(u, 932, 385, 988, 385))
+    svg = _svg(u, 1180, 460, "The assistant's tools: three history tools always, five AWS tools with --live, and the "
+                             "data sources behind them", "".join(b))
+    return svg, ("The model knows only what its tools tell it. The history tools carry the database schema; the AWS "
+                 "tools search a catalog built from the Steampipe AWS plugin's own source and checked against the columns "
+                 "your installed plugin reports.")
+
+
+def seq_session() -> tuple[str, str]:
+    parts = [("user", "You"), ("sl", "spendlens ask"), ("sess", "Session file"), ("llm", "LLM provider")]
+    steps = [
+        ("msg", "user", "sl", "ask --new -S ecs “Which ECS services are oversized?”", False),
+        ("msg", "sl", "sess", "create sessions/ecs.json · make it current", False),
+        ("msg", "sl", "llm", "instructions + tools + question", False),
+        ("note", "sl", "llm", "tool calls as usual (history, or AWS with --live)"),
+        ("msg", "llm", "sl", "answer", True),
+        ("msg", "sl", "sess", "save question · answer · tool calls", False),
+        ("msg", "sl", "user", "answer + “follow up with: spendlens ask -C”", True),
+        ("note", "user", "llm", "later: a new command, a new terminal, even another day"),
+        ("msg", "user", "sl", "ask -C “Which of those have no autoscaling?”", False),
+        ("msg", "sl", "sess", "open the current session", False),
+        ("msg", "sess", "sl", "last 12 questions + answers", True),
+        ("msg", "sl", "llm", "earlier Q&A as chat turns + new question", False),
+        ("self", "sl", "a follow-up is never answered from the cache"),
+        ("msg", "llm", "sl", "answer that uses “those”", True),
+        ("msg", "sl", "sess", "append the turn", False),
+        ("msg", "sl", "user", "answer (-o: save it as a page)", True),
+    ]
+    svg = _sequence("ss", parts, steps, "Sequence of a spendlens ask session: a first question with --new, then a "
+                                        "follow-up with -C in a later command")
+    return svg, ("A session across two commands. Only the questions and final answers are replayed, not the earlier "
+                 "tool results, so a follow-up stays cheap and works with every provider.")
+
+
 ALL = {"c4_context": c4_context, "c4_container": c4_container, "seq_report": seq_report, "seq_ask": seq_ask,
-       "seq_ask_live": seq_ask_live, "ai_pipeline": ai_pipeline}
+       "seq_ask_live": seq_ask_live, "ai_pipeline": ai_pipeline, "cli_flow": cli_flow, "ai_tools": ai_tools,
+       "seq_session": seq_session}
