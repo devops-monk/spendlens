@@ -52,6 +52,7 @@ def test_catalog_matches_hand_checked_fixture():
     ("ec2 cpu utilization last week", "aws_ec2_instance_metric_cpu_utilization", 3),
     ("NAT gateways", "aws_vpc_nat_gateway", 1),
     ("aws_eks_cluster versions", "aws_eks_cluster", 1),
+    ("how many rds instances and their ACUs configuration", "aws_rds_db_cluster", 1),  # Aurora Serverless v2
 ])
 def test_find_tables(question, expect, top):
     assert expect in [h["table"] for h in CAT.find(question, top)]
@@ -144,3 +145,9 @@ def test_with_live_columns_wins():
     assert t.columns["volume_id"].description  # catalog description kept
     assert t.columns["brand_new"].type == "JSON" and live.get("aws_future_table") is not None
     assert not check("select size from aws_ebs_volume", live).ok  # the installed plugin decides
+
+
+def test_acu_query_passes_the_checker():
+    sql = ("select db_cluster_identifier, serverless_v2_scaling_configuration ->> 'MinCapacity' as min_acu, "
+           "serverless_v2_scaling_configuration ->> 'MaxCapacity' as max_acu from aws_rds_db_cluster")
+    assert check(sql, CAT).ok

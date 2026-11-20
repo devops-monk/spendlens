@@ -39,6 +39,8 @@ spendlens brief -o brief.html
 
 Text in tool results (resource names, tags) is treated as data, never as instructions.
 
+It answers only what you asked: no savings or recommendations unless you ask for them. The history holds cost data and check results, not a full inventory, so for configuration questions ("how many Aurora clusters, and their ACU min and max?") use `--live`. Without it, the assistant says what the history can't answer and suggests the `--live` command.
+
 With `--show-tools`, every step prints as it happens: the tool and its SQL when it starts, then the row count, the time and the first rows when it returns. A spinner shows while the model is thinking.
 
 ```text

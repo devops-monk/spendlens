@@ -161,3 +161,10 @@ def test_openai_bad_json_arguments():
 def test_build_provider_config_errors(sets, msg):
     with pytest.raises(AIError, match=msg):
         build_provider(load_config(sets=sets, environ={}))
+
+
+def test_prompt_keeps_to_the_question_and_picks_the_source():
+    p = system_prompt(load_config(environ={}), False)
+    assert "Answer exactly the question asked" in p and "NOT a full inventory" in p
+    assert "spendlens ask --live" in p and "only if the user asked for advice" in p
+    assert "MinCapacity" in system_prompt(load_config(environ={}), True)
