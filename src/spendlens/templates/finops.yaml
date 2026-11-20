@@ -100,7 +100,7 @@ llm:
   # azure:              model: <deployment>, base_url: https://<res>.openai.azure.com, api_version: 2024-10-21, api_key_env: AZURE_OPENAI_API_KEY
   # openai_compatible:  model: <model>, base_url: http://localhost:11434/v1  (Ollama, vLLM, LM Studio ...)
   effort: medium                 # Claude only: low | medium | high | xhigh | max
-  max_steps: 12
+  max_steps: 20
   fallbacks: true                # Claude: retry safety-declined requests on a fallback model
   max_rows: 500
   query_wait_s: 30               # spendlens ask --live: wait per call, then the AI waits again for slow queries

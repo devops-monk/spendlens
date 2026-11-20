@@ -14,7 +14,7 @@ fi
 needs_service() {
   # Commands that never query Steampipe.
   case "${1:-}" in
-    ""|-h|--help|--version|--install-completion|--show-completion|init|params|config|plugins|history|schema|cache)
+    ""|-h|--help|--version|--install-completion|--show-completion|init|params|config|plugins|history|schema|cache|session)
       return 1 ;;
   esac
   for a in "$@"; do case "$a" in -h|--help) return 1 ;; esac; done

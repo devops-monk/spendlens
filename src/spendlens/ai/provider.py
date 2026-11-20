@@ -54,6 +54,7 @@ class Provider(Protocol):
     def start(self, system: str, tools: list[ToolSpec]) -> None: ...
     def send_user(self, text: str) -> Turn: ...
     def send_tool_results(self, results: list[ToolResult], final: bool = False) -> Turn: ...
+    def add_exchange(self, question: str, answer: str) -> None: ...
 
 
 # ------------------------------------------------------------------ Anthropic SDK (Claude API / Bedrock)
@@ -134,6 +135,10 @@ class AnthropicProvider:
         self.messages.append({"role": "user", "content": text})
         return self._request()
 
+    def add_exchange(self, question: str, answer: str) -> None:
+        """An earlier question and its answer (a resumed session), replayed as plain text turns."""
+        self.messages += [{"role": "user", "content": question}, {"role": "assistant", "content": answer}]
+
     def send_tool_results(self, results: list[ToolResult], final: bool = False) -> Turn:
         # all results for one assistant turn go back in a single user message
         self.messages.append({"role": "user", "content": [
@@ -196,6 +201,10 @@ class OpenAIProvider:
     def send_user(self, text: str) -> Turn:
         self.messages.append({"role": "user", "content": text})
         return self._request()
+
+    def add_exchange(self, question: str, answer: str) -> None:
+        """An earlier question and its answer (a resumed session), replayed as plain text turns."""
+        self.messages += [{"role": "user", "content": question}, {"role": "assistant", "content": answer}]
 
     def send_tool_results(self, results: list[ToolResult], final: bool = False) -> Turn:
         for r in results:

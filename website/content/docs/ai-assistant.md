@@ -20,6 +20,29 @@ spendlens ask --source demo "Summarise the waste findings"
 | `--max-steps` | Tool-call limit per question (default `llm.max_steps`, 12). At the limit the assistant answers from what it found and says it may be incomplete |
 | `--json` | The answer plus the full audit trail, machine-readable |
 | `--fresh` | Ignore cached answers and live results; ask and query again |
+| `--new` | Start a new session that later questions can follow up (with `-S NAME`: start that session over) |
+| `-C, --continue` | Follow up in the last session used: the assistant remembers its earlier questions and answers |
+| `-S, --session NAME` | Continue (or start) a named session |
+
+## Sessions: follow up across commands
+
+`-i` keeps a conversation going while it's open. A session keeps it between separate commands, so you can ask, read the answer, and follow up later:
+
+```bash
+spendlens ask --new "Which ECS services are over-provisioned?"   # starts a session
+spendlens ask -C "Which cluster has the most?"                   # remembers the first answer
+spendlens ask -C --live "Show their CPU and memory settings"     # mix history and live
+spendlens ask -S rds "How many Aurora clusters are there?"       # a separate, named session
+```
+
+Each session stores the questions and the final answers in `sessions/<name>.json` next to the history DB. A follow-up replays the last 12 exchanges as plain text, so the model has the context without paying again for earlier tool results. It works with every provider; a follow-up is never answered from the answer cache.
+
+| Command | What it does |
+|---|---|
+| `spendlens session list` | Every session, most recent first; `*` marks the one `-C` continues |
+| `spendlens session show [NAME]` | The questions and answers of a session (default: the current one) |
+| `spendlens session delete NAME` | Delete one session |
+| `spendlens session clear --yes` | Delete every session |
 
 ## The executive brief
 

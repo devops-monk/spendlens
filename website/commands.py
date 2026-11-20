@@ -22,7 +22,8 @@ CATEGORIES: list[tuple[str, str, list[str]]] = [
      ["report", "review", "dashboard", "brief", "notify"]),
     ("AI assistant", "Ask questions in plain English; answers come from your saved runs (and, with --live, read-only "
      "Steampipe queries). The schema and cache commands are the assistant's own tools, for you.",
-     ["ask", "schema find", "schema show", "schema check", "cache show", "cache clear"]),
+     ["ask", "session list", "session show", "session delete", "session clear", "schema find", "schema show",
+      "schema check", "cache show", "cache clear"]),
     ("History", "Every live run is saved locally, so you can compare runs and re-render reports without AWS calls.",
      ["history list", "history diff", "history path"]),
 ]
@@ -214,9 +215,25 @@ RECIPES: dict[str, list[tuple[str, str]]] = {
         ("Show every query behind the answer", "spendlens ask \"Why did EC2 cost go up last month?\" --show-tools"),
         ("Allow read-only live AWS queries too", "spendlens ask --live \"Which running instances are outside the allowed families?\""),
         ("A conversation with follow-up questions", "spendlens ask -i"),
+        ("Start a session, then follow up in later commands", "spendlens ask --new \"Which ECS services are over-provisioned?\""),
+        ("…a follow-up that remembers the earlier answers", "spendlens ask -C \"List them by cluster\""),
+        ("A named session", "spendlens ask -S ecs \"Which of those have no autoscaling?\""),
         ("On sample data", "spendlens ask --source demo \"Summarise the waste findings\""),
         ("Machine-readable answer and audit trail", "spendlens ask \"Top savings?\" --json"),
         ("Skip the cache: ask and query again", "spendlens ask --live --fresh \"How many instances are running?\""),
+    ],
+    "session list": [
+        ("Every saved ask session (* = the one -C continues)", "spendlens session list"),
+    ],
+    "session show": [
+        ("The questions and answers of the current session", "spendlens session show"),
+        ("…of a named session", "spendlens session show ecs"),
+    ],
+    "session delete": [
+        ("Delete one session", "spendlens session delete ecs"),
+    ],
+    "session clear": [
+        ("Delete every session", "spendlens session clear --yes"),
     ],
     "schema find": [
         ("Which AWS tables can answer a question", "spendlens schema find \"unattached EBS volumes\""),

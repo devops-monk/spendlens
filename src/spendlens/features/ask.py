@@ -128,6 +128,11 @@ def ask(
     show_tools: Annotated[bool, typer.Option("--show-tools", help="Show every tool call and SQL used.")] = False,
     max_steps: Annotated[int | None, typer.Option("--max-steps", help="Tool-call limit per question (llm.max_steps).")] = None,
     json_out: Annotated[bool, typer.Option("--json", help="Machine-readable answer + audit trail.")] = False,
+    session: Annotated[str | None, typer.Option(
+        "--session", "-S", help="Continue (or start) a named session: follow-up questions remember the earlier ones, "
+                                "across commands. See `spendlens session list`.")] = None,
+    new: Annotated[bool, typer.Option("--new", help="Start a new session (with --session NAME: start it over).")] = False,
+    resume: Annotated[bool, typer.Option("--continue", "-C", help="Continue the last session used.")] = False,
     fresh: Annotated[bool, typer.Option("--fresh", help="Ignore cached answers and live results; ask and query "
                                                         "again (results are still cached for next time).")] = False,
     config: ConfigOpt = None,
@@ -143,6 +148,9 @@ def ask(
       spendlens ask --live "Which running instances are not in an allowed instance family?"
       spendlens ask -i
       spendlens ask --live --fresh "How many instances are running right now?"
+      spendlens ask --new "Which ECS services are over-provisioned?"     # start a session
+      spendlens ask -C "List them by cluster"                            # follow-up in the same session
+      spendlens ask -S ecs "Which of those have no autoscaling?"          # a named session
     """
     if source is Source.live:
         raise typer.BadParameter("Use --live to allow live AWS queries; --source picks the history (last or demo).",
@@ -154,6 +162,14 @@ def ask(
     from ..ai.cache import AICache
 
     cache = AICache.for_config(cfg, history_path(cfg))
+    sess = None
+    if session or new or resume:
+        from ..ai.session import SessionError, Sessions, sessions_dir
+
+        try:
+            sess = Sessions(sessions_dir(history_path(cfg))).open(session, new=new, resume=resume)
+        except SessionError as e:
+            raise typer.BadParameter(str(e), param_hint="--session") from e
     toolbox = Toolbox(cfg, db, live=live, extra=_plugin_tools(), fresh=fresh, cache=cache)
     try:
         provider = build_provider(cfg)
@@ -161,17 +177,21 @@ def ask(
         err.print(f"[red]AI setup:[/] {e}")
         raise typer.Exit(2) from e
     agent = Agent(provider, toolbox, system_prompt(cfg, live), max_steps or cfg.llm.max_steps)
+    if sess is not None:
+        agent.preload(sess.context())
     streamed = show_tools and not json_out
     if streamed:  # show every step as it happens, not all at the end
         from ..ui import activity
 
         toolbox.on_event = LiveSteps()
         agent.waiting = lambda: activity(f"[dim]{cfg.llm.model} is thinking[/]")
+    where = (f" · session {sess.name} ({len(sess.turns)} earlier question{'' if len(sess.turns) == 1 else 's'})"
+             if sess is not None else "")
     err.print(f"[dim]spendlens ask · {provider.label} · {cfg.llm.model} · history: {source.value}"
-              f"{' + live AWS' if live else ''}[/]")
+              f"{' + live AWS' if live else ''}{where}[/]")
     try:
         questions = [question] if question else []
-        first = True  # only a conversation's first question is standalone, so only it is cached
+        first = sess is None or not sess.turns  # only a conversation's first question is standalone (cacheable)
         while True:
             if not questions:
                 if not interactive:
@@ -188,6 +208,9 @@ def ask(
             first = False
             if key and not fresh and (hit := cache.get("answer", key)):
                 _print_cached(hit, q, json_out)
+                if sess is not None:
+                    sess.add(q, hit[0]["answer"], model=hit[0].get("model") or "", live=live, source=source.value,
+                             tool_calls=0)
                 continue
             ttls_before = len(toolbox.live_ttls)
             try:
@@ -212,11 +235,16 @@ def ask(
                 ttl = min([cfg.llm.cache.answer_ttl_s, *live_left]) if live_left else cfg.llm.cache.answer_ttl_s
                 cache.put("answer", key, {"answer": ans.text, "model": ans.model, "notes": ans.notes,
                                           "steps": [s.__dict__ for s in ans.steps]}, int(ttl), label=q)
+            if sess is not None and ans.text.strip() and not ans.refused:
+                sess.add(q, ans.text, model=ans.model, live=live, source=source.value, tool_calls=len(ans.steps))
             if ans.refused and not interactive:
                 raise typer.Exit(4)
     finally:
         toolbox.close()
         cache.close()
+        if sess is not None and sess.turns:
+            err.print(f"[dim]session {sess.name} · {len(sess.turns)} question(s) · follow up with: "
+                      f"spendlens ask -C \"...\" (or -S {sess.name})[/]")
 
 
 def _answer_key(cfg, label: str, source: Source, live: bool, db, q: str) -> str:

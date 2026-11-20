@@ -264,6 +264,7 @@ The assistant answers from saved history first, which is offline and free. It qu
 - **Right first time:** it looks up the real tables, columns and required filters in a catalog built from the Steampipe AWS plugin's own source, and every query is checked before it reaches AWS. A wrong column comes back with "did you mean".
 - **Patient:** slow queries run as background jobs that the model waits for, instead of timing out.
 - **Cached:** live results are reused while fresh (15 min for resources, 5 for metrics, 6 h for Cost Explorer), and the same question on the same data costs no tokens. `--fresh` skips the cache.
+- **Sessions:** `spendlens ask --new "..."` starts a conversation, and `spendlens ask -C "..."` follows up in a later command with the earlier answers remembered. Name one with `-S ecs`; `spendlens session list | show | delete` manages them.
 
 Configure it with `llm.*` in `finops.yaml`. See [the AI assistant guide](https://spendlens.devops-monk.com/docs/ai-assistant/).
 
@@ -372,7 +373,8 @@ Unknown keys, typos and out-of-range values are rejected, and the error names th
 | `dashboard` | A self-contained HTML report with nine tabs, always covering every check (`--refresh`: re-run all now) |
 | `review` | The whole review in one page: AI analysis, spend bridge and flows, anomalies, savings, and a queue to approve, defer or reject each saving (CSV export) |
 | `brief` | One page for managers: AI summary, key numbers, charts and a savings review checklist |
-| `ask` | Questions in plain English, read-only (`--live`: any AWS table, schema-checked and cached) |
+| `ask` | Questions in plain English, read-only (`--live`: any AWS table, schema-checked and cached; `--new` / `-C` / `-S NAME`: sessions that remember follow-ups) |
+| `session list` · `show` · `delete` · `clear` | Saved `ask` sessions (offline) |
 | `schema find` · `show` · `check` | Find the AWS table for a question, read its columns and filters, check a query before it runs (offline) |
 | `cache show` · `clear` | What the AI assistant has cached and when it expires; forget it |
 | `report` · `notify` | Run everything; post Slack or Teams summaries (`notify --refresh`: re-check first) |

@@ -34,6 +34,11 @@ class Agent:
     def _wait(self) -> AbstractContextManager[Any]:
         return self.waiting()
 
+    def preload(self, exchanges: list[tuple[str, str]]) -> None:
+        """Earlier questions and answers of a saved session, so follow-ups have the context."""
+        for q, a in exchanges:
+            self.provider.add_exchange(q, a)
+
     def ask(self, question: str) -> Answer:
         audit_start = len(self.toolbox.audit)
         with self._wait():
