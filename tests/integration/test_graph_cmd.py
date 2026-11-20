@@ -154,3 +154,24 @@ def test_review_has_suggested_tags_card(tmp_path):
     html = out.read_text()
     assert "Suggested tags" in html and "mounted by EC2 instance payments-api-1" in html
     assert "spendlens graph owners --script tag-review.sh" in html
+
+
+def test_collect_prices_from_the_cur_via_tailpipe(fake_steampipe, tmp_path):
+    import stat
+
+    rows_ = [{"resource_id": "vol-0rptdata", "cost": 30.0, "first_seen": "2026-10-01", "last_seen": "2026-10-30"},
+             {"resource_id": "i-0payapi1", "cost": 50.0, "first_seen": "2026-10-01", "last_seen": "2026-10-30"}]
+    (tmp_path / "out.json").write_text(json.dumps({"columns": [], "rows": rows_}))
+    exe = tmp_path / "tailpipe"
+    exe.write_text(f'#!/bin/sh\ncat "{tmp_path}/out.json"\n')
+    exe.chmod(exe.stat().st_mode | stat.S_IEXEC)
+    r = run("graph", "collect", "--set", f"graph.tailpipe_path={exe}")
+    assert "2 resources priced from the CUR (Tailpipe)" in r.output
+    assert "2 from the CUR" in run("graph", "stats").output
+    r = run("graph", "show", "legacy-reporting")
+    assert "$30.44/mo (CUR)" in r.output and "$144.09/mo" in r.output  # 30 over 30 days, as a monthly rate
+    r = run("graph", "orphans", "--source", "last")
+    assert "legacy-reporting" in r.output
+    # without Tailpipe or Cost Explorer data, the price book, said plainly
+    r = run("graph", "collect", "--set", "graph.tailpipe_path=/nonexistent/tailpipe")
+    assert "price-book estimates" in r.output and "spendlens cost resources" in r.output

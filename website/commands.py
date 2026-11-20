@@ -142,7 +142,12 @@ RECIPES: dict[str, list[tuple[str, str]]] = {
         ("Only the Team tag", "spendlens graph owners -k Team"),
     ],
     "graph impact": [("What breaks or is left behind if it is deleted", "spendlens graph impact vol-0abc123")],
-    "graph collect": [("Read the resources and their links, save them", "spendlens graph collect")],
+    "graph collect": [
+        ("Read the resources and their links, save them", "spendlens graph collect"),
+        ("Price-book estimates only, even when the CUR is available",
+         "spendlens graph collect --set graph.cost_source=estimate"),
+        ("Billed costs from the CUR over the last 14 days", "spendlens graph collect --set graph.cur_days=14"),
+    ],
     "graph stats": [("What was collected, and what was skipped", "spendlens graph stats")],
     "cost diff": [
         ("Last full month vs the month before, by service", "spendlens cost diff"),

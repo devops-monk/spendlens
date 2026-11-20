@@ -219,9 +219,11 @@ class Analyzer:
         for vol, snaps in sorted(by_vol.items()):
             snaps.sort(key=lambda s: s.created or "")
             newest = snaps[-1].created
+            billed = all(s.cost_basis in ("cur", "cost_explorer") for s in snaps)
             ev = [f"Volume {vol} no longer exists; {_plural(len(snaps), 'snapshot')} of it remain"
                   + (f", the newest from {newest[:10]}" if newest else "") + ".",
-                  "No AMI uses them. Snapshots are incremental, so the saving is an upper bound."]
+                  "No AMI uses them." + (" The saving is what they were billed." if billed else
+                                         " Snapshots are incremental, so the saving is an upper bound.")]
             self.add("orphan_snapshots", snaps[-1], [s.id for s in snaps],
                      "Delete the snapshots (keep the newest if the data may be needed).",
                      "Snapshots may be kept for compliance or recovery; check retention rules first.", ev,

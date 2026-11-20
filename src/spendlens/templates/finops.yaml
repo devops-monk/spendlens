@@ -131,6 +131,14 @@ history:
   # path: .spendlens/history.db   # CI: restore/save this file between pipeline runs (S3 or cache)
   keep_runs: 200
 
+graph:                         # spendlens graph: how resources connect, cleanup groups, suggested owners
+  stopped_days: 14             # a stopped instance older than this starts a cleanup group
+  snapshot_orphan_days: 30     # snapshots of a deleted volume older than this
+  ami_unused_days: 90          # AMIs nobody launched from, older than this
+  rds_snapshot_orphan_days: 30 # manual snapshots of a deleted database older than this
+  cost_source: auto            # auto: the CUR via Tailpipe, else Cost Explorer resource data, else the price book
+  cur_days: 30                 # CUR window, in full days before today
+
 aws:
   profile: null                # null = the credentials Steampipe's service started with (your assumed role); or a profile name
   accounts: []

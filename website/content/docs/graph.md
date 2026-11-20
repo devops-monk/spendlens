@@ -138,7 +138,7 @@ There is one read-only query per type:
 
 Each query is checked against the AWS plugin's schema in the test suite.
 
-Costs are estimates from the `pricing:` price book in `finops.yaml`, the same numbers the savings estimates use. A type with no price in the book shows no cost rather than a guess.
+Each resource's cost comes from the best source available. See [Billed costs](#billed-costs-cur-via-tailpipe) below.
 
 | Setting | Default | Meaning |
 |---|---|---|
@@ -147,6 +147,38 @@ Costs are estimates from the `pricing:` price book in `finops.yaml`, the same nu
 | `graph.ami_unused_days` | 90 | AMIs nobody launched from, older than this |
 | `graph.rds_snapshot_orphan_days` | 30 | Manual snapshots of a deleted database older than this |
 | `graph.max_nodes` | 150 | Resources drawn in one picture |
+| `graph.cost_source` | `auto` | `auto`: the CUR via Tailpipe, else Cost Explorer resource data, else the price book. `cur`: the CUR only. `estimate`: the price book only |
+| `graph.cur_days` | 30 | The CUR window: full days before today |
+| `graph.tailpipe_path` | `tailpipe` | The Tailpipe CLI |
+
+## Billed costs (CUR via Tailpipe)
+
+By default a resource's monthly cost is an estimate from the `pricing:` price book in `finops.yaml`, the same numbers the savings estimates use. Snapshot estimates are an upper bound, because snapshots are incremental. When spendlens can see what a resource was actually billed, it uses that instead. `graph collect` tries these in order:
+
+| Source | What it is | Needs |
+|---|---|---|
+| **CUR** | Your [Cost and Usage Report](https://docs.aws.amazon.com/cur/latest/userguide/table-dictionary-cur2.html), queried with [Tailpipe](https://tailpipe.io): what each resource was billed over the last `graph.cur_days` days | Tailpipe with its AWS plugin, and the `aws_cost_and_usage_report` table collected |
+| **Cost Explorer** | Resource-level data saved by `spendlens cost resources` (the last window, up to 7 days, from a run in the last 14 days) | Resource-level data turned on in Cost Explorer |
+| **Estimate** | The price book | Nothing |
+
+How billed costs are used:
+- **Monthly rate.** A billed cost becomes a monthly rate from the days the resource was actually billed. A volume created five days ago is not under-counted.
+- **Gaps keep their estimate.** Resources the bill doesn't name keep their estimate. Each one shows its source: `(CUR)` in the terminal tree, a Basis column on the page, and `cost_basis` in JSON and for the AI.
+- **Groups follow.** Cleanup groups and their savings use the billed figures.
+
+Set up the CUR once:
+
+```bash
+# 1. In the AWS Billing console, create a CUR 2.0 export to S3 with resource IDs included.
+# 2. Install Tailpipe and its AWS plugin, point a partition at the export bucket, and collect:
+tailpipe plugin install aws
+tailpipe collect aws_cost_and_usage_report
+# 3. Check that spendlens can see it, then collect the graph:
+spendlens doctor              # "tailpipe (CUR): N CUR line items collected"
+spendlens graph collect       # "N resources priced from the CUR (Tailpipe)"
+```
+
+Tailpipe reads the CUR files it has already collected. spendlens runs one `tailpipe query` and makes no AWS calls of its own. The query sums `line_item_unblended_cost` per `line_item_resource_id`, over full days before today.
 
 ## Permissions
 

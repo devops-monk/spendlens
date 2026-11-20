@@ -285,6 +285,11 @@ class GraphConfig(_Strict):
     ami_unused_days: int = Field(90, ge=0)  # AMIs no instance or Auto Scaling group uses, older than this
     rds_snapshot_orphan_days: int = Field(30, ge=0)  # manual RDS snapshots of a deleted database
     max_nodes: int = Field(150, ge=10, le=2000)  # nodes drawn in one picture (the rest are summarised)
+    # Per-resource cost: auto = CUR via Tailpipe if installed, else Cost Explorer resource data saved by
+    # `spendlens cost resources`, else the pricing price book. cur = CUR only; estimate = price book only.
+    cost_source: Literal["auto", "cur", "estimate"] = "auto"
+    cur_days: int = Field(30, ge=1, le=92)  # CUR window (full days before today)
+    tailpipe_path: str = Field("tailpipe", pattern=r"^[^;&|`$<>]+$")  # the tailpipe CLI
 
 
 class HistoryConfig(_Strict):

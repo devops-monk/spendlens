@@ -16,7 +16,12 @@
   - AI tools `resource_context`, `cleanup_groups` and `suggested_owners`, with the graph tables in the `history_query` schema;
   - ```` ```graph ```` blocks in answers are drawn in `-o` pages (an inline SVG, rather than Mermaid);
   - route tables are collected, and NAT and load balancer shared costs appear in `graph show` and `resource_context`.
-- **Next:** phase 5 (CUR via Tailpipe), if CUR is set up.
+- **Phase 5 is built:**
+  - `graph.cost_source` (auto, cur or estimate): the CUR via `tailpipe query` first, then Cost Explorer resource data from a recent `cost resources` run, then the price book;
+  - billed costs become monthly rates from the active days, and every node records its `cost_basis`;
+  - a `doctor` check for Tailpipe and the CUR;
+  - tests use a fake `tailpipe` executable, so no real Tailpipe or AWS is involved.
+- **Next:** phase 6 (data transfer graph from VPC flow logs).
 
 ## Context
 

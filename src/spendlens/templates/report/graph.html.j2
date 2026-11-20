@@ -7,7 +7,7 @@
 <section class="br-section">
   <div class="br-kpis">
     <div class="br-kpi"><div class="k">Resource</div><div class="v gr-v">{{ vm.focus.label }}</div><div class="d">{{ vm.focus.type }}</div></div>
-    <div class="br-kpi"><div class="k">Its own cost</div><div class="v">{{ vm.focus.cost or "–" }}</div><div class="d">estimate, per month</div></div>
+    <div class="br-kpi"><div class="k">Its own cost</div><div class="v">{{ vm.focus.cost or "–" }}</div><div class="d">{{ vm.focus.basis or "estimate" }}, per month</div></div>
     <div class="br-kpi"><div class="k">With everything shown</div><div class="v">{{ vm.total }}</div><div class="d">{{ vm.count }} resources within {{ vm.depth }} link{{ "s" if vm.depth != 1 }}</div></div>
     <div class="br-kpi tone-{{ 'warn' if vm.groups else 'good' }}"><div class="k">In cleanup groups</div><div class="v">{{ vm.groups|length }}</div><div class="d">{{ vm.groups_saving }}/month to review</div></div>
   </div>
@@ -62,8 +62,8 @@
 {% if vm.rows %}
 <section class="br-section">
   <div class="card"><h2>Resources shown</h2>
-    <div class="tablewrap"><table class="sortable"><thead><tr><th>Type</th><th>Name</th><th>State</th><th class="num">Cost</th><th>Region</th><th>ID</th></tr></thead><tbody>
-    {% for r in vm.rows %}<tr><td>{{ r.type }}</td><td>{{ r.name }}</td><td>{{ r.state }}</td><td class="num" data-v="{{ r.amount }}">{{ r.cost }}</td><td>{{ r.region }}</td><td><code>{{ r.id }}</code></td></tr>{% endfor %}
+    <div class="tablewrap"><table class="sortable"><thead><tr><th>Type</th><th>Name</th><th>State</th><th class="num">Cost</th><th>Basis</th><th>Region</th><th>ID</th></tr></thead><tbody>
+    {% for r in vm.rows %}<tr><td>{{ r.type }}</td><td>{{ r.name }}</td><td>{{ r.state }}</td><td class="num" data-v="{{ r.amount }}">{{ r.cost }}</td><td>{{ r.basis }}</td><td>{{ r.region }}</td><td><code>{{ r.id }}</code></td></tr>{% endfor %}
     </tbody></table></div></div>
 </section>
 {% endif %}

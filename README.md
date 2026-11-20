@@ -212,7 +212,7 @@ spendlens graph impact vol-0abc123               # what breaks or is left behind
 spendlens graph owners --script tag-review.sh    # owner tags for untagged resources, from what they're attached to
 ```
 
-The review shows each group as a small graph, and each group is one item in its queue. More: [Resource graph & cleanup](https://spendlens.devops-monk.com/docs/graph/).
+The review shows each group as a small graph, and each group is one item in its queue. With [Tailpipe](https://tailpipe.io) and your Cost and Usage Report, costs are what each resource was actually billed rather than price-book estimates. More: [Resource graph & cleanup](https://spendlens.devops-monk.com/docs/graph/).
 
 ## Month-end, without surprises.
 

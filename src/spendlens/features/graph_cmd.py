@@ -136,6 +136,7 @@ def _latest_waste(store: Any) -> list[Finding]:
 def collect_live(cfg: Config) -> Loaded:
     """Collect the graph now and save it as a `graph` run."""
     from ..graph.collect import collect
+    from ..graph.costs import price
     from ..history import HistoryStore
     from ..ui import activity
 
@@ -143,6 +144,20 @@ def collect_live(cfg: Config) -> Loaded:
         g, meta = collect(cfg, progress=lambda s: act.update(f"Reading {s} [dim](Steampipe, read-only)[/]"))
     for why in meta["skipped"].values():
         err.print(f"[yellow]Skipped[/] {why}")
+    with activity("Pricing resources [dim](CUR via Tailpipe, Cost Explorer data, or the price book)[/]"):
+        try:
+            with HistoryStore(history_path(cfg), read_only=True) as hist:
+                meta["costs"] = price(g, cfg, store=hist)
+        except FileNotFoundError:
+            meta["costs"] = price(g, cfg)
+    c = meta["costs"]
+    if c["source"] == "estimate":
+        err.print("[dim]Costs: price-book estimates" + (f" ({'; '.join(c.get('notes', []))})" if c.get("notes") else "")
+                  + ". For billed costs: Tailpipe with the CUR, or run `spendlens cost resources` first.[/]")
+    else:
+        err.print(f"[green]Costs:[/] {c['matched']} resources priced from "
+                  f"{'the CUR (Tailpipe)' if c['source'] == 'cur' else 'Cost Explorer resource data'}; the rest are "
+                  "price-book estimates.")
     ident = caller_identity()
     started = datetime.now(UTC).isoformat(timespec="seconds")
     run_id, waste = None, []
@@ -208,6 +223,7 @@ def pick(g: Graph, target: str) -> str:
 
 def _row(n: Any, cur: str) -> dict[str, Any]:
     return {"type": type_label(n.type), "name": n.label, "state": n.state or "", "cost": money(n.monthly_cost, cur),
+            "basis": {"cur": "CUR", "cost_explorer": "Cost Explorer", "estimate": "estimate"}.get(n.cost_basis, ""),
             "amount": n.monthly_cost or 0, "region": n.region or "", "id": n.id}
 
 
@@ -314,7 +330,8 @@ def graph_show(
         out.write_text(rd.to_json(sub, focus=root, total_monthly_cost=sub.total_cost(),
                                   cleanup_groups=[grp.to_dict() for grp in groups], shared_costs=shared))
     else:
-        vm = {"focus": {"label": n.label, "type": type_label(n.type), "cost": money(n.monthly_cost, cur)},
+        vm = {"focus": {"label": n.label, "type": type_label(n.type), "cost": money(n.monthly_cost, cur),
+                        "basis": BASIS.get(n.cost_basis, "estimate").replace("price-book estimates", "estimate")},
               "total": money(sub.total_cost(), cur).removesuffix("/mo"), "count": len(sub.nodes), "depth": depth,
               "svg": rd.svg(sub, focus=root, highlight=in_groups, alarms=alarms, currency=cur, in_page=True,
                             title=f"{n.label} and what it connects to"),
@@ -500,12 +517,20 @@ def graph_stats(source: GraphSource = Source.last, config: ConfigOpt = None, set
     _print_stats(load_graph(source, cfg))
 
 
+BASIS = {"cur": "from the CUR", "cost_explorer": "from Cost Explorer resource data", "estimate": "price-book estimates",
+         "none": "unpriced"}
+
+
 def _notes(ld: Loaded) -> list[str]:
     return [f"Skipped {why}" for why in (ld.meta.get("skipped") or {}).values()]
 
 
 def _print_stats(ld: Loaded) -> None:
     s = ld.g.stats()
+    basis: dict[str, int] = {}
+    for n in ld.g.nodes.values():
+        if n.monthly_cost is not None:
+            basis[n.cost_basis] = basis.get(n.cost_basis, 0) + 1
     t = Table(title=f"Resource graph · {s['nodes']:,} resources · {s['edges']:,} links", header_style=f"bold {BRAND}")
     for c in ("type", "resources", "cost estimate"):
         t.add_column(c, overflow="fold")
@@ -513,6 +538,8 @@ def _print_stats(ld: Loaded) -> None:
         cost = ld.g.total_cost(n.id for n in ld.g.of_type(typ))
         t.add_row(type_label(typ), f"{count:,}", money(cost) if cost else "")
     console.print(t)
+    if basis:
+        console.print("[dim]Costs: " + " · ".join(f"{v:,} {BASIS.get(k, k)}" for k, v in sorted(basis.items())) + "[/]")
     if s["by_label"]:
         console.print("[dim]Links: " + " · ".join(f"{k} {v:,}" for k, v in sorted(s["by_label"].items(),
                                                                                key=lambda kv: -kv[1])) + "[/]")

@@ -138,6 +138,30 @@ def check_regions(cfg: Config) -> Check:
                  f"connection '{sp.connection}' · {note}", "")
 
 
+def check_tailpipe(cfg: Config) -> Check:
+    """Optional: exact per-resource cost for `spendlens graph` from the CUR (local; no AWS calls)."""
+    if cfg.graph.cost_source == "estimate":
+        return Check("tailpipe (CUR)", "ok", "not used (graph.cost_source = estimate)")
+    exe = shutil.which(cfg.graph.tailpipe_path)
+    if not exe:
+        return Check("tailpipe (CUR)", "warn" if cfg.graph.cost_source == "cur" else "ok",
+                     "not installed: graph costs come from Cost Explorer resource data or the price book",
+                     "Optional, for billed per-resource costs: https://tailpipe.io + its AWS plugin, then collect "
+                     "aws_cost_and_usage_report")
+    code, out = _run([exe, "query", "select count(*) as n from aws_cost_and_usage_report", "--output", "json"], 120)
+    if code != 0:
+        return Check("tailpipe (CUR)", "warn", (out.splitlines() or ["query failed"])[-1][:160],
+                     "Collect the CUR: tailpipe collect aws_cost_and_usage_report")
+    from .graph.costs import CostSourceError, parse_json
+
+    try:
+        n = int((parse_json(out) or [{}])[0].get("n") or 0)
+    except (CostSourceError, ValueError, TypeError):
+        n = 0
+    return Check("tailpipe (CUR)", "ok" if n else "warn", f"{n:,} CUR line items collected",
+                 "" if n else "Collect the CUR: tailpipe collect aws_cost_and_usage_report")
+
+
 def run_checks(
     cfg: Config, *, skip_service: bool = False, extra: list[Callable[[Config], list[Check]]] | None = None
 ) -> list[Check]:
@@ -151,6 +175,7 @@ def run_checks(
         checks.append(check_aws_identity(cfg.aws.profile))
     checks.append(check_regions(cfg))
     checks.append(check_llm(cfg))
+    checks.append(check_tailpipe(cfg))
     if not skip_service:
         checks += check_service_and_cost(cfg)
     for fn in extra or []:

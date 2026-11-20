@@ -228,7 +228,8 @@ def tree(g: Graph, root: str, *, currency: str = "USD", alarms: set[str] | None 
     alarms, groups = alarms or set(), groups or set()
 
     def line(n: Node, via: str = "") -> str:
-        cost = f" [bold]{money(n.monthly_cost, currency)}[/]" if n.monthly_cost else ""
+        tag = {"cur": " (CUR)", "cost_explorer": " (Cost Explorer)"}.get(n.cost_basis, "")
+        cost = f" [bold]{money(n.monthly_cost, currency)}[/][dim]{tag}[/]" if n.monthly_cost else ""
         state = f" [dim]{resc(n.state)}[/]" if n.state else ""
         flag = " [yellow]cleanup group[/]" if n.id in groups else " [red]alarm[/]" if n.id in alarms else ""
         arrow = f"[dim]{resc(via)} →[/] " if via else ""
