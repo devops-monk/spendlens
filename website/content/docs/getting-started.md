@@ -34,7 +34,7 @@ sh install.sh
 | Option | Effect |
 |---|---|
 | `SPENDLENS_DRY_RUN=1` | Print every step without changing anything |
-| `SPENDLENS_REF=v0.3.4` | Install a specific tag or branch (default `main`) |
+| `SPENDLENS_REF=v0.4.0` | Install a specific tag or branch (default `main`) |
 | `SPENDLENS_EXTRAS=""` | Skip the AI assistant's SDKs |
 | `SPENDLENS_SKIP_ENGINES=1` | Don't install Steampipe, Powerpipe or the plugin (you manage them) |
 | `SPENDLENS_BIN_DIR=…` | Where binaries go (default `~/.local/bin`) |

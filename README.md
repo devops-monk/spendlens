@@ -36,8 +36,18 @@
 <p align="center"><sub>One self-contained HTML report, shown with the bundled demo data.</sub></p>
 
 > [!NOTE]
-> v0.3.4. spendlens is tested end to end through Steampipe against an AWS emulator. Verification against a live
+> v0.4.0. spendlens is tested end to end through Steampipe against an AWS emulator. Verification against a live
 > account with a read-only role is next (see [PLAN.md](PLAN.md)).
+
+## New in 0.4.0
+
+- **The resource graph: follow the money, not one resource.** `spendlens graph collect` reads how your resources connect (instances, volumes, snapshots, AMIs, IPs, NAT gateways, load balancers, RDS, ECS, Lambda, route tables), read-only, with a cost on each one. The relationships follow the Steampipe AWS Insights mod. [More](https://spendlens.devops-monk.com/docs/graph/)
+- **Cleanup groups.** `spendlens graph orphans` finds connected resources that can be removed together, each with one total saving: a stopped instance with its volumes, Elastic IP and snapshots; snapshots of deleted volumes; unused AMIs; load balancers with no targets; snapshots of deleted databases. Each resource is in one group at most, and waste alarms are linked, not added. The review shows each group as a small graph and as one queue item.
+- **Suggested owners.** `spendlens graph owners` suggests tags for untagged resources from what they're attached to (a volume from the instance that mounts it), with a confidence and a reason. `--script` writes the tagging commands for you to review and run. Suggestions also show in `tags` and in the review.
+- **Explore and ask.** `graph show` draws any resource with its links and cost (HTML, SVG, Mermaid, DOT, JSON), and `graph impact` shows what deleting it would affect. The AI assistant gets `resource_context`, `cleanup_groups`, `suggested_owners` and `traffic_paths`, and saved answers draw the resources they talk about.
+- **Billed costs.** With [Tailpipe](https://tailpipe.io) and your Cost and Usage Report, each resource's cost is what it was billed. Without them, spendlens uses Cost Explorer resource data, then the price book. NAT gateway and load balancer costs are split across what uses them.
+- **Data transfer.** `spendlens graph traffic` prices VPC flow logs (via Tailpipe): cross-AZ, through NAT gateways, out to the internet. It proposes free S3/DynamoDB gateway endpoints where that traffic goes through a NAT gateway today.
+- **`spendlens find`** shows everything saved about one resource. **`spendlens open`** builds a report from saved runs and opens it in your browser.
 
 ## New in 0.3.4
 
