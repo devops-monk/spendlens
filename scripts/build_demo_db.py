@@ -457,7 +457,11 @@ def demo_graph(store: HistoryStore, rng: random.Random) -> None:
 
     link = {"volume": pick("ebs_volume_unattached", 2), "eip": pick("vpc_eip_unattached", 2),
             "lb": pick("ec2_application_load_balancer_unused", 1)}
+    from spendlens.graph.cloudtrail import apply as apply_creators
+    from spendlens.graph.demo import created_by
+
     g, meta = collect(Config(), client=FakeClient(rows(link)))
+    meta["cloudtrail"] = {"matched": apply_creators(g, created_by()), "days": 90}  # as with graph.owner_from_cloudtrail
     run_id = store.save_run("graph", account_id=ACCOUNT, caller_arn=CALLER, params=Config().graph.model_dump(),
                             meta={**meta, "demo": True}, started_at=datetime(2026, 11, 9, 6, 20, tzinfo=UTC))
     store.save_graph(run_id, *g.to_rows())

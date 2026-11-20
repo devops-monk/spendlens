@@ -100,7 +100,9 @@ def tag_keys(cfg: Config) -> list[str]:
 def suggestions_for(g: Graph, cfg: Config, min_confidence: str = "low") -> list[Any]:
     from ..graph.owners import suggest_owners
 
-    return suggest_owners(g, tag_keys(cfg), min_confidence=min_confidence)
+    return suggest_owners(g, tag_keys(cfg), min_confidence=min_confidence,
+                          # collecting creators is opt-in; once a graph has them they are always used
+                          creator_key=cfg.graph.cloudtrail_owner_key)
 
 
 def saved_graph(source: Source, cfg: Config) -> Loaded | None:
@@ -182,6 +184,20 @@ def collect_live(cfg: Config) -> Loaded:
         g, meta = collect(cfg, progress=lambda s: act.update(f"Reading {s} [dim](Steampipe, read-only)[/]"))
     for why in meta["skipped"].values():
         err.print(f"[yellow]Skipped[/] {why}")
+    if cfg.graph.owner_from_cloudtrail:
+        from ..graph.cloudtrail import apply, creators
+        from ..steampipe import SteampipeClient
+
+        with activity("Reading who created what [dim](CloudTrail LookupEvents, read-only)[/]") as act, \
+                SteampipeClient(cfg.steampipe) as sp:
+            found, ct_skipped = creators(sp.query, cfg.graph.cloudtrail_days,
+                                         progress=lambda s: act.update(f"CloudTrail: {s} [dim](read-only)[/]"))
+        meta["cloudtrail"] = {"matched": apply(g, found), "events_found": len(found), "skipped": ct_skipped,
+                              "days": cfg.graph.cloudtrail_days}
+        err.print(f"[dim]CloudTrail: creators found for {meta['cloudtrail']['matched']} resource(s) over the last "
+                  f"{cfg.graph.cloudtrail_days} days.[/]")
+        if ct_skipped:
+            err.print(f"[yellow]CloudTrail skipped[/] {len(ct_skipped)} event type(s): {next(iter(ct_skipped.values()))}")
     with activity("Pricing resources [dim](CUR via Tailpipe, Cost Explorer data, or the price book)[/]"):
         try:
             with HistoryStore(history_path(cfg), read_only=True) as hist:

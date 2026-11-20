@@ -8,6 +8,8 @@ the first rule that finds a value wins, and every suggestion says where it came 
           task definition <- its ECS service, RDS instance <- its cluster
   medium  one step removed: snapshot <- the volume it was taken from (or that volume's instance), AMI snapshot <-
           the AMI, RDS snapshot <- its database, AMI <- the instances launched from it (when they all agree)
+  medium  opt-in (graph.owner_from_cloudtrail): who created it, from CloudTrail, for the owner tag only
+          (graph.cloudtrail_owner_key), when nothing attached already names an owner
   low     the subnet: the value most tagged resources in the same subnet carry (at least 3, at least 60% agreeing)
 
 Only tags in the tagging policy (tagging.mandatory) and the usual owner keys are suggested, only when the resource
@@ -67,8 +69,9 @@ def _value(n: Node, key: str) -> str | None:
 
 
 class Owners:
-    def __init__(self, g: Graph, keys: list[str]):
+    def __init__(self, g: Graph, keys: list[str], creator_key: str | None = None):
         self.g = g
+        self.creator_key = (creator_key or "").lower()
         seen: set[str] = set()
         self.keys = [k for k in keys if not (k.lower() in seen or seen.add(k.lower()))]  # Team == team
         self.subnet_of: dict[str, list[str]] = defaultdict(list)  # subnet id -> resources in it
@@ -152,6 +155,12 @@ class Owners:
                     found = Suggestion(n.id, n.type, n.label, n.region or "", spelled, value, src.id, src.label, conf,
                                        f"{why} {type_label(src.type)} {src.label}")
                     break
+            if (found is None and self.creator_key and key.lower() == self.creator_key
+                    and (by := n.attrs.get("created_by"))):
+                when = str(n.attrs.get("created_at") or "")[:10]
+                found = Suggestion(n.id, n.type, n.label, n.region or "", key, str(by), "", "", "medium",
+                                   f"created by {by} ({n.attrs.get('created_event')}{' on ' + when if when else ''}, "
+                                   "CloudTrail)")
             if found is None and (m := self.subnet_majority(n, key)):
                 found = Suggestion(n.id, n.type, n.label, n.region or "", key, m[0], "", "", "low", m[1])
             if found:
@@ -165,8 +174,10 @@ class Owners:
         return sorted(out, key=lambda s: (-LEVELS[s.confidence], s.type, s.name, s.key))
 
 
-def suggest_owners(g: Graph, keys: list[str], *, min_confidence: str = "low") -> list[Suggestion]:
-    return Owners(g, keys).all(min_confidence)
+def suggest_owners(g: Graph, keys: list[str], *, min_confidence: str = "low",
+                   creator_key: str | None = None) -> list[Suggestion]:
+    keys = [*keys, creator_key] if creator_key else keys
+    return Owners(g, keys, creator_key).all(min_confidence)
 
 
 def by_resource(suggestions: list[Suggestion]) -> dict[str, list[Suggestion]]:

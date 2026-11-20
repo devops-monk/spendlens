@@ -138,6 +138,7 @@ graph:                         # spendlens graph: how resources connect, cleanup
   rds_snapshot_orphan_days: 30 # manual snapshots of a deleted database older than this
   cost_source: auto            # auto: the CUR via Tailpipe, else Cost Explorer resource data, else the price book
   cur_days: 30                 # CUR window, in full days before today
+  owner_from_cloudtrail: false # opt-in: who created each resource (CloudTrail, last 90 days) as an Owner suggestion
 
 aws:
   profile: null                # null = the credentials Steampipe's service started with (your assumed role); or a profile name

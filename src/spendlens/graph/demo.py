@@ -294,6 +294,16 @@ def rows(link: dict[str, list[dict[str, Any]]] | None = None) -> dict[str, list[
     return t
 
 
+def created_by() -> dict[str, dict[str, str]]:
+    """Who created resources made in the last 90 days (all LookupEvents keeps), as `graph collect` records it with
+    graph.owner_from_cloudtrail."""
+    return {
+        "report-export": {"by": "bob@example.com", "at": "2026-09-01T09:00:00+00:00", "event": "CreateFunction20150331"},
+        "payments-db-pre-upgrade": {"by": "carol@example.com", "at": "2026-09-30T22:00:00+00:00",
+                                    "event": "CreateDBSnapshot"},
+    }
+
+
 class FakeClient:
     """Answers collect()'s queries from rows(), matched by the table in `from <table>`."""
 

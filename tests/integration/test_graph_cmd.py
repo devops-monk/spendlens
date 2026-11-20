@@ -221,3 +221,33 @@ def test_traffic_ai_tool_and_review_section(tmp_path):
     run("review", "--source", "demo", "--no-ai", "-o", str(out))
     html = out.read_text()
     assert 'id="transfer"' in html and "endpoint|vpc-0prod|DynamoDB" in html
+
+
+def test_cloudtrail_creators_are_opt_in(monkeypatch):
+    from spendlens.graph.demo import FakeClient, rows
+
+    tables = rows()
+    tables["aws_cloudtrail_lookup_event"] = [
+        {"event_name": "CreateFunction20150331", "event_time": "2026-11-01T09:00:00Z", "username": "bob@example.com",
+         "resources": [{"ResourceName": "report-export"}]}]
+    clients = []
+
+    class Ctx(FakeClient):
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            pass
+
+    monkeypatch.setattr("spendlens.steampipe.SteampipeClient", lambda *a, **k: clients.append(Ctx(tables)) or clients[-1])
+    monkeypatch.setattr("spendlens.features.graph_cmd.caller_identity", lambda: {"Account": "123456789012"})
+    run("graph", "collect", "--set", "graph.tailpipe_path=/nonexistent/tailpipe")  # off by default
+    assert not any("aws_cloudtrail_lookup_event" in q for c in clients for q in c.sql)
+    clients.clear()
+    r = run("graph", "collect", "--set", "graph.tailpipe_path=/nonexistent/tailpipe",
+            "--set", "graph.owner_from_cloudtrail=true", "--set", "graph.cloudtrail_days=30")
+    assert "creators found for 1 resource(s) over the last 30 days" in r.output
+    ct = [q for c in clients for q in c.sql if "aws_cloudtrail_lookup_event" in q]
+    assert len(ct) == 20 and all("interval '30 days'" in q for q in ct)
+    r = run("graph", "owners", "-k", "Owner")
+    assert "bob@example.com" in r.output and "created by bob@example.com" in r.output

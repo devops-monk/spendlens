@@ -293,6 +293,11 @@ class GraphConfig(_Strict):
     cost_source: Literal["auto", "cur", "estimate"] = "auto"
     cur_days: int = Field(30, ge=1, le=92)  # CUR window (full days before today)
     flow_days: int = Field(7, ge=1, le=31)  # VPC flow log window for `graph traffic` (full days before today)
+    # Opt-in: who created each resource (CloudTrail LookupEvents, the last cloudtrail_days days) as an owner hint.
+    # Off by default: ~2 LookupEvents calls/second makes collection slower; needs cloudtrail:LookupEvents.
+    owner_from_cloudtrail: bool = False
+    cloudtrail_days: int = Field(90, ge=1, le=90)
+    cloudtrail_owner_key: str = Field("Owner", min_length=1, max_length=128)  # the tag the creator is suggested for
     tailpipe_path: str = Field("tailpipe", pattern=r"^[^;&|`$<>]+$")  # the tailpipe CLI
 
 

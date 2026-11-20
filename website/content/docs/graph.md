@@ -81,6 +81,7 @@ spendlens graph owners --source demo
 |---|---|
 | high | Directly attached or managed: a volume from the instance that mounts it, a network interface or Elastic IP from its instance or NAT gateway, an instance from its Auto Scaling group, a target group from its load balancer, an RDS instance from its cluster |
 | medium | One step removed: a snapshot from its volume (or that volume's instance), a snapshot behind an AMI from the AMI, an RDS snapshot from its database, an AMI from the instances launched from it |
+| medium | Opt-in: who created it, from CloudTrail, for the owner tag only (see below) |
 | low | The subnet: the value that most tagged resources in the same subnet carry (at least 3, at least 60% agreeing) |
 
 How a value is chosen:
@@ -95,6 +96,18 @@ The same suggestions appear in three places:
 - in a **Suggested tags** card in the review.
 
 These all come from the saved graph, with no extra AWS calls.
+
+**Who created it (CloudTrail, opt-in).** With `graph.owner_from_cloudtrail: true`, `graph collect` also asks CloudTrail who created each resource. It runs one LookupEvents query per creation event (RunInstances, CreateVolume, CreateSnapshot, CreateDBInstance and others, 20 in all), each bounded to the last `graph.cloudtrail_days` days. The creator is suggested for your owner tag (`graph.cloudtrail_owner_key`, default `Owner`) with medium confidence, and only when nothing attached already names an owner.
+
+```bash
+spendlens graph collect --set graph.owner_from_cloudtrail=true
+spendlens graph owners -k Owner
+```
+
+It is off by default, for three reasons:
+- **Speed:** LookupEvents allows about two calls a second, so it adds time to every collection in a busy account.
+- **History:** it only knows resources created in the last 90 days, because that is all LookupEvents keeps.
+- **Permission:** it needs `cloudtrail:LookupEvents`. Without it, the step is skipped with a note and the rest of the collection runs.
 
 > spendlens never applies tags. `--script` writes `aws resourcegroupstaggingapi tag-resources` commands, one per resource, each with its reason as a comment. Low-confidence lines are commented out. Review the script before you run it with a role that is allowed to tag.
 
@@ -205,6 +218,9 @@ Each resource's cost comes from the best source available. See [Billed costs](#b
 | `graph.cur_days` | 30 | The CUR window: full days before today |
 | `graph.tailpipe_path` | `tailpipe` | The Tailpipe CLI |
 | `graph.flow_days` | 7 | The VPC flow log window for `graph traffic` |
+| `graph.owner_from_cloudtrail` | `false` | Opt-in: record who created each resource (CloudTrail LookupEvents) as an owner hint |
+| `graph.cloudtrail_days` | 90 | How far back to look for creation events (90 at most) |
+| `graph.cloudtrail_owner_key` | `Owner` | The tag the creator is suggested for |
 | `pricing.nat_gateway_gb` · `cross_az_gb` · `internet_egress_gb` | 0.045 · 0.01 · 0.09 | Data transfer prices (USD per GB) |
 
 ## Billed costs (CUR via Tailpipe)
@@ -244,6 +260,7 @@ These are all covered by `ReadOnlyAccess`. With a narrower role, the graph needs
 - **Auto Scaling:** `autoscaling:DescribeAutoScalingGroups`;
 - **RDS:** `rds:DescribeDBInstances`, `rds:DescribeDBClusters`, `rds:DescribeDBSnapshots`, `rds:DescribeDBClusterSnapshots`;
 - **ECS:** `ecs:ListClusters`, `ecs:DescribeClusters`, `ecs:ListServices`, `ecs:DescribeServices`;
-- **Lambda:** `lambda:ListFunctions`.
+- **Lambda:** `lambda:ListFunctions`;
+- **Only with `graph.owner_from_cloudtrail`:** `cloudtrail:LookupEvents`.
 
 A missing permission skips that one type, with a note, and never fails the run.

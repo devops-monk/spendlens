@@ -170,6 +170,8 @@ RECIPES: dict[str, list[tuple[str, str]]] = {
         ("Price-book estimates only, even when the CUR is available",
          "spendlens graph collect --set graph.cost_source=estimate"),
         ("Billed costs from the CUR over the last 14 days", "spendlens graph collect --set graph.cur_days=14"),
+        ("Also record who created each resource (CloudTrail, opt-in), for Owner suggestions",
+         "spendlens graph collect --set graph.owner_from_cloudtrail=true"),
     ],
     "graph stats": [("What was collected, and what was skipped", "spendlens graph stats")],
     "cost diff": [
