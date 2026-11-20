@@ -53,7 +53,7 @@ class Provider(Protocol):
 
     def start(self, system: str, tools: list[ToolSpec]) -> None: ...
     def send_user(self, text: str) -> Turn: ...
-    def send_tool_results(self, results: list[ToolResult]) -> Turn: ...
+    def send_tool_results(self, results: list[ToolResult], final: bool = False) -> Turn: ...
 
 
 # ------------------------------------------------------------------ Anthropic SDK (Claude API / Bedrock)
@@ -85,10 +85,12 @@ class AnthropicProvider:
         self.tools = [{"name": t.name, "description": t.description, "input_schema": t.parameters, "strict": True}
                       for t in tools]
 
-    def _request(self) -> Turn:
+    def _request(self, final: bool = False) -> Turn:
         llm = self.cfg.llm
         kwargs: dict[str, Any] = {"model": self.model, "max_tokens": llm.max_tokens, "system": self.system,
                                   "tools": self.tools, "messages": self.messages}
+        if final:  # out of tool steps: the model must answer in text
+            kwargs["tool_choice"] = {"type": "none"}
         if llm.effort:
             kwargs["output_config"] = {"effort": llm.effort}
         if self.server_fallbacks:
@@ -132,12 +134,12 @@ class AnthropicProvider:
         self.messages.append({"role": "user", "content": text})
         return self._request()
 
-    def send_tool_results(self, results: list[ToolResult]) -> Turn:
+    def send_tool_results(self, results: list[ToolResult], final: bool = False) -> Turn:
         # all results for one assistant turn go back in a single user message
         self.messages.append({"role": "user", "content": [
             {"type": "tool_result", "tool_use_id": r.call_id, "content": r.content, "is_error": r.is_error}
             for r in results]})
-        return self._request()
+        return self._request(final)
 
 
 # ------------------------------------------------------------------ OpenAI SDK (OpenAI / Azure / compatible)
@@ -155,10 +157,10 @@ class OpenAIProvider:
         self.tools = [{"type": "function", "function": {"name": t.name, "description": t.description,
                                                         "parameters": t.parameters}} for t in tools]
 
-    def _request(self) -> Turn:
+    def _request(self, final: bool = False) -> Turn:
         llm = self.cfg.llm
         kwargs: dict[str, Any] = {"model": self.model, "messages": self.messages, "tools": self.tools,
-                                  "tool_choice": "auto"}
+                                  "tool_choice": "none" if final else "auto"}  # final: out of tool steps, answer now
         # newer OpenAI/Azure models take max_completion_tokens; many compatible servers only know max_tokens
         kwargs["max_tokens" if self.family == "openai_compatible" else "max_completion_tokens"] = llm.max_tokens
         if llm.temperature is not None:
@@ -195,11 +197,11 @@ class OpenAIProvider:
         self.messages.append({"role": "user", "content": text})
         return self._request()
 
-    def send_tool_results(self, results: list[ToolResult]) -> Turn:
+    def send_tool_results(self, results: list[ToolResult], final: bool = False) -> Turn:
         for r in results:
             self.messages.append({"role": "tool", "tool_call_id": r.call_id,
                                   "content": ("ERROR: " if r.is_error else "") + r.content})
-        return self._request()
+        return self._request(final)
 
 
 # ------------------------------------------------------------------ factory

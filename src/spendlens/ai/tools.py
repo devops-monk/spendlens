@@ -97,6 +97,27 @@ The latest run of a feature: select max(id) from runs where feature = '...'.
 Always filter findings/cost_rows to one run_id (usually the latest), or you will double count across runs."""
 
 
+# short names people use -> words in Cost Explorer's service names (which are long: "Amazon Relational Database Service")
+SERVICE_ALIASES = {
+    "rds": ["Relational Database"], "aurora": ["Relational Database"], "ec2": ["Elastic Compute Cloud", "EC2"],
+    "ebs": ["EC2 - Other", "Elastic Block Store"], "nat": ["EC2 - Other", "VPC"], "s3": ["Simple Storage Service"],
+    "lambda": ["Lambda"], "elb": ["Elastic Load Balancing"], "alb": ["Elastic Load Balancing"],
+    "nlb": ["Elastic Load Balancing"], "dynamodb": ["DynamoDB"], "efs": ["Elastic File System"],
+    "eks": ["Elastic Container Service for Kubernetes", "Elastic Kubernetes"], "ecs": ["Elastic Container Service"],
+    "fargate": ["Elastic Container Service"], "cloudwatch": ["CloudWatch"], "cloudfront": ["CloudFront"],
+    "elasticache": ["ElastiCache"], "redshift": ["Redshift"], "opensearch": ["OpenSearch"],
+    "kms": ["Key Management Service"], "sqs": ["Simple Queue Service"], "sns": ["Simple Notification Service"],
+    "vpc": ["Virtual Private Cloud", "VPC"], "route53": ["Route 53"], "glue": ["Glue"], "athena": ["Athena"],
+}
+COST_FEATURES = ("cost_diff", "cost_trend", "cost_showback", "cost_breakdown", "forecast", "anomalies")
+
+
+def _patterns(text: str) -> list[str]:
+    t = text.strip()
+    key = t.lower().replace("amazon ", "").replace("aws ", "").replace(" ", "")
+    return sorted({t, *SERVICE_ALIASES.get(key, [])}, key=len)
+
+
 # ------------------------------------------------------------------ toolbox
 
 
@@ -110,6 +131,7 @@ class Toolbox:
     fresh: bool = False  # skip cache reads (still write)
     cache: Any = None  # AICache | None
     live_ttls: list[float] = field(default_factory=list)  # remaining freshness (s) of each live result used
+    on_event: Any = None  # callable(kind: "start" | "done", name, args, entry=None, content=None): live display
     _sqlite: sqlite3.Connection | None = None
     _steampipe: Any = None
     _catalog: Any = None
@@ -123,6 +145,15 @@ class Toolbox:
                      "Summary of the saved spendlens runs: for each feature its latest run (id, time, account) and "
                      "finding/alarm/saving totals or cost-row counts, plus the history database schema. Call this "
                      "first to see what data exists.", _schema(), lambda a: self.history_overview()),
+            ToolSpec("history_cost",
+                     "Everything saved about one service's (or tag value's) cost, in one call: for the latest run of "
+                     "each cost feature (cost_diff, cost_trend, cost_breakdown, cost_showback, anomalies, forecast) "
+                     "its rows by period, plus the latest findings for that service. Use it first for 'why did X "
+                     "cost change' questions. Short names work (rds, ec2, s3, ebs, nat, lambda ...).",
+                     _schema({"service": {"type": "string",
+                                          "description": "Service or group to match, e.g. 'rds' or 'Amazon Relational "
+                                                         "Database Service' or a tag value."}}, ["service"]),
+                     lambda a: self.history_cost(a["service"])),
             ToolSpec("history_query",
                      "Run ONE read-only SQLite SELECT against the spendlens history database (saved findings and "
                      "cost data; no AWS calls, free).\n" + HISTORY_SCHEMA_HINT,
@@ -160,28 +191,42 @@ class Toolbox:
             ]
         return specs + self.extra
 
+    def _emit(self, kind: str, name: str, args: dict[str, Any], entry: AuditEntry | None = None,
+              content: str | None = None) -> None:
+        if self.on_event is not None:
+            try:
+                self.on_event(kind, name, args, entry, content)
+            except Exception:  # noqa: BLE001, S110 - the display must never break a question
+                pass
+
+    def _log(self, call_id: str, entry: AuditEntry, content: str, is_error: bool = False) -> ToolResult:
+        self.audit.append(entry)
+        self._emit("done", entry.tool, entry.arguments, entry, content)
+        return ToolResult(call_id, content, is_error)
+
     def execute(self, call_id: str, name: str, arguments: dict[str, Any] | None) -> ToolResult:
         spec = next((s for s in self.specs() if s.name == name), None)
         args = arguments if isinstance(arguments, dict) else {}
+        self._emit("start", name, args)
         t0 = time.monotonic()
         if spec is None:
-            self.audit.append(AuditEntry(name, args, False, None, 0, "unknown tool"))
-            return ToolResult(call_id, f"Error: unknown tool '{name}'.", True)
+            return self._log(call_id, AuditEntry(name, args, False, None, 0, "unknown tool"),
+                             f"Error: unknown tool '{name}'.", True)
         missing = [k for k in spec.parameters.get("required", []) if k not in args]
         if missing:
-            self.audit.append(AuditEntry(name, args, False, None, 0, f"missing {missing}"))
-            return ToolResult(call_id, f"Error: missing required argument(s): {', '.join(missing)}.", True)
+            return self._log(call_id, AuditEntry(name, args, False, None, 0, f"missing {missing}"),
+                             f"Error: missing required argument(s): {', '.join(missing)}.", True)
         try:
             out = spec.handler(args)
         except (ToolError, UnsafeSQL) as e:
-            self.audit.append(AuditEntry(name, args, False, None, int((time.monotonic() - t0) * 1000), str(e)))
-            return ToolResult(call_id, f"Error: {e}", True)
+            return self._log(call_id, AuditEntry(name, args, False, None, int((time.monotonic() - t0) * 1000), str(e)),
+                             f"Error: {e}", True)
         except Exception as e:  # noqa: BLE001 - surface any tool failure to the model, never crash the session
-            self.audit.append(AuditEntry(name, args, False, None, int((time.monotonic() - t0) * 1000), repr(e)))
-            return ToolResult(call_id, f"Error: {type(e).__name__}: {e}", True)
+            return self._log(call_id, AuditEntry(name, args, False, None, int((time.monotonic() - t0) * 1000), repr(e)),
+                             f"Error: {type(e).__name__}: {e}", True)
         rows = out.get("row_count") if isinstance(out, dict) else None
-        self.audit.append(AuditEntry(name, args, True, rows, int((time.monotonic() - t0) * 1000)))
-        return ToolResult(call_id, self._serialise(out))
+        return self._log(call_id, AuditEntry(name, args, True, rows, int((time.monotonic() - t0) * 1000)),
+                         self._serialise(out))
 
     def _serialise(self, out: Any) -> str:
         text = out if isinstance(out, str) else json.dumps(out, default=str, separators=(",", ":"))
@@ -227,12 +272,64 @@ class Toolbox:
                             (r["id"],)).fetchone()
             c = con.execute("select count(*) n, round(sum(amount), 2) total from cost_rows where run_id = ?",
                             (r["id"],)).fetchone()
-            features.append({"feature": r["feature"], "latest_run_id": run["id"], "started_at": run["started_at"],
-                             "account_id": run["account_id"], "findings": f["n"], "alarms": f["alarms"] or 0,
-                             "est_monthly_saving_on_alarms": f["saving"] or 0, "cost_rows": c["n"],
-                             "cost_rows_total": c["total"]})
+            item = {"feature": r["feature"], "latest_run_id": run["id"], "started_at": run["started_at"],
+                    "account_id": run["account_id"], "findings": f["n"], "alarms": f["alarms"] or 0,
+                    "est_monthly_saving_on_alarms": f["saving"] or 0, "cost_rows": c["n"], "cost_rows_total": c["total"]}
+            if c["n"]:  # what the cost rows hold, so no queries are spent discovering it
+                item["periods"] = {k: p for k, p in con.execute(
+                    "select distinct kind, period from cost_rows where run_id = ? order by kind", (run["id"],))}
+                item["dimensions"] = [d for (d,) in con.execute(
+                    "select distinct dimension from cost_rows where run_id = ?", (run["id"],))]
+            features.append(item)
+        latest = [f["latest_run_id"] for f in features if f["feature"] in ("cost_diff", "cost_trend") and f["cost_rows"]]
+        names = [g for (g,) in con.execute(
+            f"select grp from cost_rows where run_id in ({','.join('?' * len(latest))}) and grp not like '%' || "
+            "char(31) || '%' group by grp order by sum(amount) desc limit 40", latest)] if latest else []
         return {"database": str(self.history_db), "features": features, "schema": HISTORY_SCHEMA_HINT,
-                "row_count": len(features)}
+                "cost_groups_by_spend": names,
+                "tip": "For one service's cost change use history_cost('<service>'); grp values are the exact names in "
+                       "cost_groups_by_spend.", "row_count": len(features)}
+
+    def history_cost(self, service: str) -> dict[str, Any]:
+        con = self._history()
+        pats = _patterns(service)
+        like = " or ".join("lower(grp) like ?" for _ in pats)
+        args = [f"%{p.lower()}%" for p in pats]
+        out: dict[str, Any] = {"matched": pats, "cost": {}, "findings": {}}
+        for feat in COST_FEATURES:
+            run = con.execute("select id, started_at, meta from runs where feature = ? order by id desc limit 1",
+                              (feat,)).fetchone()
+            if not run:
+                continue
+            rows = con.execute(f"select kind, period, dimension, replace(grp, char(31), ' > ') grp, round(sum(amount), 2) "
+                               f"amount from cost_rows where run_id = ? and ({like}) group by kind, period, dimension, grp "
+                               "order by dimension, grp, kind", (run["id"], *args)).fetchall()
+            if rows:
+                out["cost"][feat] = {"run_id": run["id"], "started_at": run["started_at"],
+                                     "rows": [list(r) for r in rows[: self.cfg.llm.max_rows]],
+                                     "columns": ["kind", "period", "dimension", "grp", "amount"],
+                                     "truncated": len(rows) > self.cfg.llm.max_rows}
+        short = [p.lower() for p in pats] + [k for k, v in SERVICE_ALIASES.items() if set(v) & set(pats)]
+        flike = " or ".join("lower(service) = ? or lower(resource_type) like ?" for _ in short)
+        fargs = [a for s in short for a in (s, f"%{s}%")]
+        for feat in ("rightsize", "waste", "savings_hub", "tags"):
+            run = con.execute("select id from runs where feature = ? order by id desc limit 1", (feat,)).fetchone()
+            if not run:
+                continue
+            rows = con.execute(f"select control, status, count(*) n, round(sum(coalesce(est_monthly_saving, 0)), 2) "
+                               f"saving from findings where run_id = ? and ({flike}) group by control, status "
+                               "order by saving desc limit 20", (run["id"], *fargs)).fetchall()
+            if rows:
+                out["findings"][feat] = {"run_id": run["id"], "columns": ["control", "status", "n", "est_monthly_saving"],
+                                         "rows": [list(r) for r in rows]}
+        out["row_count"] = sum(len(v["rows"]) for part in ("cost", "findings") for v in out[part].values())
+        if not out["cost"]:
+            out["note"] = ("No saved cost rows match. Pick an exact name from history_overview's cost_groups_by_spend, "
+                           "or run `spendlens cost diff` first.")
+        elif "cost_breakdown" not in out["cost"]:
+            out["note"] = ("No usage-type breakdown is saved, so the cause inside the service is unknown here. Say so, and "
+                           "suggest `spendlens cost diff -g service -b usage-type` (or -b tag:Name) to see it.")
+        return out
 
     # ----- live AWS (Steampipe)
 

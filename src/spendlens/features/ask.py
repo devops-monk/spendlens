@@ -9,10 +9,12 @@ from __future__ import annotations
 
 import json
 import time
-from typing import Annotated
+from typing import Annotated, Any
 
 import typer
 from rich.markdown import Markdown
+from rich.padding import Padding
+from rich.syntax import Syntax
 from rich.table import Table
 
 from ..ai.agent import Agent, Answer
@@ -29,9 +31,80 @@ def _plugin_tools() -> list[ToolSpec]:
             for t in registry.ai_tools.values()]
 
 
-def _print(ans: Answer, show_tools: bool) -> None:
+PREVIEW_ROWS = 5
+
+
+def _cell(v: Any) -> str:
+    s = json.dumps(v, default=str) if isinstance(v, (dict, list)) else str(v).replace("\x1f", " > ")
+    return s if len(s) <= 48 else s[:47] + "…"
+
+
+def _preview_table(columns: list[str], rows: list[list[Any]], title: str = "") -> Table:
+    t = Table(title=title or None, title_justify="left", header_style="dim", box=None, padding=(0, 1))
+    for c in columns[:8]:
+        t.add_column(str(c), overflow="ellipsis", no_wrap=True)
+    for r in rows[:PREVIEW_ROWS]:
+        t.add_row(*[_cell(v) for v in r[:8]])
+    if len(rows) > PREVIEW_ROWS:
+        t.add_row(f"[dim]… {len(rows) - PREVIEW_ROWS} more[/]", *[""] * (min(len(columns), 8) - 1))
+    return t
+
+
+def _preview(content: str) -> list[Any]:
+    """A short view of a tool's output: the first rows as a table, or the start of the text."""
+    try:
+        out = json.loads(content)
+    except ValueError:
+        return [f"[dim]{content[:300]}{'…' if len(content) > 300 else ''}[/]"]
+    if isinstance(out, dict) and isinstance(out.get("rows"), list) and out.get("columns"):
+        return [_preview_table(out["columns"], out["rows"])]
+    if isinstance(out, dict) and isinstance(out.get("features"), list):  # history_overview
+        return [_preview_table(["feature", "run", "saved", "alarms", "cost rows"],
+                               [[f["feature"], f["latest_run_id"], str(f["started_at"])[:16], f["alarms"], f["cost_rows"]]
+                                for f in out["features"]])]
+    if isinstance(out, dict) and isinstance(out.get("cost"), dict):  # history_cost
+        parts: list[Any] = [_preview_table(v["columns"], v["rows"], f"{k} · run #{v['run_id']}")
+                            for k, v in out["cost"].items()]
+        parts += [_preview_table(v["columns"], v["rows"], f"{k} findings · run #{v['run_id']}")
+                  for k, v in out.get("findings", {}).items()]
+        if out.get("note"):
+            parts.append(f"[dim]{out['note']}[/]")
+        return parts
+    text = json.dumps(out, default=str)
+    return [f"[dim]{text[:300]}{'…' if len(text) > 300 else ''}[/]"]
+
+
+class LiveSteps:
+    """--show-tools: print each tool call as it starts, then its result and the first rows, as they happen."""
+
+    def __init__(self) -> None:
+        self.n = 0
+
+    def __call__(self, kind: str, name: str, args: dict[str, Any], entry: Any = None, content: str | None = None) -> None:
+        if kind == "start":
+            self.n += 1
+            sql = args.get("sql")
+            other = {k: v for k, v in args.items() if k != "sql"}
+            console.print(f"[bold {BRAND}]▸ {self.n}[/] [bold]{name}[/]"
+                          + (f" [dim]{json.dumps(other, default=str)}[/]" if other else ""))
+            if sql:
+                console.print(Padding(Syntax(sql.strip(), "sql", word_wrap=True, background_color="default"),
+                                      (0, 0, 0, 4)))
+            return
+        if not entry.ok:
+            console.print(f"    [red]✗ {entry.error}[/] [dim]· {entry.ms} ms[/]")
+            return
+        res = f"{entry.rows} row(s)" if entry.rows is not None else "ok"
+        console.print(f"    [green]✓[/] {res} [dim]· {entry.ms} ms[/]")
+        for part in _preview(content or ""):
+            console.print(Padding(part, (0, 0, 0, 4)))
+
+
+def _print(ans: Answer, show_tools: bool, streamed: bool = False) -> None:
+    if streamed and ans.steps:
+        console.rule(style="dim")
     console.print(Markdown(ans.text))
-    if show_tools and ans.steps:
+    if show_tools and ans.steps and not streamed:
         t = Table(title="Tool calls (audit trail)", header_style=f"bold {BRAND}", show_lines=False)
         for c in ("#", "tool", "arguments", "result"):
             t.add_column(c, overflow="fold")
@@ -88,6 +161,12 @@ def ask(
         err.print(f"[red]AI setup:[/] {e}")
         raise typer.Exit(2) from e
     agent = Agent(provider, toolbox, system_prompt(cfg, live), max_steps or cfg.llm.max_steps)
+    streamed = show_tools and not json_out
+    if streamed:  # show every step as it happens, not all at the end
+        from ..ui import activity
+
+        toolbox.on_event = LiveSteps()
+        agent.waiting = lambda: activity(f"[dim]{cfg.llm.model} is thinking[/]")
     err.print(f"[dim]spendlens ask · {provider.label} · {cfg.llm.model} · history: {source.value}"
               f"{' + live AWS' if live else ''}[/]")
     try:
@@ -127,7 +206,7 @@ def ask(
                     "steps": [s.__dict__ for s in ans.steps],
                 }, default=str, indent=2))
             else:
-                _print(ans, show_tools)
+                _print(ans, show_tools, streamed)
             if key and not (ans.refused or ans.hit_step_limit) and ans.text.strip():
                 live_left = toolbox.live_ttls[ttls_before:]
                 ttl = min([cfg.llm.cache.answer_ttl_s, *live_left]) if live_left else cfg.llm.cache.answer_ttl_s

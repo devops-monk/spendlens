@@ -39,7 +39,7 @@ def test_openai_compatible_full_loop_with_audit():
     assert [s["tool"] for s in doc["steps"]] == ["history_overview", "history_query"]
     assert all(s["ok"] for s in doc["steps"])
     first, last = stub.requests[0]["body"], stub.requests[-1]["body"]
-    assert {t["function"]["name"] for t in first["tools"]} == {"history_overview", "history_query"}
+    assert {t["function"]["name"] for t in first["tools"]} == {"history_overview", "history_cost", "history_query"}
     assert first["tool_choice"] == "auto" and first["max_tokens"] == 16000 and "temperature" not in first
     assert first["messages"][0]["role"] == "system" and "read-only" in first["messages"][0]["content"]
     assert [m["role"] for m in last["messages"]][-2:] == ["assistant", "tool"]
@@ -83,7 +83,8 @@ def test_guard_error_goes_back_to_model_and_show_tools():
     assert r.exit_code == 0, r.output
     tool_msg = stub.requests[1]["body"]["messages"][-1]
     assert tool_msg["role"] == "tool" and tool_msg["content"].startswith("ERROR:") and "only SELECT" in tool_msg["content"]
-    assert "Tool calls (audit trail)" in r.output and "delete from findings" in r.output
+    assert "▸ 1 history_query" in r.output and "delete from findings" in r.output and "only SELECT" in r.output
+    assert "▸ 2 history_query" in r.output and "✓ 1 row(s)" in r.output and "Tool calls (audit trail)" not in r.output
 
 
 def test_step_limit():
@@ -91,6 +92,39 @@ def test_step_limit():
         r = ask(stub, "loop", "--max-steps", "2", "--json")
     doc = json.loads(r.stdout[r.stdout.index("{"):])
     assert doc["hit_step_limit"] and len(doc["steps"]) == 2
+
+
+@pytest.mark.parametrize("provider", ["openai_compatible", "anthropic"])
+def test_step_limit_still_answers(provider):
+    script = [("tool", "history_overview", {}), ("tool", "history_overview", {}), ("final", "RDS fell by $308.72.")]
+    with StubLLM(script) as stub:
+        r = ask(stub, "why did rds go down", "--max-steps", "1", "--json", provider=provider)
+        last = stub.requests[-1]["body"]
+    doc = json.loads(r.stdout[r.stdout.index("{"):])
+    assert doc["answer"] == "RDS fell by $308.72." and doc["hit_step_limit"] and len(doc["steps"]) == 1
+    assert any("may be incomplete" in n for n in doc["notes"])
+    assert last["tool_choice"] in ("none", {"type": "none"})  # the final request allows no more tools
+    declined = json.dumps(last["messages"][-1])
+    assert "tool-step limit (1) is reached" in declined
+
+
+def test_history_cost_finds_a_service_by_short_name():
+    from spendlens.ai.tools import Toolbox
+    from spendlens.config import Config
+    from spendlens.history import demo_db_path
+
+    tb = Toolbox(Config(), demo_db_path())
+    out = tb.history_cost("rds")
+    diff = out["cost"]["cost_diff"]["rows"]
+    assert [r[3] for r in diff] == ["Amazon Relational Database Service"] * 2
+    assert len(out["cost"]["cost_trend"]["rows"]) == 6
+    assert any("data-pipeline" in r[3] for r in out["cost"]["cost_breakdown"]["rows"])  # the cause inside RDS
+    assert "rightsize" in out["findings"] and "note" not in out
+    assert tb.history_cost("no-such-service")["note"].startswith("No saved cost rows")
+    o = tb.history_overview()
+    assert "Amazon Relational Database Service" in o["cost_groups_by_spend"]
+    diff_run = next(f for f in o["features"] if f["feature"] == "cost_diff")
+    assert diff_run["periods"] == {"p0": "2026-09", "p1": "2026-10"} and diff_run["dimensions"] == ["service"]
 
 
 def test_live_tools_only_with_flag():

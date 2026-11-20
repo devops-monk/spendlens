@@ -16,8 +16,8 @@ spendlens ask --source demo "Summarise the waste findings"
 | `-i, --interactive` | Keep asking follow-up questions in one conversation |
 | `--source` | History to answer from: `last` (yours, default) or `demo` |
 | `--live` | Also allow read-only live AWS queries through Steampipe |
-| `--show-tools` | Show every tool call and the SQL behind the answer |
-| `--max-steps` | Tool-call limit per question (default `llm.max_steps`, 12) |
+| `--show-tools` | Show each tool call as it runs: the tool, its SQL, the result and the first rows |
+| `--max-steps` | Tool-call limit per question (default `llm.max_steps`, 12). At the limit the assistant answers from what it found and says it may be incomplete |
 | `--json` | The answer plus the full audit trail, machine-readable |
 | `--fresh` | Ignore cached answers and live results; ask and query again |
 
@@ -31,12 +31,26 @@ spendlens brief -o brief.html
 
 ## How it answers
 
-1. It reads `history_overview` to see which saved runs exist.
-2. It queries the history database with `history_query`. This is offline and free.
-3. Only with `--live`, and only when history can't answer, it queries AWS live through Steampipe (below).
-4. It answers with the key numbers, the evidence, and the run each number came from. Savings are labelled as estimates with their source.
+1. It reads `history_overview`: which saved runs exist, each cost run's periods and dimensions, and the exact service names.
+2. For "why did a service's cost change", `history_cost` returns that service's saved cost in every cost run (diff, trend, the breakdown inside it), plus its findings, in one call. Short names work: `rds`, `ec2`, `s3`, `nat`.
+3. Anything else comes from the history database with `history_query`. All three are offline and free.
+4. Only with `--live`, and only when history can't answer, it queries AWS live through Steampipe (below).
+5. It answers with the key numbers, the evidence, and the run each number came from. Savings are labelled as estimates with their source.
 
 Text in tool results (resource names, tags) is treated as data, never as instructions.
+
+With `--show-tools`, every step prints as it happens: the tool and its SQL when it starts, then the row count, the time and the first rows when it returns. A spinner shows while the model is thinking.
+
+```text
+▸ 2 history_cost {"service": "rds"}
+    ✓ 32 row(s) · 2 ms
+    cost_diff · run #7
+     kind  period   dimension  grp                                 amount
+     p0    2026-09  service    Amazon Relational Database Service  9365.26
+     p1    2026-10  service    Amazon Relational Database Service  9056.54
+```
+
+If the step limit is reached, the assistant still answers from what it found and notes that the answer may be incomplete. Raise the limit with `--max-steps`.
 
 ## Live AWS questions: right first time
 
