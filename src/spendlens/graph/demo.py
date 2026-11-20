@@ -30,6 +30,37 @@ def _base(region: str = R) -> dict[str, Any]:
     return {"account_id": ACCOUNT, "region": region}
 
 
+AZ = {"subnet-0priv-a": f"{R}a", "subnet-0priv-b": f"{R}b", "subnet-0pub-a": f"{R}c"}
+IPS = {"i-0payapi1": "10.20.1.11", "i-0payapi2": "10.20.2.12", "i-0legacyrpt": "10.20.1.30",
+       "i-0batchwkr": "10.20.2.40", "i-0searchidx": "10.20.2.13"}
+S3_IP, DDB_IP, WEB_IP = "3.5.64.10", "52.94.24.10", "93.184.216.34"
+
+
+def flows() -> list[dict[str, Any]]:
+    """A week of VPC flow log rows (aggregated per interface and address pair, as the traffic query returns them)."""
+    gb = 1024 ** 3
+
+    def f(eni: str, src: str, dst: str, gbs: float) -> dict[str, Any]:
+        return {"interface_id": eni, "src_addr": src, "dst_addr": dst, "bytes": int(gbs * gb)}
+
+    pay1, pay2, search, batch = (IPS[k] for k in ("i-0payapi1", "i-0payapi2", "i-0searchidx", "i-0batchwkr"))
+    return [
+        # payments-api-1 (AZ a) calls search-indexer (AZ b): cross-AZ, seen at both ends
+        f("eni-0payapi1", pay1, search, 200), f("eni-0searchidx", pay1, search, 200),
+        f("eni-0searchidx", search, pay1, 60), f("eni-0payapi1", search, pay1, 60),
+        # payments-api-2 (private, via the NAT gateway) reads DynamoDB: no DynamoDB endpoint in the VPC
+        f("eni-0payapi2", pay2, DDB_IP, 100), f("eni-0payapi2", DDB_IP, pay2, 300),
+        # ... and S3, through the VPC's S3 gateway endpoint: free
+        f("eni-0payapi2", pay2, S3_IP, 50), f("eni-0payapi2", S3_IP, pay2, 400),
+        # search-indexer fetches from the internet through the NAT gateway
+        f("eni-0searchidx", search, WEB_IP, 50), f("eni-0searchidx", WEB_IP, search, 20),
+        # batch-worker and search-indexer share AZ b: free
+        f("eni-0batchwkr", batch, search, 500),
+        # the NAT gateway's own interface (skipped: counted at the sender) and an interface not collected
+        f("eni-0nat", "10.20.3.5", WEB_IP, 50), f("eni-0elsewhere", "10.9.0.1", "10.9.0.2", 5),
+    ]
+
+
 def rows(link: dict[str, list[dict[str, Any]]] | None = None) -> dict[str, list[dict[str, Any]]]:
     """Rows per Steampipe table. link: {"eip": [{"arn", "region"}], "volume": [{"arn", "region", "size_gb",
     "volume_type"}], "lb": [{"arn", "region"}]} -- resources to reuse from the demo waste alarms."""
@@ -70,6 +101,7 @@ def rows(link: dict[str, list[dict[str, Any]]] | None = None) -> dict[str, list[
                                                                 "NetworkInterfaceId": "eni-0nat"}]})
     t["aws_ec2_network_interface"].append({**_base(), "network_interface_id": "eni-0nat", "status": "in-use",
                                            "interface_type": "nat_gateway", "description": "Interface for NAT Gateway",
+                                           "private_ip_address": "10.20.3.5", "availability_zone": f"{R}c",
                                            "subnet_id": "subnet-0pub-a", "requester_managed": True, "tags": {}})
     t["aws_vpc_eip"].append({**_base(), "arn": _arn("eip", "eipalloc-0nat"), "allocation_id": "eipalloc-0nat",
                              "public_ip": "34.240.1.10", "association_id": "eipassoc-0nat",
@@ -92,6 +124,7 @@ def rows(link: dict[str, list[dict[str, Any]]] | None = None) -> dict[str, list[
             "network_interfaces": [{"NetworkInterfaceId": eni}]})
         t["aws_ec2_network_interface"].append({**_base(), "network_interface_id": eni, "status": "in-use",
                                                "interface_type": "interface", "description": "", "subnet_id": subnet,
+                                               "availability_zone": AZ[subnet], "private_ip_address": IPS[iid],
                                                "attached_instance_id": iid, "attachment_time": launched,
                                                "association_allocation_id": eip, "requester_managed": False,
                                                "tags": {}})

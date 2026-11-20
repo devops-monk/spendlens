@@ -78,8 +78,9 @@ spendlens brief -o brief.html
 3. For questions about specific resources ("what is vol-0abc attached to?", "who owns these untagged volumes?", "what can we clean up?", "why does the NAT gateway cost so much?"), it uses the saved [resource graph](../graph/):
    - `resource_context`: a resource's links, the group's cost, its cleanup group, suggested owner, impact and shared NAT or load balancer cost;
    - `cleanup_groups`: what can be removed together;
-   - `suggested_owners`: owner tags for untagged resources.
-4. Anything else comes from the history database with `history_query`. All six history tools are offline and free.
+   - `suggested_owners`: owner tags for untagged resources;
+   - `traffic_paths`: data transfer by path (cross-AZ, NAT, internet) from VPC flow logs, with gateway-endpoint proposals.
+4. Anything else comes from the history database with `history_query`. All seven history tools are offline and free.
 5. Only with `--live`, and only when history can't answer, it queries AWS live through Steampipe (below).
 6. It answers with the key numbers, the evidence, and the run each number came from. Savings are labelled as estimates with their source.
 

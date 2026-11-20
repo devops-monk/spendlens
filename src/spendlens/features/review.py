@@ -186,14 +186,29 @@ def _group_rows(groups: list[Any], cur: str) -> list[dict[str, Any]]:
     return out
 
 
+def _endpoint_rows(proposals: list[dict[str, Any]], cur: str) -> list[dict[str, Any]]:
+    out = []
+    for p in proposals:
+        amt = round(p["monthly_saving"], 2)
+        out.append({
+            "id": f"endpoint|{p['vpc']}|{p['service']}", "what": p["title"], "resource": p["vpc"] or "-",
+            "full": p["vpc"] or "", "service": "VPC", "region": "", "owner": "", "reason": p["why"],
+            "control": "graph:gateway_endpoint", "amount": amt, "monthly": ch.money(amt, cur, compact=False),
+            "yearly": ch.money(amt * 12, cur), "effort": "low", "kind": "change", "kind_label": KINDS["change"][0],
+            "band": _band(amt), "category": "Data transfer", "source": "spendlens graph traffic", "also": "",
+        })
+    return out
+
+
 def review_rows(d: Data, cfg: Config, groups: list[Any] | None = None,
-                suggested: dict[str, str] | None = None) -> list[dict[str, Any]]:
+                suggested: dict[str, str] | None = None,
+                endpoints: list[dict[str, Any]] | None = None) -> list[dict[str, Any]]:
     """Every proposal to decide. A cleanup group replaces the waste alarms about its own resources, so a saving is
     never counted twice."""
     cur = cfg.pricing.currency
     m = merged_savings(d)
     covered = {(f["control"], f["resource"]) for grp in groups or [] for f in grp.findings}
-    if m is None and not groups:
+    if m is None and not groups and not endpoints:
         return []
     owners = _owners(d, cfg)
     for res, v in (suggested or {}).items():  # untagged: the owner of what it is attached to
@@ -217,6 +232,7 @@ def review_rows(d: Data, cfg: Config, groups: list[Any] | None = None,
             "also": r.get("also_flagged_by") or "",
         })
     out += _group_rows(groups or [], cur)
+    out += _endpoint_rows(endpoints or [], cur)
     out.sort(key=lambda r: -r["amount"])
     return out
 
@@ -249,7 +265,8 @@ def review_page(d: Data, cfg: Config, source: Source, analysis: Analysis, fx: di
     full = view_model(d, cfg, source)
     cl = extra.get("cleanup")
     groups = cl["groups"] if cl else []
-    rows = review_rows(d, cfg, groups, cl["owner"] if cl else None)
+    tr = extra.get("traffic")
+    rows = review_rows(d, cfg, groups, cl["owner"] if cl else None, (tr or {}).get("proposals"))
     notes = {(n.date, n.group): n.explanation for n in analysis.anomaly_notes}
     spikes = [r for r in _anomaly_rows(d) if r.get("direction", "spike") == "spike"]
     vm.update({
@@ -278,8 +295,18 @@ def review_page(d: Data, cfg: Config, source: Source, analysis: Analysis, fx: di
         "cleanup": cleanup_view(cl, cur) if cl else None,
         "suggested_tags": suggested_view(cl["suggestions"], cl["graph"]) if cl and cl["suggestions"] else None,
         "skip_graph": "graph" in extra.get("skipped", []),
+        "traffic": traffic_view(tr, cur) if tr else None,
     })
     return vm
+
+
+def traffic_view(t: dict[str, Any], cur: str) -> dict[str, Any]:
+    return {"total": ch.money(t.get("monthly_cost") or 0, cur), "days": t.get("window_days"), "run": t.get("run"),
+            "bars": [{"label": v["label"], "value": v["monthly_cost"],
+                      "tip": f"{v['label']}: {v['gb_month']:,.0f} GB/month, {ch.money(v['monthly_cost'], cur)}"}
+                     for v in (t.get("by_path") or {}).values() if v["monthly_cost"]],
+            "proposals": t.get("proposals") or [],
+            "top": [r for r in t.get("rows") or [] if r["monthly_cost"]][:8]}
 
 
 def suggested_view(sugg: list[Any], g: Any) -> dict[str, Any]:
@@ -384,8 +411,10 @@ def review(
         for s in skipped:  # left out on request: not in the facts, the AI analysis or the page
             for part in (data.runs, data.findings, data.cost):
                 part.pop(s, None)
+        trun = None if "graph" in skipped else store.latest_run("graph_traffic")
         extra = {"breakdown": breakdown(store, cur), "skipped": skipped,
-                 "cleanup": None if "graph" in skipped else cleanup(store, data, cfg)}
+                 "cleanup": None if "graph" in skipped else cleanup(store, data, cfg),
+                 "traffic": {**trun.meta["traffic"], "run": trun.id} if trun and trun.meta.get("traffic") else None}
     shown = Source.last if source is Source.live else source
     fx = facts(data, view_model(data, cfg, shown), cfg)
     analysis = rules(fx)
@@ -401,7 +430,8 @@ def review(
     out.write_text(html)
     by = f"AI analysis by {analysis.model}" if analysis.by == "ai" else "rule-based summary"
     groups = (extra["cleanup"] or {}).get("groups") or []
-    n = len(review_rows(data, cfg, groups, (extra["cleanup"] or {}).get("owner")))
+    n = len(review_rows(data, cfg, groups, (extra["cleanup"] or {}).get("owner"),
+                        (extra["traffic"] or {}).get("proposals")))
     err.print(f"[green]Wrote[/] {out} ({len(html) // 1024} KiB · {by} · {n} proposals "
               f"to review{f', {len(groups)} cleanup groups' if groups else ''})")
 

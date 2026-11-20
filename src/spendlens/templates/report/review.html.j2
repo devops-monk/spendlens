@@ -6,7 +6,7 @@
 {% set a = vm.a %}{% set cur = vm.currency %}{% set s = vm.cost_diff %}
 
 <nav class="rv-nav" aria-label="Review sections">
-  <a href="#summary">Summary</a><a href="#spend">Spend</a><a href="#anomalies">Anomalies</a><a href="#savings">Savings</a>{% if vm.cleanup %}<a href="#cleanup">Cleanup <span class="rv-count">{{ vm.cleanup.count }}</span></a>{% endif %}
+  <a href="#summary">Summary</a><a href="#spend">Spend</a><a href="#anomalies">Anomalies</a><a href="#savings">Savings</a>{% if vm.cleanup %}<a href="#cleanup">Cleanup <span class="rv-count">{{ vm.cleanup.count }}</span></a>{% endif %}{% if vm.traffic %}<a href="#transfer">Transfer</a>{% endif %}
   <a href="#queue">Review queue{% if vm.review %} <span class="rv-count">{{ vm.review|length }}</span>{% endif %}</a>
   <a href="#governance">{{ "Budget" if vm.skip_tags else "Budget & tags" }}</a><a href="#method">Method</a>
 </nav>
@@ -168,6 +168,19 @@
 <section class="br-section" id="cleanup">
   <h2 class="br-h">Cleanup groups</h2>
   {% call card("Cleanup groups") %}{{ missing("graph orphans") }}{% endcall %}
+</section>
+{% endif %}
+{% if vm.traffic %}{% set tv = vm.traffic %}
+<section class="br-section" id="transfer">
+  <h2 class="br-h">Data transfer</h2>
+  {% call card("Where data transfer costs " ~ tv.total ~ "/month", "From VPC flow logs (run #" ~ tv.run ~ ", last " ~ tv.days ~ " days), priced with your price book; traffic between two collected resources counted once") %}
+    {% if tv.bars %}{{ charts.hbars(tv.bars, label="Data transfer cost by path", fill="var(--series-2)", width=1080, cur=cur) }}{% endif %}
+    {% if tv.top %}<div class="tablewrap"><table><thead><tr><th>Resource</th><th>Path</th><th>To</th><th>Via</th><th class="num">GB/month</th><th class="num">Cost</th></tr></thead><tbody>
+    {% for r in tv.top %}<tr><td>{{ r.resource_name }}</td><td>{{ r.path_label }}</td><td>{{ r.peer_name }}</td><td>{{ r.via_name }}</td><td class="num">{{ "{:,.0f}".format(r.gb_in_month + r.gb_out_month) }}</td><td class="num">{{ charts.money(r.monthly_cost, cur) }}</td></tr>{% endfor %}
+    </tbody></table></div>{% endif %}
+    {% for p in tv.proposals %}<p class="note">· <b>{{ p.title }}</b>: about {{ charts.money(p.monthly_saving, cur) }}/month. {{ p.why }} (In the review queue.)</p>{% endfor %}
+    <p class="note">Every path: <code>spendlens graph traffic --source last -f html -o traffic.html</code>.</p>
+  {% endcall %}
 </section>
 {% endif %}
 

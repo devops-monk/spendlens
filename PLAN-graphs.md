@@ -21,7 +21,13 @@
   - billed costs become monthly rates from the active days, and every node records its `cost_basis`;
   - a `doctor` check for Tailpipe and the CUR;
   - tests use a fake `tailpipe` executable, so no real Tailpipe or AWS is involved.
-- **Next:** phase 6 (data transfer graph from VPC flow logs).
+- **Phase 6 is built:** `graph traffic`.
+  - It reads VPC flow logs with `tailpipe query`, matches each flow to the resource that sent it, and classifies the path: same-AZ, cross-AZ, gateway endpoint, NAT, internet, or inside the VPC.
+  - Prices come from `pricing.*_gb`, and S3 and DynamoDB are recognised from the bundled `ip-ranges.json` subset.
+  - It proposes a gateway endpoint where S3 or DynamoDB traffic goes through a NAT gateway.
+  - Results show in the review's "Data transfer" section and its queue, and the AI has a `traffic_paths` tool.
+  - It needs route tables (collected since phase 4) and network-interface IPs and AZs (added).
+- **Phase 7** (`open`, `find`, report hints) remains.
 
 ## Context
 

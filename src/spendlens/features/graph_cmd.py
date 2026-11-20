@@ -5,6 +5,7 @@
   graph orphans          cleanup groups: connected resources that can be removed together, with one total saving
   graph impact <id>      if this resource is deleted: what breaks, what is left behind unused, what stays
   graph owners           suggested owner tags for untagged resources, from what they are attached to
+  graph traffic          data transfer paths from VPC flow logs (Tailpipe): cross-AZ, NAT, internet, with costs
   graph stats            what was collected, and which sources were skipped (and why)
 
 show, impact, owners and stats read the saved graph (no AWS calls). orphans collects first by default (--source live),
@@ -330,7 +331,7 @@ def graph_show(
         out.write_text(rd.to_json(sub, focus=root, total_monthly_cost=sub.total_cost(),
                                   cleanup_groups=[grp.to_dict() for grp in groups], shared_costs=shared))
     else:
-        vm = {"focus": {"label": n.label, "type": type_label(n.type), "cost": money(n.monthly_cost, cur),
+        vm = {"traffic": None, "focus": {"label": n.label, "type": type_label(n.type), "cost": money(n.monthly_cost, cur),
                         "basis": BASIS.get(n.cost_basis, "estimate").replace("price-book estimates", "estimate")},
               "total": money(sub.total_cost(), cur).removesuffix("/mo"), "count": len(sub.nodes), "depth": depth,
               "svg": rd.svg(sub, focus=root, highlight=in_groups, alarms=alarms, currency=cur, in_page=True,
@@ -379,7 +380,7 @@ def graph_orphans(
                              "already_flagged_by_waste": flagged})
     if fmt is Format.html:
         alarms = ld.alarms
-        vm = {"focus": None, "rows": [], "shared": [], "groups": [group_view(grp, ld.g, cur, alarms=alarms) for grp in groups],
+        vm = {"traffic": None, "focus": None, "rows": [], "shared": [], "groups": [group_view(grp, ld.g, cur, alarms=alarms) for grp in groups],
               "groups_saving": money(total, cur).removesuffix("/mo"), "members": sum(len(grp.members) for grp in groups),
               "flagged": money(flagged, cur).removesuffix("/mo"), "notes": _notes(ld)}
         _page(out or Path("spendlens-cleanup.html"), vm, "Cleanup groups",
@@ -444,6 +445,118 @@ def graph_impact(
     console.print(f"Saves [bold]{money(r['monthly_cost'], cur) or 'no estimate'}[/]"
                   + (f", plus {money(r['left_behind_cost'], cur)} if what is left behind is removed too"
                      if r["left_behind_cost"] else "") + ". [dim]Read-only: nothing was changed.[/]")
+
+
+def load_traffic(source: Source, cfg: Config) -> tuple[dict[str, Any], Loaded]:
+    """(traffic result, the graph it was matched against). live runs the flow-log query now (Tailpipe, local)."""
+    from ..history import HistoryStore, demo_db_path
+
+    if source is Source.live:
+        from ..graph.costs import CostSourceError, tailpipe_runner
+        from ..graph.traffic import analyse, flow_sql
+        from ..ui import activity
+
+        ld = load_graph(Source.last, cfg)
+        try:
+            run = tailpipe_runner(cfg.graph.tailpipe_path)
+            with activity(f"Reading {cfg.graph.flow_days} days of VPC flow logs [dim](Tailpipe, local)[/]"):
+                flows = run(flow_sql(cfg.graph.flow_days))
+        except CostSourceError as e:
+            err.print(f"[red]VPC flow logs unavailable:[/] {e}\n[dim]Needs Tailpipe with the AWS plugin and the "
+                      "aws_vpc_flow_log table collected (see the Resource graph docs). Try --source demo.[/]")
+            raise typer.Exit(1) from e
+        result = analyse(ld.g, flows, cfg.pricing, cfg.graph.flow_days)
+        if cfg.history.enabled:
+            try:
+                with HistoryStore(history_path(cfg)) as store:
+                    saved = {**result, "rows": result["rows"][:500]}
+                    store.save_run("graph_traffic", account_id=ld.account, params=cfg.graph.model_dump(mode="json"),
+                                   meta={**ci_meta(), "traffic": saved, "graph_run": ld.run_id})
+                    store.prune(cfg.history.keep_runs)
+            except Exception as e:  # noqa: BLE001 - history must never break a live run
+                err.print(f"[yellow]Warning: could not save to history: {e}[/]")
+        return result, ld
+    path = demo_db_path() if source is Source.demo else history_path(cfg)
+    try:
+        with HistoryStore(path, read_only=True) as store:
+            run = store.latest_run("graph_traffic")
+    except FileNotFoundError:
+        run = None
+    if run is None:
+        err.print(f"[red]No saved traffic analysis in {path}.[/] Run [bold]spendlens graph traffic[/] (needs Tailpipe "
+                  "with VPC flow logs) or try --source demo.")
+        raise typer.Exit(1)
+    err.print(f"[dim]Using {source.value} traffic: run #{run.id} from {run.started_at}[/]")
+    return run.meta["traffic"], load_graph(source, cfg)
+
+
+@graph_app.command("traffic")
+def graph_traffic(
+    source: Annotated[Source, typer.Option("--source", help="live = read the VPC flow logs now with Tailpipe (local, "
+                                                            "no AWS calls); last = the saved analysis; demo = sample "
+                                                            "data.")] = Source.live,
+    path: Annotated[str | None, typer.Option("--path", help="Only one path: cross_az, nat, internet, endpoint, "
+                                                            "same_az or vpc_other.")] = None,
+    top: Annotated[int, typer.Option("--top", help="Rows to show.")] = 30,
+    fmt: FormatOpt = Format.table,
+    out: OutOpt = None,
+    config: ConfigOpt = None,
+    sets: SetOpt = None,
+) -> None:
+    """Data transfer paths from VPC flow logs, priced: cross-AZ, through a NAT gateway, to the internet.
+
+    Each flow is matched to the resource that sent it (from the saved resource graph). Proposes a gateway endpoint
+    where S3 or DynamoDB traffic goes through a NAT gateway (gateway endpoints are free). Needs Tailpipe with the
+    AWS plugin's aws_vpc_flow_log table; prices from finops.yaml pricing.*_gb.
+    Examples:
+      spendlens graph traffic
+      spendlens graph traffic --path cross_az
+      spendlens graph traffic --source demo -f html -o traffic.html
+    """
+    from ..graph.render import svg as draw
+    from ..graph.traffic import PATHS, drawing
+
+    if path and path not in PATHS:
+        raise typer.BadParameter(f"one of: {', '.join(PATHS)}", param_hint="--path")
+    cfg = load(config, None, sets)
+    cur = cfg.pricing.currency
+    result, ld = load_traffic(source, cfg)
+    rows = [r for r in result["rows"] if not path or r["path"] == path]
+    meta = ReportMeta(title="Data transfer", account_id=ld.account,
+                      extra={"source": source.value, "window_days": result["window_days"],
+                             "monthly_cost": result["monthly_cost"]})
+    table = [{"resource": r["resource_name"], "path": r["path_label"], "to": r["peer_name"], "via": r["via_name"],
+              "gb_in_per_month": r["gb_in_month"], "gb_out_per_month": r["gb_out_month"],
+              "cost_per_month": r["monthly_cost"], "region": r["region"]} for r in rows[:top]]
+    if fmt is Format.html:
+        pic, cols = drawing(ld.g, result)
+        vm = {"focus": None, "rows": [], "shared": [], "groups": [], "notes": [],
+              "traffic": {**result, "rows": rows[:top], "total": money(result["monthly_cost"], cur).removesuffix("/mo"),
+                          "svg": draw(pic, currency=cur, in_page=True, title="Costliest data transfer paths",
+                                      columns=cols)
+                          if pic.edges else "",
+                          "by_path_bars": [{"label": v["label"], "value": v["monthly_cost"],
+                                            "tip": f"{v['label']}: {v['gb_month']:,.0f} GB, {money(v['monthly_cost'], cur)}"}
+                                           for v in result["by_path"].values()]}}
+        _page(out or Path("spendlens-traffic.html"), vm, "Data transfer",
+              f"VPC flow logs, last {result['window_days']} days", cfg)
+        return
+    if fmt is not Format.table:
+        emit(table if fmt is not Format.json else [{**result, "rows": rows}], fmt, out, "Data transfer", meta=meta)
+        return
+    if not table:
+        console.print("[green]No priced data transfer in the window.[/]")
+    else:
+        emit(table, fmt, out, f"Data transfer · {money(result['monthly_cost'], cur)} (monthly rate, last "
+                              f"{result['window_days']} days of flow logs)", meta=meta)
+    for v in result["by_path"].values():
+        err.print(f"  {v['label']}: {v['gb_month']:,.0f} GB/month · {money(v['monthly_cost'], cur)}")
+    for prop in result["proposals"]:
+        console.print(f"[yellow]Proposal:[/] {prop['title']} · saves about {money(prop['monthly_saving'], cur)} "
+                      f"[dim]({prop['why']})[/]")
+    if result["unmatched_interfaces"]:
+        err.print(f"[dim]{result['unmatched_interfaces']} interface(s) in the flow logs are not in the saved graph "
+                  "(another account or region, or collected since): `spendlens graph collect` refreshes it.[/]")
 
 
 class Confidence(str, Enum):

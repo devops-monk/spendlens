@@ -461,6 +461,14 @@ def demo_graph(store: HistoryStore, rng: random.Random) -> None:
     run_id = store.save_run("graph", account_id=ACCOUNT, caller_arn=CALLER, params=Config().graph.model_dump(),
                             meta={**meta, "demo": True}, started_at=datetime(2026, 11, 9, 6, 20, tzinfo=UTC))
     store.save_graph(run_id, *g.to_rows())
+    # a week of VPC flow logs, as `spendlens graph traffic` saves it
+    from spendlens.graph.demo import flows
+    from spendlens.graph.traffic import analyse
+
+    cfg = Config()
+    store.save_run("graph_traffic", account_id=ACCOUNT, caller_arn=CALLER, params=cfg.graph.model_dump(),
+                   meta={"traffic": analyse(g, flows(), cfg.pricing, 7), "graph_run": run_id, "demo": True},
+                   started_at=datetime(2026, 11, 9, 6, 25, tzinfo=UTC))
 
 
 GENERATORS = [demo_tags, demo_finops, demo_costs, demo_phase5, demo_graph]

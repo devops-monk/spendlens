@@ -168,7 +168,11 @@ def _eni(r: dict[str, Any], p: PricingConfig) -> Built:
     n = Node(_arn(r.get("region"), r.get("account_id"), "network-interface", eid), "ec2_network_interface",
              _name(tags, eid), state=r.get("status"), created=_ts(r.get("attachment_time")), tags=tags,
              attrs={"eni_id": eid, "interface_type": r.get("interface_type"), "description": r.get("description") or "",
-                    "attached_to": r.get("attached_instance_id"), "requester_managed": r.get("requester_managed")},
+                    "attached_to": r.get("attached_instance_id"), "requester_managed": r.get("requester_managed"),
+                    "az": r.get("availability_zone"), "subnet_id": r.get("subnet_id"),
+                    "ips": sorted({str(x) for x in [r.get("private_ip_address"), r.get("association_public_ip"),
+                                                    *[(p or {}).get("PrivateIpAddress") for p in
+                                                      _list(r.get("private_ip_addresses"))]] if x})},
              **_common(r))
     refs: list[Ref] = []
     if r.get("association_allocation_id"):
@@ -413,7 +417,8 @@ SOURCES: tuple[Source, ...] = (
         _ami, "AMIs"),
     Source("ec2_network_interface", "aws_ec2_network_interface", _sql(
         "aws_ec2_network_interface", "network_interface_id, status, interface_type, description, attached_instance_id, "
-        "attachment_time, association_allocation_id, requester_managed, subnet_id, tags"), _eni, "network interfaces"),
+        "attachment_time, association_allocation_id, requester_managed, subnet_id, availability_zone, "
+        "private_ip_address, association_public_ip, private_ip_addresses, tags"), _eni, "network interfaces"),
     Source("vpc_eip", "aws_vpc_eip", _sql(
         "aws_vpc_eip", "arn, allocation_id, public_ip, association_id, instance_id, network_interface_id, tags"),
         _eip, "Elastic IPs"),

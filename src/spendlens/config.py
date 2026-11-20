@@ -144,6 +144,9 @@ class PricingConfig(_Strict):
     rds_snapshot_gb_month: float = 0.095
     eip_hour: float = 0.005
     nat_gateway_hour: float = 0.045
+    nat_gateway_gb: float = 0.045  # data processed by a NAT gateway, each direction
+    cross_az_gb: float = 0.01  # charged on each side: 0.02 per GB between two AZs
+    internet_egress_gb: float = 0.09  # first tier, out to the internet
     load_balancer_hour: dict[str, float] = Field(default_factory=lambda: {
         "application": 0.0225, "network": 0.0225, "gateway": 0.0125, "classic": 0.025})
     secret_month: float = 0.40
@@ -289,6 +292,7 @@ class GraphConfig(_Strict):
     # `spendlens cost resources`, else the pricing price book. cur = CUR only; estimate = price book only.
     cost_source: Literal["auto", "cur", "estimate"] = "auto"
     cur_days: int = Field(30, ge=1, le=92)  # CUR window (full days before today)
+    flow_days: int = Field(7, ge=1, le=31)  # VPC flow log window for `graph traffic` (full days before today)
     tailpipe_path: str = Field("tailpipe", pattern=r"^[^;&|`$<>]+$")  # the tailpipe CLI
 
 

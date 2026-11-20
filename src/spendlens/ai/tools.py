@@ -97,6 +97,7 @@ Tables (SQLite):
   attrs JSON) and graph_edges(run_id, from_id, to_id, label, kind ['uses','contains','ref']) for feature 'graph':
   how resources connect (labels: mounts, eni, in subnet, routes via, snapshot, backed by, launched from, public ip,
   forwards to, targets, manages, member, runs). Prefer resource_context / cleanup_groups / suggested_owners.
+  Feature 'graph_traffic' keeps its data transfer analysis in runs.meta: use traffic_paths.
 The latest run of a feature: select max(id) from runs where feature = '...'.
 Always filter findings/cost_rows to one run_id (usually the latest), or you will double count across runs."""
 
@@ -189,6 +190,15 @@ class Toolbox:
                               "key": {"type": "string", "description": "Optional: one tag key, e.g. Team."},
                               "min_confidence": {"type": "string", "description": "Optional: high, medium or low."}}),
                      lambda a: self.suggested_owners(a.get("resource"), a.get("key"), a.get("min_confidence") or "low")),
+            ToolSpec("traffic_paths",
+                     "Data transfer from the saved VPC flow log analysis (spendlens graph traffic): per resource and "
+                     "path (cross_az, nat, internet, endpoint, same_az, vpc_other) the GB per month and monthly cost, "
+                     "the totals per path, and gateway-endpoint proposals. Offline and free. Use it for 'why is NAT "
+                     "so expensive', 'which services talk across AZs', 'should we add an S3 or DynamoDB endpoint'.",
+                     _schema({"path": {"type": "string", "description": "Optional: one path, e.g. nat or cross_az."},
+                              "resource": {"type": "string", "description": "Optional: one resource name or id."},
+                              "top": {"type": "integer", "description": "Optional: rows (default 20)."}}),
+                     lambda a: self.traffic_paths(a.get("path"), a.get("resource"), a.get("top") or 20)),
             ToolSpec("history_query",
                      "Run ONE read-only SQLite SELECT against the spendlens history database (saved findings and "
                      "cost data; no AWS calls, free).\n" + HISTORY_SCHEMA_HINT,
@@ -460,6 +470,29 @@ class Toolbox:
                 "resources": len({x.resource for x in sugg}), "row_count": len(rows),
                 "note": "Suggestions only; spendlens never applies tags. `spendlens graph owners --script "
                         "tag-review.sh` writes the commands for a person to review."}
+
+    def traffic_paths(self, path: str | None, resource: str | None, top: int) -> dict[str, Any]:
+        con = self._history()
+        run = con.execute("select id, started_at, meta from runs where feature = 'graph_traffic' order by id desc "
+                          "limit 1").fetchone()
+        if run is None:
+            return {"note": "No saved data transfer analysis. `spendlens graph traffic` makes one from VPC flow logs "
+                            "collected with Tailpipe; `--source demo` has a sample.", "row_count": 0}
+        t = json.loads(run["meta"] or "{}").get("traffic") or {}
+        rows = t.get("rows") or []
+        if path:
+            rows = [r for r in rows if r["path"] == path]
+        if resource:
+            low = resource.lower()
+            rows = [r for r in rows if low in (r["resource_name"] or "").lower() or low in r["resource"].lower()]
+        keep = ("resource_name", "resource_type", "path_label", "peer_name", "via_name", "gb_in_month", "gb_out_month",
+                "monthly_cost", "region")
+        out = [{k: r.get(k) for k in keep} for r in rows[: max(1, int(top))]]
+        return {"run": {"id": run["id"], "started_at": run["started_at"], "window_days": t.get("window_days")},
+                "by_path": t.get("by_path"), "monthly_cost": t.get("monthly_cost"), "proposals": t.get("proposals"),
+                "rows": out, "row_count": len(out),
+                "note": "Monthly rates from the flow log window, priced with finops.yaml pricing.*_gb; traffic "
+                        "between two collected resources is counted once, by the sender. Estimates for review."}
 
     def history_cost(self, service: str) -> dict[str, Any]:
         con = self._history()

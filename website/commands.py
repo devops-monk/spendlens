@@ -13,7 +13,8 @@ CATEGORIES: list[tuple[str, str, list[str]]] = [
      ["tags", "tags types", "rightsize", "rightsize controls", "waste", "waste controls"]),
     ("Resource graph", "How resources connect and what they cost together: cleanup groups of resources that can be "
      "removed together, suggested owner tags for untagged resources, and what deleting one would affect. show, impact, owners and stats read the saved graph.",
-     ["graph orphans", "graph owners", "graph show", "graph impact", "graph collect", "graph stats"]),
+     ["graph orphans", "graph owners", "graph traffic", "graph show", "graph impact", "graph collect",
+      "graph stats"]),
     ("Cost analysis", "What changed, where, and who owns it, from Cost Explorer. Each period is one bounded request "
      "($0.01 each, billed by AWS).",
      ["cost diff", "cost trend", "cost showback", "cost resources"]),
@@ -41,6 +42,7 @@ TASKS: list[tuple[str, str]] = [
     ("Find groups of resources I can clean up together", "graph orphans"),
     ("See what a resource is connected to before deleting it", "graph impact"),
     ("Find who owns untagged resources", "graph owners"),
+    ("See what NAT gateways and cross-AZ traffic cost", "graph traffic"),
     ("See what changed in my bill since last month", "cost diff"),
     ("See which resources or apps changed inside each service", "cost diff"),
     ("See spend per team, environment or cost centre", "cost showback"),
@@ -140,6 +142,12 @@ RECIPES: dict[str, list[tuple[str, str]]] = {
         ("Only the sure ones, as CSV", "spendlens graph owners --min-confidence high -f csv -o owners.csv"),
         ("Write the tagging commands to review and run yourself", "spendlens graph owners --script tag-review.sh"),
         ("Only the Team tag", "spendlens graph owners -k Team"),
+    ],
+    "graph traffic": [
+        ("Data transfer paths from the last week of VPC flow logs", "spendlens graph traffic"),
+        ("Only cross-AZ traffic", "spendlens graph traffic --path cross_az"),
+        ("As a page with the costliest paths drawn", "spendlens graph traffic -f html -o traffic.html"),
+        ("Try it on the bundled demo data", "spendlens graph traffic --source demo"),
     ],
     "graph impact": [("What breaks or is left behind if it is deleted", "spendlens graph impact vol-0abc123")],
     "graph collect": [

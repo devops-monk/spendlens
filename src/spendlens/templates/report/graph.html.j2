@@ -3,6 +3,27 @@
     name escaped, so they are emitted as markup. -#}
 {% extends "base.html.j2" %}
 {% block main %}
+{% if vm.traffic %}{% set t = vm.traffic %}
+<section class="br-section">
+  <div class="br-kpis">
+    <div class="br-kpi tone-warn"><div class="k">Data transfer</div><div class="v">{{ t.total }}</div><div class="d">per month, priced paths only</div></div>
+    {% for k, v in t.by_path.items() %}<div class="br-kpi"><div class="k">{{ v.label }}</div><div class="v">{{ "{:,.0f}".format(v.gb_month) }} GB</div><div class="d">${{ "{:,.2f}".format(v.monthly_cost) }}/month</div></div>{% endfor %}
+  </div>
+  {% for p in t.proposals %}
+  <article class="card gr-card">
+    <div class="gr-head"><div><span class="gr-kind">Proposal</span><h2>{{ p.title }}</h2></div>
+      <div class="gr-amt">${{ "{:,.2f}".format(p.monthly_saving) }}<span>/month</span></div></div>
+    <p>{{ p.why }}</p><dl class="gr-dl"><dt>Before you do</dt><dd>{{ p.check_first }}</dd></dl>
+  </article>
+  {% endfor %}
+  {% if t.svg %}<div class="card"><h2>Costliest paths</h2><p class="hint">Each line: GB per month and its monthly cost, through the NAT gateway where there is one.</p><div class="gw">{{ t.svg }}</div></div>{% endif %}
+  <div class="card"><h2>Every path</h2>
+    <p class="hint">Monthly rates from the last {{ t.window_days }} days of VPC flow logs; prices from finops.yaml (pricing.*_gb). Traffic between two collected resources is counted once, by the sender.</p>
+    <div class="tablewrap"><table class="sortable"><thead><tr><th>Resource</th><th>Path</th><th>To</th><th>Via</th><th class="num">GB in</th><th class="num">GB out</th><th class="num">Cost</th></tr></thead><tbody>
+    {% for r in t.rows %}<tr><td>{{ r.resource_name }}</td><td>{{ r.path_label }}</td><td>{{ r.peer_name }}</td><td>{{ r.via_name }}</td><td class="num">{{ "{:,.0f}".format(r.gb_in_month) }}</td><td class="num">{{ "{:,.0f}".format(r.gb_out_month) }}</td><td class="num" data-v="{{ r.monthly_cost }}">${{ "{:,.2f}".format(r.monthly_cost) }}</td></tr>{% endfor %}
+    </tbody></table></div></div>
+</section>
+{% endif %}
 {% if vm.focus %}
 <section class="br-section">
   <div class="br-kpis">
@@ -46,7 +67,7 @@
   {% endfor %}
   <p class="note">Costs are estimates from the finops.yaml price book (snapshot costs are an upper bound). Each resource is in at most one group. spendlens never deletes anything: review each group with its owner.</p>
 </section>
-{% elif not vm.focus %}
+{% elif not vm.focus and not vm.traffic %}
 <section class="br-section"><div class="card"><h2>No cleanup groups</h2><p class="empty">Nothing found that can be removed together. Thresholds: <code>graph.*</code> in finops.yaml.</p></div></section>
 {% endif %}
 

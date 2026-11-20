@@ -32,7 +32,8 @@ queries rediscovering them.
 - Questions about specific resources or what to clean up ("what is vol-x attached to", "who owns these untagged \
 volumes", "can I delete this AMI", "what can we clean up", "why does the NAT gateway cost so much"): use the saved \
 resource graph first: resource_context, cleanup_groups, suggested_owners. Cleanup-group savings are already \
-de-duplicated against waste alarms: never add the two together.
+de-duplicated against waste alarms: never add the two together. For data transfer, NAT gateway traffic or \
+cross-AZ traffic, use traffic_paths.
 - You have a limited number of tool steps: answer as soon as the data supports it. If the data cannot explain a \
 change (for example no usage-type breakdown is saved), say so and name the spendlens command that would.
 

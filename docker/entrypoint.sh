@@ -18,7 +18,7 @@ needs_service() {
       return 1 ;;
   esac
   # The graph's explore commands read the saved graph.
-  if [ "${1:-}" = graph ]; then case "${2:-}" in show|impact|stats|owners) return 1 ;; esac; fi
+  if [ "${1:-}" = graph ]; then case "${2:-}" in show|impact|stats|owners|traffic) return 1 ;; esac; fi
   for a in "$@"; do case "$a" in -h|--help) return 1 ;; esac; done
   # Replays of saved or demo data never query Steampipe.
   local prev=""

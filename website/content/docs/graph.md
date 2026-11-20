@@ -7,6 +7,7 @@ spendlens reads how your resources connect, read-only, and saves the result to i
 - **`graph show`** draws any resource with everything it connects to, and what the group costs.
 - **`graph impact`** says what would break, or be left behind, if one resource were deleted.
 - **`graph owners`** suggests owner tags for untagged resources, from what they are attached to.
+- **`graph traffic`** prices data transfer from VPC flow logs: cross-AZ, through NAT gateways, out to the internet.
 
 The relationships follow the [Steampipe AWS Insights mod](https://hub.powerpipe.io/mods/turbot/aws_insights)'s relationship graphs, collected for the whole account at once. spendlens adds the monthly cost of every resource and the waste alarms about it.
 
@@ -106,12 +107,45 @@ A NAT gateway or a load balancer serves many resources. `graph show` splits its 
 
 This is an allocation estimate, labelled as one. Data processing charges are not in the price book.
 
+## Data transfer (VPC flow logs via Tailpipe)
+
+NAT gateway processing, cross-AZ traffic and internet egress are hard to see in the bill. `graph traffic` reads your VPC flow logs with [Tailpipe](https://tailpipe.io) (the AWS plugin's `aws_vpc_flow_log` table), matches each flow to the resource that sent it, and prices the path:
+
+```bash
+spendlens graph traffic                          # last 7 days of flow logs (graph.flow_days)
+spendlens graph traffic --path cross_az
+spendlens graph traffic --source demo -f html -o traffic.html
+```
+
+| Path | How it is recognised | Price (finops.yaml `pricing:`) |
+|---|---|---|
+| Same AZ | Another collected interface in the same AZ | Free |
+| Cross-AZ | Another collected interface in a different AZ | `cross_az_gb` on each side ($0.02/GB in all) |
+| Gateway endpoint | S3 or DynamoDB, from a VPC with a gateway endpoint for it | Free |
+| Through a NAT gateway | A public address, from a subnet whose route table points at a NAT gateway | `nat_gateway_gb` in and out, plus `internet_egress_gb` out (not to S3 or DynamoDB) |
+| Straight to the internet | A public address, from a subnet without a NAT route | `internet_egress_gb` out |
+| Inside the VPC (not collected) | A private address spendlens did not collect, such as peering or an RDS interface | Not priced |
+
+How the numbers are counted:
+- **Recognising S3 and DynamoDB.** Their addresses come from AWS's public `ip-ranges.json`, bundled with spendlens.
+- **Counted at the sender.** Traffic between two collected resources is counted once, by the one that sent it. A NAT gateway's own interface is skipped, because its traffic is already counted at the resource behind it.
+- **Monthly rates.** Costs are monthly rates from the window.
+
+**Proposals.** Where S3 or DynamoDB traffic goes through a NAT gateway and the VPC has no gateway endpoint for it, spendlens proposes adding one. Gateway endpoints for S3 and DynamoDB are free, so the NAT processing charge on that traffic goes away. The proposal appears in `graph traffic`, in the review's **Data transfer** section and in its queue.
+
+**Requirements:**
+- Tailpipe with the AWS plugin, with the flow logs collected (`tailpipe collect aws_vpc_flow_log`);
+- a saved resource graph (`spendlens graph collect`), to match addresses to resources.
+
+spendlens itself makes no AWS calls here. The analysis is saved, so `--source last` replays it, and the AI assistant answers "why is NAT so expensive?" from it with its `traffic_paths` tool.
+
 ## Ask about it
 
-The AI assistant has three tools on the saved graph:
+The AI assistant has four tools on the saved graph and traffic analysis:
 - `resource_context`: what a resource connects to, what it costs, its cleanup group, its owner, and what deleting it would affect;
 - `cleanup_groups`;
-- `suggested_owners`.
+- `suggested_owners`;
+- `traffic_paths`.
 
 Answers saved with `-o` draw the resources they talk about:
 
@@ -150,6 +184,8 @@ Each resource's cost comes from the best source available. See [Billed costs](#b
 | `graph.cost_source` | `auto` | `auto`: the CUR via Tailpipe, else Cost Explorer resource data, else the price book. `cur`: the CUR only. `estimate`: the price book only |
 | `graph.cur_days` | 30 | The CUR window: full days before today |
 | `graph.tailpipe_path` | `tailpipe` | The Tailpipe CLI |
+| `graph.flow_days` | 7 | The VPC flow log window for `graph traffic` |
+| `pricing.nat_gateway_gb` · `cross_az_gb` · `internet_egress_gb` | 0.045 · 0.01 · 0.09 | Data transfer prices (USD per GB) |
 
 ## Billed costs (CUR via Tailpipe)
 

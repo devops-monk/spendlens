@@ -175,3 +175,49 @@ def test_collect_prices_from_the_cur_via_tailpipe(fake_steampipe, tmp_path):
     # without Tailpipe or Cost Explorer data, the price book, said plainly
     r = run("graph", "collect", "--set", "graph.tailpipe_path=/nonexistent/tailpipe")
     assert "price-book estimates" in r.output and "spendlens cost resources" in r.output
+
+
+def test_traffic_demo_table_html_json(tmp_path):
+    r = run("graph", "traffic", "--source", "demo")
+    assert "payments-api-2" in r.output and "Through a NAT gateway" in r.output and "DynamoDB" in r.output
+    assert "Proposal: Add a DynamoDB gateway endpoint to vpc-0prod" in r.output
+    r = run("graph", "traffic", "--source", "demo", "--path", "cross_az", "-f", "csv", "-o", str(tmp_path / "t.csv"))
+    lines = (tmp_path / "t.csv").read_text().splitlines()
+    assert len(lines) == 3 and all("Cross-AZ" in ln for ln in lines[1:])
+    run("graph", "traffic", "--source", "demo", "-f", "html", "-o", str(tmp_path / "t.html"))
+    html = (tmp_path / "t.html").read_text()
+    assert "Costliest paths" in html and '<svg class="slg in-page"' in html and "Add a DynamoDB gateway endpoint" in html
+    assert runner.invoke(app, ["graph", "traffic", "--source", "demo", "--path", "nope"]).exit_code == 2
+
+
+def test_traffic_live_reads_flow_logs_with_tailpipe(fake_steampipe, tmp_path):
+    import stat
+
+    from spendlens.graph.demo import flows
+
+    run("graph", "collect", "--set", "graph.tailpipe_path=/nonexistent/tailpipe")  # the graph to match flows against
+    (tmp_path / "out.json").write_text(json.dumps({"columns": [], "rows": flows()}))
+    exe = tmp_path / "tailpipe"
+    exe.write_text(f'#!/bin/sh\necho "$@" > "{tmp_path}/args"\ncat "{tmp_path}/out.json"\n')
+    exe.chmod(exe.stat().st_mode | stat.S_IEXEC)
+    r = run("graph", "traffic", "--set", f"graph.tailpipe_path={exe}")
+    assert "DynamoDB gateway endpoint" in r.output
+    assert "from aws_vpc_flow_log" in (tmp_path / "args").read_text()
+    r = run("graph", "traffic", "--source", "last")  # saved, replayed offline
+    assert "payments-api-2" in r.output
+    r = runner.invoke(app, ["graph", "traffic", "--set", "graph.tailpipe_path=/nonexistent/tailpipe"])
+    assert r.exit_code == 1 and "Tailpipe" in " ".join(r.output.split())
+
+
+def test_traffic_ai_tool_and_review_section(tmp_path):
+    from spendlens.ai.tools import Toolbox
+    from spendlens.config import load_config
+    from spendlens.history import demo_db_path
+
+    tb = Toolbox(load_config(environ={}), demo_db_path())
+    d = json.loads(tb.execute("1", "traffic_paths", {"path": "nat"}).content)
+    assert {r["peer_name"] for r in d["rows"]} == {"DynamoDB", "Internet"} and d["proposals"][0]["service"] == "DynamoDB"
+    out = tmp_path / "r.html"
+    run("review", "--source", "demo", "--no-ai", "-o", str(out))
+    html = out.read_text()
+    assert 'id="transfer"' in html and "endpoint|vpc-0prod|DynamoDB" in html

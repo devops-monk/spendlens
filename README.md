@@ -210,6 +210,7 @@ spendlens graph orphans                          # cleanup groups (read-only)
 spendlens graph show i-0abc123 -o graph.html     # what it connects to, and what the group costs
 spendlens graph impact vol-0abc123               # what breaks or is left behind if it is deleted
 spendlens graph owners --script tag-review.sh    # owner tags for untagged resources, from what they're attached to
+spendlens graph traffic                          # NAT, cross-AZ and internet data transfer, from VPC flow logs
 ```
 
 The review shows each group as a small graph, and each group is one item in its queue. With [Tailpipe](https://tailpipe.io) and your Cost and Usage Report, costs are what each resource was actually billed rather than price-book estimates. More: [Resource graph & cleanup](https://spendlens.devops-monk.com/docs/graph/).
@@ -389,7 +390,7 @@ Unknown keys, typos and out-of-range values are rejected, and the error names th
 |---|---|
 | `tags` | Tag compliance across 70 resource types |
 | `rightsize` · `waste` | 65 controls with $/month estimates |
-| `graph orphans` · `owners` · `show` · `impact` | How resources connect: cleanup groups with one total saving each, suggested owner tags for untagged resources, a resource's neighbours drawn as a page, what deleting one affects |
+| `graph orphans` · `owners` · `traffic` · `show` · `impact` | How resources connect: cleanup groups with one total saving each, suggested owner tags for untagged resources, data transfer paths from VPC flow logs, a resource's neighbours drawn as a page, what deleting one affects |
 | `cost diff` · `trend` · `showback` · `resources` | What changed, where, and who owns it |
 | `anomalies` · `forecast` | Daily spikes; month-end projection against budgets |
 | `savings hub` · `commitments` · `summary` | AWS recommendations, coverage, one de-duplicated total (`summary --refresh`: re-check now) |

@@ -90,6 +90,7 @@ SECTIONS: list[tuple[str, str, str, list[tuple[str, str, str]]]] = [
         ("What breaks if I delete this?", "spendlens graph impact vol-0abc123", "offline"),
         ("Who owns untagged volumes, snapshots and IPs?", "spendlens graph owners", "offline"),
         ("Tagging commands to review and run yourself", "spendlens graph owners --script tag-review.sh", "offline"),
+        ("What NAT gateways and cross-AZ traffic cost (VPC flow logs via Tailpipe)", "spendlens graph traffic", "offline"),
         ("Try it on sample data", "spendlens graph orphans --source demo", "offline"),
     ]),
     ("hunt", "Find one kind of waste", "Run a single check when you already know what you're looking for.", [

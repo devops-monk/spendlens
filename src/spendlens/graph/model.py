@@ -28,6 +28,8 @@ TYPES: dict[str, tuple[str, int]] = {
     "ebs_snapshot": ("EBS snapshot", 6),
     "rds_db_snapshot": ("RDS snapshot", 6),
     "ec2_ami": ("AMI", 7),
+    "aws_service": ("AWS service", 8),
+    "internet": ("Internet", 8),
 }
 KINDS = ("uses", "contains", "ref")
 HUBS = ("vpc", "vpc_subnet")

@@ -71,7 +71,7 @@ def test_ai_brief_uses_model_json_and_sanitises(tmp_path):
     assert "read-only" in body["messages"][0]["content"]  # FinOps analyst profile
     facts = body["messages"][1]["content"].split("Facts (JSON):\n", 1)[1]
     assert json.loads(facts)["cost_change"]["to"] == "2026-10"
-    assert {t["function"]["name"] for t in body["tools"]} == {"history_overview", "history_cost", "history_query", "resource_context", "cleanup_groups", "suggested_owners"}  # no live AWS
+    assert {t["function"]["name"] for t in body["tools"]} == {"history_overview", "history_cost", "history_query", "resource_context", "cleanup_groups", "suggested_owners", "traffic_paths"}  # no live AWS
 
 
 def test_ai_failure_falls_back_to_rules(tmp_path):

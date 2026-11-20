@@ -57,12 +57,13 @@ def _clip(s: str, n: int) -> str:
 # ------------------------------------------------------------------ layout
 
 
-def layout(g: Graph, focus: str | None = None) -> tuple[dict[str, tuple[float, float]], list[Node], list[Edge], int, int]:
+def layout(g: Graph, focus: str | None = None, columns: dict[str, int] | None = None,
+           ) -> tuple[dict[str, tuple[float, float]], list[Node], list[Edge], int, int]:
     """Positions by column (type) and barycentre order. Columns longer than MAX_PER_COLUMN fold the rest into one
     "+N more" node, and edges to folded nodes go to it."""
     cols: dict[int, list[Node]] = defaultdict(list)
     for n in sorted(g.nodes.values(), key=lambda n: (n.type, n.label, n.id)):
-        cols[layer(n.type)].append(n)
+        cols[columns[n.id] if columns and n.id in columns else layer(n.type)].append(n)
     order = sorted(cols)
     folded: dict[str, str] = {}
     shown: dict[int, list[Node]] = {}
@@ -119,12 +120,13 @@ def layout(g: Graph, focus: str | None = None) -> tuple[dict[str, tuple[float, f
 
 
 def svg(g: Graph, *, focus: str | None = None, highlight: set[str] | None = None, alarms: set[str] | None = None,
-        currency: str = "USD", in_page: bool = False, title: str = "Resource graph") -> str:
+        currency: str = "USD", in_page: bool = False, title: str = "Resource graph",
+        columns: dict[str, int] | None = None) -> str:
     """An inline SVG. highlight = members of a cleanup group, alarms = resources with a failing check."""
     highlight, alarms = highlight or set(), alarms or set()
     if not g.nodes:
         return Markup("")
-    pos, nodes, edges, w, h = layout(g, focus)
+    pos, nodes, edges, w, h = layout(g, focus, columns)
     out = [(f'<svg class="slg{" in-page" if in_page else ""}" viewBox="0 0 {w} {h}" width="{w}" height="{h}" '
             f'role="img" aria-label="{escape(title)}" xmlns="http://www.w3.org/2000/svg">'),
            f"<title>{escape(title)}</title>"]
