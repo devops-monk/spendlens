@@ -208,6 +208,8 @@ def review_page(d: Data, cfg: Config, source: Source, analysis: Analysis, fx: di
         "savings_notes": (merged_savings(d) or ([], []))[1],
         "tags_by_type": (full["tags"] or {}).get("by_type", []),
         "metric": cfg.cost.metric.replace("_", " "),
+        "skipped": [s.replace("_", " ") for s in extra.get("skipped", [])],
+        "skip_tags": "tags" in extra.get("skipped", []),
         "review_key": d.account or ("demo" if source is Source.demo else "local"),
         "findings": {f: (full[f] or {}).get("hint") for f in ("rightsize", "waste")},
     })
@@ -246,6 +248,8 @@ def review(
     refresh: Annotated[bool, typer.Option("--refresh", help="Re-run every section live now, even ones run today.")] = False,
     max_steps: Annotated[int | None, typer.Option("--max-steps", help="Tool calls the AI may make (default 6).")] = None,
     fresh: Annotated[bool, typer.Option("--fresh", help="Write a new AI analysis even if one exists for this data.")] = False,
+    skip: Annotated[list[str] | None, typer.Option(
+        "--skip", help=f"Leave a check out: not run, not sent to the AI, not shown (repeatable). One of: {', '.join(FEATURES)}.")] = None,
     config: ConfigOpt = None,
     profile: ProfileOpt = None,
     sets: SetOpt = None,
@@ -261,13 +265,18 @@ def review(
       spendlens review --source demo -o review.html
       spendlens review --source last --no-ai -o review.html
       spendlens review --refresh -o review.html
+      spendlens review --skip tags -o review.html     # no tagging check
     """
+    skipped = sorted(set(skip or []))
+    if bad := [s for s in skipped if s not in FEATURES]:
+        raise typer.BadParameter(f"Unknown check(s): {', '.join(bad)}. Checks: {', '.join(FEATURES)}", param_hint="--skip")
+    features = tuple(f for f in FEATURES if f not in skipped)
     cfg = load(config, profile, sets)
     path = demo_db_path() if source is Source.demo else history_path(cfg)
     if source is Source.live:
         from .. import refresh as rf
 
-        rf.ensure_fresh(path, FEATURES, config=config, profile=profile, refresh=refresh)
+        rf.ensure_fresh(path, features, config=config, profile=profile, refresh=refresh)
     elif refresh:
         raise typer.BadParameter("--refresh runs sections live: drop --source last/demo.", param_hint="--refresh")
     try:
@@ -278,7 +287,10 @@ def review(
     cur = cfg.pricing.currency
     with store:
         data = Data(store)
-        extra = {"breakdown": breakdown(store, cur)}
+        for s in skipped:  # left out on request: not in the facts, the AI analysis or the page
+            for part in (data.runs, data.findings, data.cost):
+                part.pop(s, None)
+        extra = {"breakdown": breakdown(store, cur), "skipped": skipped}
     shown = Source.last if source is Source.live else source
     fx = facts(data, view_model(data, cfg, shown), cfg)
     analysis = rules(fx)

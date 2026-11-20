@@ -8,7 +8,7 @@
 <nav class="rv-nav" aria-label="Review sections">
   <a href="#summary">Summary</a><a href="#spend">Spend</a><a href="#anomalies">Anomalies</a><a href="#savings">Savings</a>
   <a href="#queue">Review queue{% if vm.review %} <span class="rv-count">{{ vm.review|length }}</span>{% endif %}</a>
-  <a href="#governance">Budget &amp; tags</a><a href="#method">Method</a>
+  <a href="#governance">{{ "Budget" if vm.skip_tags else "Budget &amp; tags" }}</a><a href="#method">Method</a>
 </nav>
 
 <section class="br-top" id="summary">
@@ -31,7 +31,7 @@
 <section class="br-section">
   <ol class="rv-how" aria-label="How this review is made">
     <li><b>AWS</b><span>Cost Explorer, Cost Optimization Hub and read-only resource checks</span></li>
-    <li><b>spendlens checks</b><span>cost diff, trend, anomalies, forecast, tags, rightsizing, waste</span></li>
+    <li><b>spendlens checks</b><span>cost diff, trend, anomalies, forecast{{ '' if vm.skip_tags else ', tags' }}, rightsizing, waste</span></li>
     <li><b>Figures</b><span>computed and de-duplicated by spendlens, never by the AI</span></li>
     <li><b>{{ "AI analyst" if a.by == "ai" else "Summary" }}</b><span>{{ "explains the figures in plain English" if a.by == "ai" else "rule-based explanation of the figures" }}</span></li>
     <li class="you"><b>You decide</b><span>approve, defer or reject each saving, then export</span></li>
@@ -194,12 +194,14 @@
       {% if vm.forecast %}{% for m in vm.forecast.meters %}{{ charts.meter(m.name, m.pct, m.status, m.detail) }}{% endfor %}
       {% else %}{{ missing("forecast") }}{% endif %}
     {% endcall %}
+    {% if not vm.skip_tags %}
     {% call card("Tag compliance", "Share of resources passing each tagging check") %}
       {% if vm.tags %}{% for m in vm.tags.meters %}{{ charts.meter(m.name, m.pct, m.status, m.detail) }}{% endfor %}
       {% else %}{{ missing("tags") }}{% endif %}
     {% endcall %}
+    {% endif %}
   </div>
-  {% if vm.tags_by_type %}
+  {% if vm.tags_by_type and not vm.skip_tags %}
   {% call card("Where tags are missing", "Tag alarms by resource type") %}{{ charts.hbars(vm.tags_by_type, label="Tag alarms by resource type", fill="var(--series-2)", width=1080, fmt=charts.count) }}{% endcall %}
   {% endif %}
   {% if a.risks %}
@@ -213,6 +215,7 @@
     {% call card("Where each figure comes from", "Latest saved run of each check, " ~ vm.oldest ~ " to " ~ vm.freshest) %}
       <div class="tablewrap"><table><thead><tr><th>Section</th><th>Run</th><th>Saved (UTC)</th></tr></thead><tbody>
       {% for r in vm.ages %}<tr><td>{{ r.section }}</td><td>#{{ r.run }}</td><td>{{ r.date }}</td></tr>{% endfor %}
+      {% for s in vm.skipped %}<tr><td>{{ s }}</td><td colspan="2">left out (--skip)</td></tr>{% endfor %}
       {% if vm.breakdown %}<tr><td>cost breakdown</td><td>#{{ vm.breakdown.run }}</td><td>–</td></tr>{% endif %}
       </tbody></table></div>
     {% endcall %}

@@ -185,6 +185,7 @@ RECIPES: dict[str, list[tuple[str, str]]] = {
         ("Rule-based analysis: nothing sent to an AI provider", "spendlens review --source last --no-ai -o review.html"),
         ("Re-run every section now, then write the review", "spendlens review --refresh -o review.html"),
         ("A new AI analysis even on unchanged data", "spendlens review --fresh -o review.html"),
+        ("Leave the tagging check out: not run, not sent to the AI, not shown", "spendlens review --skip tags -o review.html"),
         ("The review on sample data", "spendlens review --source demo -o demo-review.html"),
     ],
     "brief": [

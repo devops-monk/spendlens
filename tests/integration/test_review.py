@@ -59,6 +59,19 @@ def test_ai_review_uses_the_analyst_and_reuses_the_briefs_analysis(tmp_path):
         assert b.exit_code == 0 and stub.requests == []
 
 
+def test_skip_leaves_a_check_out(tmp_path):
+    out = tmp_path / "r.html"
+    r = run("--source", "demo", "--no-ai", "--skip", "tags", "-o", str(out))
+    assert r.exit_code == 0, r.output
+    html = out.read_text()
+    assert "Tag compliance" not in html and "Where tags are missing" not in html and "Budget &amp; tags" not in html
+    assert "left out (--skip)" in html and "Month-end forecast vs budgets" in html
+    data = payload(html)
+    assert "tag_compliance_pct" not in data["facts"] and "mandatory_tags" not in data["facts"]
+    assert len(data["review"]) == 41  # the savings are untouched
+    assert run("--source", "demo", "--skip", "nope").exit_code == 2
+
+
 def test_refresh_needs_live():
     assert run("--source", "last", "--refresh").exit_code == 2
 

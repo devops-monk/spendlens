@@ -94,8 +94,9 @@ def report(
                                   "--ai" if ai else "--no-ai", "-o", str(out / "brief.html")], timeout,
                         step=f"{total - 1}/{total}"))
     # the full review reuses the brief's AI analysis from the cache (same data), so it costs no extra tokens
+    skip_args = [a for s in skip or [] for a in ("--skip", s)]  # a skipped step stays out of the review too
     results.append(_run("review", [sys.executable, "-m", "spendlens", "review", "--source", hist, *cfg_args, *set_args,
-                                   "--ai" if ai else "--no-ai", "-o", str(out / "review.html")], timeout,
+                                   *skip_args, "--ai" if ai else "--no-ai", "-o", str(out / "review.html")], timeout,
                         step=f"{total}/{total}"))
     (out / "report-steps.json").write_text(json.dumps(results, indent=2))
 

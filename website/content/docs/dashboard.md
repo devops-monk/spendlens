@@ -84,6 +84,7 @@ spendlens review -o review.html                          # AI analysis; reuses t
 spendlens review --source last -o review.html            # saved runs only, no AWS calls
 spendlens review --source last --no-ai -o review.html    # nothing sent to an AI provider
 spendlens review --refresh -o review.html                # re-run every section live first
+spendlens review --skip tags -o review.html              # leave a check out (repeatable)
 spendlens review --source demo -o review.html            # sample data
 ```
 
