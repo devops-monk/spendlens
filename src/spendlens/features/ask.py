@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import time
+from pathlib import Path
 from typing import Annotated, Any
 
 import typer
@@ -133,6 +134,8 @@ def ask(
                                 "across commands. See `spendlens session list`.")] = None,
     new: Annotated[bool, typer.Option("--new", help="Start a new session (with --session NAME: start it over).")] = False,
     resume: Annotated[bool, typer.Option("--continue", "-C", help="Continue the last session used.")] = False,
+    out: Annotated[Path | None, typer.Option("--out", "-o", help="Also save the answer as a page: .html (styled, "
+                                                                 "with the tool calls) or .md.")] = None,
     fresh: Annotated[bool, typer.Option("--fresh", help="Ignore cached answers and live results; ask and query "
                                                         "again (results are still cached for next time).")] = False,
     config: ConfigOpt = None,
@@ -151,6 +154,7 @@ def ask(
       spendlens ask --new "Which ECS services are over-provisioned?"     # start a session
       spendlens ask -C "List them by cluster"                            # follow-up in the same session
       spendlens ask -S ecs "Which of those have no autoscaling?"          # a named session
+      spendlens ask "Which ECS services should be right-sized?" -o ecs.html   # save the answer as a page
     """
     if source is Source.live:
         raise typer.BadParameter("Use --live to allow live AWS queries; --source picks the history (last or demo).",
@@ -208,6 +212,8 @@ def ask(
             first = False
             if key and not fresh and (hit := cache.get("answer", key)):
                 _print_cached(hit, q, json_out)
+                if out:
+                    _save(out, q, hit[0]["answer"], hit[0].get("model") or "", live, hit[0].get("steps") or [])
                 if sess is not None:
                     sess.add(q, hit[0]["answer"], model=hit[0].get("model") or "", live=live, source=source.value,
                              tool_calls=0)
@@ -235,8 +241,11 @@ def ask(
                 ttl = min([cfg.llm.cache.answer_ttl_s, *live_left]) if live_left else cfg.llm.cache.answer_ttl_s
                 cache.put("answer", key, {"answer": ans.text, "model": ans.model, "notes": ans.notes,
                                           "steps": [s.__dict__ for s in ans.steps]}, int(ttl), label=q)
+            if out and ans.text.strip() and not ans.refused:
+                _save(out, q, ans.text, ans.model, live, [s.__dict__ for s in ans.steps])
             if sess is not None and ans.text.strip() and not ans.refused:
-                sess.add(q, ans.text, model=ans.model, live=live, source=source.value, tool_calls=len(ans.steps))
+                sess.add(q, ans.text, model=ans.model, live=live, source=source.value, tool_calls=len(ans.steps),
+                         steps=[s.__dict__ for s in ans.steps])
             if ans.refused and not interactive:
                 raise typer.Exit(4)
     finally:
@@ -245,6 +254,16 @@ def ask(
         if sess is not None and sess.turns:
             err.print(f"[dim]session {sess.name} · {len(sess.turns)} question(s) · follow up with: "
                       f"spendlens ask -C \"...\" (or -S {sess.name})[/]")
+
+
+def _save(out: Path, q: str, answer: str, model: str, live: bool, steps: list) -> None:
+    from datetime import UTC, datetime
+
+    from ..render import answer as page
+
+    page.write(out, [{"question": q, "answer": answer, "model": model, "live": live, "steps": steps,
+                      "at": datetime.now(UTC).isoformat(timespec="seconds")}])
+    err.print(f"[green]Wrote[/] {out}")
 
 
 def _answer_key(cfg, label: str, source: Source, live: bool, db, q: str) -> str:

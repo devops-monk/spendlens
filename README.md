@@ -265,6 +265,7 @@ The assistant answers from saved history first, which is offline and free. It qu
 - **Patient:** slow queries run as background jobs that the model waits for, instead of timing out.
 - **Cached:** live results are reused while fresh (15 min for resources, 5 for metrics, 6 h for Cost Explorer), and the same question on the same data costs no tokens. `--fresh` skips the cache.
 - **Sessions:** `spendlens ask --new "..."` starts a conversation, and `spendlens ask -C "..."` follows up in a later command with the earlier answers remembered. Name one with `-S ecs`; `spendlens session list | show | delete` manages them.
+- **Save it:** `-o answer.html` saves the answer as a styled page (or `.md`); `spendlens session show NAME -o session.html` saves a whole conversation.
 
 Configure it with `llm.*` in `finops.yaml`. See [the AI assistant guide](https://spendlens.devops-monk.com/docs/ai-assistant/).
 

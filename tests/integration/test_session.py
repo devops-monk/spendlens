@@ -73,3 +73,48 @@ def test_continue_needs_a_session_and_names_are_checked(tmp_path):
         Sessions(tmp_path).open("../etc/passwd")
     with StubLLM([("final", "x")]) as stub:
         assert ask(stub, "q", "-C").exit_code == 2
+
+
+ANSWER_MD = """**92 services** can be right-sized.
+
+| Cluster | Service | vCPU | Memory |
+|---|---|---|---|
+| uat1 | stored-card-service | 2.00 | 4 GB |
+
+<script>alert(1)</script> [x](javascript:alert(1))"""
+
+
+def test_answer_saved_as_page_and_markdown(tmp_path):
+    out = tmp_path / "ecs.html"
+    script = [("tool", "history_overview", {}), ("final", ANSWER_MD)]
+    with StubLLM(script) as stub:
+        r = ask(stub, "Which ECS services should be right-sized?", "-o", str(out))
+    assert r.exit_code == 0, r.output
+    html = out.read_text()
+    assert "Which ECS services should be right-sized?" in html and "<table>" in html and "stored-card-service" in html
+    assert "<strong>92 services</strong>" in html and "1 tool call" in html and "history_overview" in html
+    assert "<script>alert(1)</script>" not in html and 'href="javascript:' not in html  # account text stays text
+    with StubLLM([("final", ANSWER_MD)]) as stub:
+        ask(stub, "same as markdown", "-o", str(tmp_path / "a.md"), "--fresh")
+    md = (tmp_path / "a.md").read_text()
+    assert md.startswith("## same as markdown") and "| uat1 | stored-card-service |" in md
+
+
+def test_whole_session_saved_as_one_page(tmp_path):
+    with StubLLM([("final", "first answer")]) as stub:
+        ask(stub, "q one", "-S", "pg")
+    with StubLLM([("final", "second answer")]) as stub:
+        ask(stub, "q two", "-S", "pg")
+    out = tmp_path / "s.html"
+    r = runner.invoke(app, ["session", "show", "pg", "-o", str(out)])
+    assert r.exit_code == 0, r.output
+    html = out.read_text()
+    assert "Session pg" in html and "Question 1" in html and "q two" in html and "second answer" in html
+
+
+def test_prompt_never_writes_html():
+    from spendlens.ai.prompts import system_prompt
+    from spendlens.config import load_config
+
+    p = system_prompt(load_config(environ={}), False)
+    assert "Never write HTML" in p and "-o report.html" in p

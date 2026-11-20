@@ -23,6 +23,7 @@ spendlens ask --source demo "Summarise the waste findings"
 | `--new` | Start a new session that later questions can follow up (with `-S NAME`: start that session over) |
 | `-C, --continue` | Follow up in the last session used: the assistant remembers its earlier questions and answers |
 | `-S, --session NAME` | Continue (or start) a named session |
+| `-o, --out FILE` | Also save the answer as a page: `.html` (styled, light and dark, with the tool calls) or `.md` |
 
 ## Sessions: follow up across commands
 
@@ -40,9 +41,21 @@ Each session stores the questions and the final answers in `sessions/<name>.json
 | Command | What it does |
 |---|---|
 | `spendlens session list` | Every session, most recent first; `*` marks the one `-C` continues |
-| `spendlens session show [NAME]` | The questions and answers of a session (default: the current one) |
+| `spendlens session show [NAME]` | The questions and answers of a session (default: the current one); `-o session.html` saves them all as one page |
 | `spendlens session delete NAME` | Delete one session |
 | `spendlens session clear --yes` | Delete every session |
+
+## Save an answer as a page
+
+Ask for a report and the assistant writes Markdown, never HTML. Add `-o` and spendlens saves the answer as a self-contained page in the same style as the other reports, with the question, the answer's tables and a "How it was answered" list of every tool call:
+
+```bash
+spendlens ask --live "Which ECS services should be right-sized? Name each service." -o ecs-rightsize.html
+spendlens ask -C "Which of those have no autoscaling?" -o ecs-autoscaling.md
+spendlens session show ecs -o ecs-session.html     # the whole conversation on one page
+```
+
+Raw HTML in an answer is shown as text, so names and tags from your account can never become markup.
 
 ## The executive brief
 

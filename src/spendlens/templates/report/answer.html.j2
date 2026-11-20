@@ -1,0 +1,20 @@
+{#- `spendlens ask -o answer.html` / `spendlens session show -o`: questions and the assistant's answers as a page.
+    Context: turns [{question, html (answer rendered from Markdown, raw HTML disabled), meta, steps}]. -#}
+{% extends "base.html.j2" %}
+{% block main %}
+{% for t in turns %}
+<section class="br-section ans">
+  <p class="eyebrow">{{ "Question" if turns|length == 1 else "Question " ~ loop.index }}</p>
+  <h2 class="br-h">{{ t.question }}</h2>
+  <div class="card ans-body">{{ t.html }}</div>
+  <p class="note">{{ t.meta }}</p>
+  {% if t.steps %}
+  <details class="ans-steps"><summary>How it was answered: {{ t.steps|length }} tool call{{ "" if t.steps|length == 1 else "s" }}</summary>
+    <div class="tablewrap"><table><thead><tr><th>#</th><th>Tool</th><th>Query / arguments</th><th>Result</th></tr></thead><tbody>
+    {% for s in t.steps %}<tr><td>{{ loop.index }}</td><td>{{ s.tool }}</td><td><code class="ans-sql">{{ s.args }}</code></td><td>{{ s.result }}</td></tr>{% endfor %}
+    </tbody></table></div>
+  </details>
+  {% endif %}
+</section>
+{% endfor %}
+{% endblock %}

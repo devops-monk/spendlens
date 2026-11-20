@@ -329,3 +329,13 @@ td.mx-cell.empty-cell{color:var(--muted);background:transparent}
 @media (max-width:900px){.rv-how{grid-template-columns:1fr 1fr}.rv-how li::after{display:none}}
 @media (max-width:640px){.rv-how{grid-template-columns:1fr}.rv-gloss{grid-template-columns:1fr}.rv-gloss dd{margin-bottom:6px}}
 @media print{.rv-nav,.rv-tools,.rv-note,.rv-legend{display:none}.rv-dec button:not([aria-pressed="true"]){display:none}.rv-table tr.rv-hide{display:table-row}}
+/* ask answers saved as a page */
+.ans .eyebrow{color:var(--ink-2);font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;margin:0 0 4px}
+.ans-body{font-size:15px;line-height:1.6}.ans-body>:first-child{margin-top:0}.ans-body>:last-child{margin-bottom:0}
+.ans-body h1,.ans-body h2,.ans-body h3{font-size:17px;margin:20px 0 8px}
+.ans-body table{display:block;overflow-x:auto;margin:10px 0}.ans-body th,.ans-body td{text-align:left;vertical-align:top}
+.ans-body code{font-size:13px;background:var(--surface-2,rgba(127,127,127,.12));padding:1px 5px;border-radius:5px}
+.ans-body pre{overflow-x:auto;padding:12px;border-radius:10px;background:var(--surface-2,rgba(127,127,127,.12))}
+.ans-steps{margin:6px 0 0}.ans-steps summary{cursor:pointer;color:var(--ink-2);font-size:13px}
+.ans-sql{white-space:pre-wrap;word-break:break-word;font-size:12px}
+@media print{.ans-steps{display:none}}

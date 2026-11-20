@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Annotated
 
 import typer
@@ -47,13 +48,21 @@ def session_list(config: ConfigOpt = None) -> None:
 def session_show(
     name: Annotated[str | None, typer.Argument(help="Session name (default: the current one).")] = None,
     config: ConfigOpt = None,
+    out: Annotated[Path | None, typer.Option("--out", "-o", help="Save the whole session as a page (.html) or .md.")] = None,
 ) -> None:
-    """The questions and answers of a session."""
+    """The questions and answers of a session (-o: save them as one HTML page or Markdown file)."""
     s = _sessions(config)
     try:
         x = s.get(name or s.current() or "")
     except SessionError as e:
         raise _fail(SessionError("No current session. See: spendlens session list") if not name else e) from e
+    if out:
+        from ..render import answer as page
+
+        page.write(out, x.turns, title=f"Session {x.name}",
+                   subtitle=f"{len(x.turns)} question(s) · started {x.created[:16].replace('T', ' ')} UTC")
+        err.print(f"[green]Wrote[/] {out}")
+        return
     console.print(f"[bold {BRAND}]Session {x.name}[/] [dim]· {len(x.turns)} question(s) · started "
                   f"{x.created[:16].replace('T', ' ')} UTC[/]")
     for i, t in enumerate(x.turns, 1):

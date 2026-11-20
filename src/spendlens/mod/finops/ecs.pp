@@ -89,7 +89,12 @@ control "ecs_task_cpu_over_max" {
       'Task ' || split_part(task_arn, '/', 3) || ' (' || coalesce("group", '-') || ') in ' || cluster_name
         || ' has ' || round(cpu::numeric / 1024, 2) || ' vCPU (max ' || $1 || ').' as reason,
       cluster_name,
-      round(cpu::numeric / 1024, 2) as vcpu
+      case when "group" like 'service:%' then substr("group", 9) end as ecs_service,
+      split_part(split_part(task_definition_arn, '/', 2), ':', 1) as task_family,
+      launch_type,
+      round(cpu::numeric / 1024, 2) as vcpu,
+      round(memory::numeric / 1024, 2) as memory_gb,
+      $1::numeric as max_vcpu
       ${local.tag_dimensions_sql}
       ${local.common_dimensions_sql}
     from
@@ -122,7 +127,12 @@ control "ecs_task_memory_over_max" {
       'Task ' || split_part(task_arn, '/', 3) || ' (' || coalesce("group", '-') || ') in ' || cluster_name
         || ' has ' || round(memory::numeric / 1024, 2) || ' GB memory (max ' || $1 || ' GB).' as reason,
       cluster_name,
-      round(memory::numeric / 1024, 2) as memory_gb
+      case when "group" like 'service:%' then substr("group", 9) end as ecs_service,
+      split_part(split_part(task_definition_arn, '/', 2), ':', 1) as task_family,
+      launch_type,
+      round(cpu::numeric / 1024, 2) as vcpu,
+      round(memory::numeric / 1024, 2) as memory_gb,
+      $1::numeric as max_memory_gb
       ${local.tag_dimensions_sql}
       ${local.common_dimensions_sql}
     from

@@ -66,9 +66,10 @@ class Session:
             out.append((t["question"], a if len(a) <= ANSWER_CHARS else a[:ANSWER_CHARS] + "\n[answer shortened]"))
         return out
 
-    def add(self, question: str, answer: str, *, model: str, live: bool, source: str, tool_calls: int) -> None:
+    def add(self, question: str, answer: str, *, model: str, live: bool, source: str, tool_calls: int,
+            steps: list[dict[str, Any]] | None = None) -> None:
         self.turns.append({"at": _now(), "question": question, "answer": answer, "model": model, "live": live,
-                           "source": source, "tool_calls": tool_calls})
+                           "source": source, "tool_calls": tool_calls, "steps": steps or []})
         self.updated = _now()
         self.save()
 

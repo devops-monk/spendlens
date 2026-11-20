@@ -218,6 +218,7 @@ RECIPES: dict[str, list[tuple[str, str]]] = {
         ("Start a session, then follow up in later commands", "spendlens ask --new \"Which ECS services are over-provisioned?\""),
         ("…a follow-up that remembers the earlier answers", "spendlens ask -C \"List them by cluster\""),
         ("A named session", "spendlens ask -S ecs \"Which of those have no autoscaling?\""),
+        ("Save the answer as a page", "spendlens ask \"Which ECS services should be right-sized?\" -o ecs.html"),
         ("On sample data", "spendlens ask --source demo \"Summarise the waste findings\""),
         ("Machine-readable answer and audit trail", "spendlens ask \"Top savings?\" --json"),
         ("Skip the cache: ask and query again", "spendlens ask --live --fresh \"How many instances are running?\""),
@@ -228,6 +229,7 @@ RECIPES: dict[str, list[tuple[str, str]]] = {
     "session show": [
         ("The questions and answers of the current session", "spendlens session show"),
         ("…of a named session", "spendlens session show ecs"),
+        ("The whole session as one HTML page", "spendlens session show ecs -o ecs-session.html"),
     ],
     "session delete": [
         ("Delete one session", "spendlens session delete ecs"),

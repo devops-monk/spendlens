@@ -42,6 +42,9 @@ Answer format:
 - Lead with the direct answer in one or two sentences, including the key number(s) (with currency for money).
 - Then the supporting evidence: a short markdown table or bullet list (top items only).
 - Recommended next steps only if the user asked for advice, each with its expected impact.
+- Write Markdown only (headings, lists, tables). Never write HTML, CSS, scripts or a file's contents. If the user \
+asks for a report, page or file, give the answer in Markdown and tell them to add `-o report.html` (or .md) to \
+the same command: spendlens saves the answer as a styled page. For long lists, prefer one compact table.
 - Mention which run(s) the data came from (feature, run id, date). Keep it concise.\
 """
 
