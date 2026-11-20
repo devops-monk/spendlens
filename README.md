@@ -36,8 +36,14 @@
 <p align="center"><sub>One self-contained HTML report, shown with the bundled demo data.</sub></p>
 
 > [!NOTE]
-> v0.3.2. spendlens is tested end to end through Steampipe against an AWS emulator. Verification against a live
+> v0.3.3. spendlens is tested end to end through Steampipe against an AWS emulator. Verification against a live
 > account with a read-only role is next (see [PLAN.md](PLAN.md)).
+
+## New in 0.3.3
+
+- **"Why did RDS cost change?" in a few steps.** A new `history_cost` tool gives the assistant a service's saved cost in every cost run (diff, trend, the breakdown inside it) plus its findings in one call; short names like `rds`, `ec2`, `nat` work. The first overview also lists each cost run's periods and exact service names.
+- **Always an answer.** At the tool-step limit the assistant answers from what it found and says it may be incomplete, instead of giving up.
+- **`--show-tools` is live.** Each tool call prints as it runs: the tool, its SQL, the row count, the time and the first rows, with a spinner while the model thinks.
 
 ## New in 0.3.2
 
