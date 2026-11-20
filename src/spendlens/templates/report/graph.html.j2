@@ -1,0 +1,62 @@
+{#- `spendlens graph show -o x.html` (one resource and its neighbours) and `spendlens graph orphans -f html`
+    (cleanup groups). Context: vm (features/graph_cmd.py). SVGs are built by spendlens.graph.render with every
+    name escaped, so they are emitted as markup. -#}
+{% extends "base.html.j2" %}
+{% block main %}
+{% if vm.focus %}
+<section class="br-section">
+  <div class="br-kpis">
+    <div class="br-kpi"><div class="k">Resource</div><div class="v gr-v">{{ vm.focus.label }}</div><div class="d">{{ vm.focus.type }}</div></div>
+    <div class="br-kpi"><div class="k">Its own cost</div><div class="v">{{ vm.focus.cost or "–" }}</div><div class="d">estimate, per month</div></div>
+    <div class="br-kpi"><div class="k">With everything shown</div><div class="v">{{ vm.total }}</div><div class="d">{{ vm.count }} resources within {{ vm.depth }} link{{ "s" if vm.depth != 1 }}</div></div>
+    <div class="br-kpi tone-{{ 'warn' if vm.groups else 'good' }}"><div class="k">In cleanup groups</div><div class="v">{{ vm.groups|length }}</div><div class="d">{{ vm.groups_saving }}/month to review</div></div>
+  </div>
+  <div class="card">
+    <h2>How {{ vm.focus.label }} connects</h2>
+    <p class="hint">Hover a resource to see its links. Orange: in a cleanup group · red: a failing check · dashed line: a reference (each side lives on without the other).</p>
+    <div class="gw">{{ vm.svg }}</div>
+  </div>
+</section>
+{% endif %}
+
+{% if vm.groups %}
+<section class="br-section" id="groups">
+  {% if vm.focus %}<h2 class="br-h">Cleanup groups here</h2>{% endif %}
+  {% if not vm.focus %}
+  <div class="br-kpis">
+    <div class="br-kpi tone-warn"><div class="k">Potential saving</div><div class="v">{{ vm.groups_saving }}</div><div class="d">per month, {{ vm.groups|length }} group{{ "s" if vm.groups|length != 1 }}</div></div>
+    <div class="br-kpi"><div class="k">Resources</div><div class="v">{{ vm.members }}</div><div class="d">that can be removed together</div></div>
+    <div class="br-kpi"><div class="k">Already flagged by waste</div><div class="v">{{ vm.flagged }}</div><div class="d">of the saving; the rest is new</div></div>
+  </div>
+  {% endif %}
+  {% for g in vm.groups %}
+  <article class="card gr-card">
+    <div class="gr-head"><div><span class="gr-kind">{{ g.kind_label }}</span><h2>{{ g.title }}</h2></div>
+      <div class="gr-amt">{{ g.saving }}<span>/month</span></div></div>
+    <ul class="gr-ev">{% for e in g.evidence %}<li>{{ e }}</li>{% endfor %}</ul>
+    {% if g.svg %}<div class="gw mini">{{ g.svg }}</div>{% endif %}
+    <dl class="gr-dl"><dt>Action</dt><dd>{{ g.action }}</dd><dt>Before you do</dt><dd>{{ g.risk }}</dd>
+      {% if g.owner %}<dt>Owner</dt><dd>{{ g.owner }}</dd>{% endif %}
+      {% if g.findings %}<dt>Waste checks</dt><dd>{{ g.findings|length }} of these resources are already flagged ({{ g.findings_saving }}/month).</dd>{% endif %}</dl>
+    <details><summary>{{ g.rows|length }} resource{{ "s" if g.rows|length != 1 }}</summary>
+      <div class="tablewrap"><table><thead><tr><th>Type</th><th>Name</th><th>State</th><th class="num">Cost</th><th>ID</th></tr></thead><tbody>
+      {% for r in g.rows %}<tr><td>{{ r.type }}</td><td>{{ r.name }}</td><td>{{ r.state }}</td><td class="num">{{ r.cost }}</td><td><code>{{ r.id }}</code></td></tr>{% endfor %}
+      </tbody></table></div></details>
+  </article>
+  {% endfor %}
+  <p class="note">Costs are estimates from the finops.yaml price book (snapshot costs are an upper bound). Each resource is in at most one group. spendlens never deletes anything: review each group with its owner.</p>
+</section>
+{% elif not vm.focus %}
+<section class="br-section"><div class="card"><h2>No cleanup groups</h2><p class="empty">Nothing found that can be removed together. Thresholds: <code>graph.*</code> in finops.yaml.</p></div></section>
+{% endif %}
+
+{% if vm.rows %}
+<section class="br-section">
+  <div class="card"><h2>Resources shown</h2>
+    <div class="tablewrap"><table class="sortable"><thead><tr><th>Type</th><th>Name</th><th>State</th><th class="num">Cost</th><th>Region</th><th>ID</th></tr></thead><tbody>
+    {% for r in vm.rows %}<tr><td>{{ r.type }}</td><td>{{ r.name }}</td><td>{{ r.state }}</td><td class="num" data-v="{{ r.amount }}">{{ r.cost }}</td><td>{{ r.region }}</td><td><code>{{ r.id }}</code></td></tr>{% endfor %}
+    </tbody></table></div></div>
+</section>
+{% endif %}
+{% for n in vm.notes %}<p class="note">· {{ n }}</p>{% endfor %}
+{% endblock %}

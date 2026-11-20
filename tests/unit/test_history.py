@@ -40,7 +40,7 @@ def test_history_v1_db_is_migrated(tmp_path):
         assert s.findings(1)[0].service is None
         rid = s.save_run("rightsize", [Finding(control="c", resource="r", status=Status.OK, service="ec2")])
         assert s.findings(rid)[0].service == "ec2"
-        assert s.conn.execute("pragma user_version").fetchone()[0] == 2
+        assert s.conn.execute("pragma user_version").fetchone()[0] == 3
 
 
 

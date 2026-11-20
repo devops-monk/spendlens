@@ -32,6 +32,7 @@ spendlens only reads. It never creates, modifies or deletes AWS resources. Recom
 | Command | Needs |
 |---|---|
 | `tags`, `rightsize`, `waste` | `ReadOnlyAccess` (resource inventory + CloudWatch metrics) |
+| `graph` | `ReadOnlyAccess`, or the Describe/List actions for EC2, EBS, ELB, Auto Scaling, RDS, ECS and Lambda listed in [Resource graph](../graph/#permissions). A missing one skips that type |
 | `cost diff/trend/showback`, `anomalies` | `ce:GetCostAndUsage` |
 | `cost resources` | `ce:GetCostAndUsageWithResources`, plus resource-level data enabled in Cost Explorer settings |
 | `forecast` | `ce:GetCostForecast`, `budgets:ViewBudget` (it falls back to a linear projection without the forecast permission) |

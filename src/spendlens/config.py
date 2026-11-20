@@ -277,6 +277,16 @@ class PowerpipeConfig(_Strict):
     extra_args: list[str] = Field(default_factory=list)  # appended to every powerpipe invocation
 
 
+class GraphConfig(_Strict):
+    """`spendlens graph`: the resource graph and cleanup groups (resources that can be removed together)."""
+
+    stopped_days: int = Field(14, ge=0)  # a stopped instance older than this starts a cleanup group
+    snapshot_orphan_days: int = Field(30, ge=0)  # snapshots of a deleted volume older than this
+    ami_unused_days: int = Field(90, ge=0)  # AMIs no instance or Auto Scaling group uses, older than this
+    rds_snapshot_orphan_days: int = Field(30, ge=0)  # manual RDS snapshots of a deleted database
+    max_nodes: int = Field(150, ge=10, le=2000)  # nodes drawn in one picture (the rest are summarised)
+
+
 class HistoryConfig(_Strict):
     enabled: bool = True  # save every live run to the local SQLite store
     path: str | None = None  # default ~/.local/share/spendlens/spendlens.db; in CI restore/save between jobs
@@ -349,6 +359,7 @@ class Config(_Strict):
     savings: SavingsConfig = Field(default_factory=SavingsConfig)
     dashboard: DashboardConfig = Field(default_factory=DashboardConfig)
     history: HistoryConfig = Field(default_factory=HistoryConfig)
+    graph: GraphConfig = Field(default_factory=GraphConfig)
     aws: AWSConfig = Field(default_factory=AWSConfig)
     powerpipe_vars: dict[str, Any] = Field(default_factory=dict)  # raw passthrough, merged last
     plugins: dict[str, dict[str, Any]] = Field(default_factory=dict)  # per-plugin settings

@@ -38,7 +38,8 @@ REPO_URL = "https://github.com/devops-monk/spendlens"
 NAV = [
     ("Get started", [("", "Introduction"), ("getting-started", "Getting started"), ("configuration", "Configuration"),
                      ("permissions", "IAM permissions"), ("docker", "Docker"), ("ways-to-run", "Ways to run")]),
-    ("Features", [("tags", "Tag compliance"), ("rightsize-waste", "Rightsizing & waste"), ("cost", "Cost analysis"),
+    ("Features", [("tags", "Tag compliance"), ("rightsize-waste", "Rightsizing & waste"),
+                  ("graph", "Resource graph & cleanup"), ("cost", "Cost analysis"),
                   ("anomalies-forecast", "Anomalies & forecast"), ("savings", "Savings"),
                   ("dashboard", "Dashboard & formats"), ("history", "History & sources")]),
     ("AI", [("ai-assistant", "AI assistant")]),
@@ -114,6 +115,7 @@ DOC_INFO = {
     "docker": ("box", "Run the ready-made image, locally or in CI."),
     "tags": ("tag", "Five tag checks across 70 resource types."),
     "rightsize-waste": ("resize", "Oversized, non-standard and idle resources, each priced."),
+    "graph": ("map", "How resources connect, what they cost together, and what can be cleaned up together."),
     "cost": ("chart", "What changed, where, and who owns the spend."),
     "anomalies-forecast": ("pulse", "Daily spikes and the month-end projection against budgets."),
     "savings": ("coins", "One de-duplicated savings number you can defend."),

@@ -11,6 +11,9 @@ CATEGORIES: list[tuple[str, str, list[str]]] = [
      "Run your company standards against every resource. Each result is a finding (alarm, ok, info, skip, error) "
      "with a reason, the resource, account, region and, where it applies, a monthly saving estimate.",
      ["tags", "tags types", "rightsize", "rightsize controls", "waste", "waste controls"]),
+    ("Resource graph", "How resources connect and what they cost together: cleanup groups of resources that can be "
+     "removed together, and what deleting one would affect. show, impact and stats read the saved graph.",
+     ["graph orphans", "graph show", "graph impact", "graph collect", "graph stats"]),
     ("Cost analysis", "What changed, where, and who owns it, from Cost Explorer. Each period is one bounded request "
      "($0.01 each, billed by AWS).",
      ["cost diff", "cost trend", "cost showback", "cost resources"]),
@@ -35,6 +38,8 @@ TASKS: list[tuple[str, str]] = [
     ("Find resources missing mandatory tags", "tags"),
     ("Find oversized or non-standard resources", "rightsize"),
     ("Find idle and orphaned resources I'm paying for", "waste"),
+    ("Find groups of resources I can clean up together", "graph orphans"),
+    ("See what a resource is connected to before deleting it", "graph impact"),
     ("See what changed in my bill since last month", "cost diff"),
     ("See which resources or apps changed inside each service", "cost diff"),
     ("See spend per team, environment or cost centre", "cost showback"),
@@ -118,6 +123,20 @@ RECIPES: dict[str, list[tuple[str, str]]] = {
         ("Fail a CI job (exit 3) on any alarm", "spendlens waste --fail-on-alarm"),
     ],
     "waste controls": [("List every waste check with its service", "spendlens waste controls")],
+    "graph orphans": [
+        ("Collect the graph now (read-only) and list cleanup groups", "spendlens graph orphans"),
+        ("From the saved graph, groups worth at least $20/month", "spendlens graph orphans --source last --min-saving 20"),
+        ("Every group with a small graph, as a page", "spendlens graph orphans -f html -o cleanup.html"),
+        ("Try it on the bundled demo data", "spendlens graph orphans --source demo"),
+    ],
+    "graph show": [
+        ("A resource and its neighbours, as a tree", "spendlens graph show i-0abc123"),
+        ("Three links deep, as an interactive page", "spendlens graph show payments-api -d 3 -o payments.html"),
+        ("As Mermaid for a wiki or pull request", "spendlens graph show vol-0abc123 -o vol.mmd"),
+    ],
+    "graph impact": [("What breaks or is left behind if it is deleted", "spendlens graph impact vol-0abc123")],
+    "graph collect": [("Read the resources and their links, save them", "spendlens graph collect")],
+    "graph stats": [("What was collected, and what was skipped", "spendlens graph stats")],
     "cost diff": [
         ("Last full month vs the month before, by service", "spendlens cost diff"),
         ("This month to date vs the same days last month, by account", "spendlens cost diff --mtd -g account"),

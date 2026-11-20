@@ -6,9 +6,9 @@
 {% set a = vm.a %}{% set cur = vm.currency %}{% set s = vm.cost_diff %}
 
 <nav class="rv-nav" aria-label="Review sections">
-  <a href="#summary">Summary</a><a href="#spend">Spend</a><a href="#anomalies">Anomalies</a><a href="#savings">Savings</a>
+  <a href="#summary">Summary</a><a href="#spend">Spend</a><a href="#anomalies">Anomalies</a><a href="#savings">Savings</a>{% if vm.cleanup %}<a href="#cleanup">Cleanup <span class="rv-count">{{ vm.cleanup.count }}</span></a>{% endif %}
   <a href="#queue">Review queue{% if vm.review %} <span class="rv-count">{{ vm.review|length }}</span>{% endif %}</a>
-  <a href="#governance">{{ "Budget" if vm.skip_tags else "Budget &amp; tags" }}</a><a href="#method">Method</a>
+  <a href="#governance">{{ "Budget" if vm.skip_tags else "Budget & tags" }}</a><a href="#method">Method</a>
 </nav>
 
 <section class="br-top" id="summary">
@@ -131,6 +131,7 @@
   {% call card("Where the savings come from", "From the check that found them to the service they save on") %}
     {{ charts.flow(x.flow, label="Savings by source and service", left="Found by", right="Service", cur=cur) }}
     {% for n in vm.savings_notes %}<p class="note">· {{ n }}</p>{% endfor %}
+    {% if vm.cleanup and vm.cleanup.new_amount %}<p class="note">· <a href="#cleanup">Cleanup groups</a> add <b>{{ vm.cleanup.new }}/month</b> on top of these: resources no single check flags, such as snapshots of a stopped instance's volumes.</p>{% endif %}
   {% endcall %}
   {% if a.actions %}
   {% call card("Recommended next steps", "Prioritised by the " ~ ("AI analyst" if a.by == "ai" else "estimated saving") ~ "; each needs an owner's review") %}
@@ -143,6 +144,32 @@
   {% endif %}
   {% endif %}
 </section>
+
+{% if vm.cleanup %}{% set c = vm.cleanup %}
+<section class="br-section" id="cleanup">
+  <h2 class="br-h">Cleanup groups</h2>
+  <div class="card">
+    <h2>{{ c.count }} group{{ "s" if c.count != 1 }} of resources that can be removed together · {{ c.total }}/month</h2>
+    <p class="hint">From the resource graph (run #{{ c.run }}, {{ c.date }} UTC): how volumes, snapshots, Elastic IPs, AMIs and load balancers connect. {{ c.members }} resources in all; {{ c.new }}/month of it is not flagged by any single check. Each group is one item in the review queue, replacing the waste alarms it includes.</p>
+  </div>
+  {% for g in c.groups %}
+  <article class="card gr-card">
+    <div class="gr-head"><div><span class="gr-kind">{{ g.kind_label }}</span><h2>{{ g.title }}</h2></div>
+      <div class="gr-amt">{{ g.saving }}<span>/month</span></div></div>
+    <ul class="gr-ev">{% for e in g.evidence %}<li>{{ e }}</li>{% endfor %}</ul>
+    {% if g.svg %}<div class="gw mini">{{ g.svg }}</div>{% endif %}
+    <dl class="gr-dl"><dt>Action</dt><dd>{{ g.action }}</dd><dt>Before you do</dt><dd>{{ g.risk }}</dd>
+      {% if g.owner %}<dt>Owner</dt><dd>{{ g.owner }}</dd>{% endif %}</dl>
+  </article>
+  {% endfor %}
+  {% if c.more %}<p class="note">{{ c.more }} more group{{ "s" if c.more != 1 }} in the review queue. All of them: <code>spendlens graph orphans --source last -f html -o cleanup.html</code>.</p>{% endif %}
+</section>
+{% elif not vm.skip_graph %}
+<section class="br-section" id="cleanup">
+  <h2 class="br-h">Cleanup groups</h2>
+  {% call card("Cleanup groups") %}{{ missing("graph orphans") }}{% endcall %}
+</section>
+{% endif %}
 
 <section class="br-section" id="queue">
   <h2 class="br-h">Review queue</h2>
@@ -217,6 +244,7 @@
       {% for r in vm.ages %}<tr><td>{{ r.section }}</td><td>#{{ r.run }}</td><td>{{ r.date }}</td></tr>{% endfor %}
       {% for s in vm.skipped %}<tr><td>{{ s }}</td><td colspan="2">left out (--skip)</td></tr>{% endfor %}
       {% if vm.breakdown %}<tr><td>cost breakdown</td><td>#{{ vm.breakdown.run }}</td><td>–</td></tr>{% endif %}
+      {% if vm.cleanup %}<tr><td>resource graph</td><td>#{{ vm.cleanup.run }}</td><td>{{ vm.cleanup.date }}</td></tr>{% endif %}
       </tbody></table></div>
     {% endcall %}
     {% call card("How to read this review") %}

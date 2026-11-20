@@ -172,3 +172,9 @@
   document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},0);});
  totals();filter();
 })();
+/* resource graphs: hover a node to highlight its links */
+(()=>{document.querySelectorAll('svg.slg').forEach(s=>{if(s.dataset.on)return;s.dataset.on=1;
+const E=[...s.querySelectorAll('.e')];s.querySelectorAll('.n').forEach(n=>{const id=n.dataset.id;
+n.addEventListener('mouseenter',()=>{s.classList.add('dim');n.classList.add('hi');E.forEach(e=>{if(e.dataset.a===id||e.dataset.b===id){
+e.classList.add('hi');const o=e.dataset.a===id?e.dataset.b:e.dataset.a;const m=s.querySelector('.n[data-id="'+CSS.escape(o)+'"]');if(m)m.classList.add('hi');}});});
+n.addEventListener('mouseleave',()=>{s.classList.remove('dim');s.querySelectorAll('.hi').forEach(x=>x.classList.remove('hi'));});});});})();

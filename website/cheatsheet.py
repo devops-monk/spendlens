@@ -82,6 +82,14 @@ SECTIONS: list[tuple[str, str, str, list[tuple[str, str, str]]]] = [
         ("Every rightsizing check, OK ones too, as a filterable report", "spendlens rightsize --status all -f html -o checks.html", "aws"),
         ("Only waste worth $20/month or more, as CSV", "spendlens waste --min-saving 20 -f csv -o waste.csv", "aws"),
     ]),
+    ("graph", "Clean up together", "Connected resources that can be removed together, and what a resource is linked to.", [
+        ("Cleanup groups: a stopped instance with its volumes, IP and snapshots, and more", "spendlens graph orphans", "aws"),
+        ("Every cleanup group with a small graph", "spendlens graph orphans -f html -o cleanup.html", "aws"),
+        ("What a resource connects to, and what the group costs", "spendlens graph show i-0abc123", "offline"),
+        ("Draw it as a page", "spendlens graph show payments-api -o payments.html", "offline"),
+        ("What breaks if I delete this?", "spendlens graph impact vol-0abc123", "offline"),
+        ("Try it on sample data", "spendlens graph orphans --source demo", "offline"),
+    ]),
     ("hunt", "Find one kind of waste", "Run a single check when you already know what you're looking for.", [
         ("Elastic IPs not attached to anything (billed hourly)", "spendlens waste -C vpc_eip_unattached", "aws"),
         ("NAT gateways with no traffic", "spendlens waste -C vpc_nat_gateway_unused", "aws"),
@@ -239,6 +247,6 @@ KINDS = {
 
 # Short labels for the sticky section bar.
 NAV = {"start": "First run", "changed": "Bill changes", "trends": "Trends", "spikes": "Spikes & budget",
-       "waste": "Waste", "hunt": "One check", "tags": "Tags", "savings": "Savings", "fresh": "Fresh reports", "share": "Sharing", "ci": "CI gates",
+       "waste": "Waste", "graph": "Clean up", "hunt": "One check", "tags": "Tags", "savings": "Savings", "fresh": "Fresh reports", "share": "Sharing", "ci": "CI gates",
        "replay": "History", "ai": "AI", "schema": "Schema & cache",
        "scope": "Settings"}

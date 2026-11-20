@@ -12,6 +12,7 @@
       <a href="#principles">Principles</a>
       <a href="#cli">A command</a>
       <a href="#flags">Flags</a>
+      <a href="#graph">Resource graph</a>
       <a href="#report-run">Report run</a>
       <a href="#ask">Ask</a>
       <a href="#ai-tools">AI tools</a>
@@ -167,6 +168,25 @@
     </table></div>
     <p class="arch-note">See the effective settings and where each came from with <code>spendlens params</code>; check
       your setup with <code>spendlens doctor</code>.</p>
+  </div>
+</section>
+
+<section class="section showcase arch alt" id="graph">
+  <div class="wrap sc stack">
+    <div class="sc-text">
+      <div class="sc-title">
+        <p class="t-eyebrow">Resource graph</p>
+        <h2>Follow the money,<br>not one resource.</h2>
+      </div>
+      <div class="sc-copy">
+        <p>A waste check sees "this volume is attached to a stopped instance". The graph sees the whole group: the
+          stopped instance, its volumes, its Elastic IP and the snapshots of those volumes, with one total saving.
+          spendlens reads how resources connect, read-only, prices every one from your price book, and finds
+          <b>cleanup groups</b>: resources that can be removed together, each counted once.</p>
+        <ul class="chips"><li>7 cleanup rules</li><li>Waste alarms linked, not added</li><li><a href="{{ root }}docs/graph/">How it works ›</a></li></ul>
+      </div>
+    </div>
+    <div class="sc-media">{{ diagram("graph_flow") }}</div>
   </div>
 </section>
 

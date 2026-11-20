@@ -7,6 +7,7 @@ dashboard, explained with charts made for it:
   * anomalies: usual vs actual for each spike, with the AI's likely cause;
   * savings: by source and service, a source -> service flow, an effort x value matrix, the kind of change each
     proposal is (configuration change, removal, commitment);
+  * cleanup groups: connected resources that can be removed together (spendlens graph), drawn as small graphs;
   * a review queue: approve, defer or reject every proposal with a note, then export the decisions as CSV;
   * budgets, tag governance, and the data and method behind each figure.
 
@@ -48,6 +49,11 @@ SERVICE_NAMES = {"ebs": "EBS", "ec2": "EC2", "rds": "RDS", "s3": "S3", "vpc": "V
                  "redshift": "Redshift", "eks": "EKS", "ecs": "ECS", "cloudwatch": "CloudWatch", "efs": "EFS",
                  "opensearch": "OpenSearch", "kinesis": "Kinesis", "commitments": "Commitments"}
 WATERFALL_STEPS = 8
+REVIEW_FEATURES = (*FEATURES, "graph")  # the review also shows cleanup groups from the resource graph
+GROUP_SERVICE = {"stopped_instance": "EC2", "idle_load_balancer": "Load balancing", "unused_ami": "EC2",
+                 "orphan_snapshots": "EBS", "unattached_volume": "EBS", "unassociated_eip": "VPC",
+                 "rds_orphan_snapshots": "RDS"}
+GROUPS_SHOWN = 8
 
 
 def _kind(control: str | None, reason: str | None) -> str:
@@ -136,14 +142,53 @@ def breakdown(store: HistoryStore, cur: str) -> dict[str, Any] | None:
             "movers": movers[:12], "run": run.id}
 
 
-def review_rows(d: Data, cfg: Config) -> list[dict[str, Any]]:
+def cleanup(store: HistoryStore, d: Data, cfg: Config) -> dict[str, Any] | None:
+    """Cleanup groups from the latest saved resource graph (spendlens graph orphans), linked to the waste alarms."""
+    from ..graph.analyze import cleanup_groups
+    from ..graph.model import Graph
+    from .graph_cmd import Loaded, owner_keys
+
+    run = store.latest_run("graph")
+    if run is None:
+        return None
+    g = Graph.from_rows(*store.graph(run.id))
+    ld = Loaded(g, run.meta, run.id, run.started_at, run.account_id, d.findings.get("waste", []), Source.last)
+    groups = cleanup_groups(g, cfg.graph, now=ld.now, collected=ld.collected, findings=ld.waste,
+                            owner_keys=owner_keys(cfg))
+    return {"graph": g, "groups": groups, "alarms": ld.alarms, "run": run.id,
+            "date": run.started_at[:16].replace("T", " ")}
+
+
+def _group_rows(groups: list[Any], cur: str) -> list[dict[str, Any]]:
+    out = []
+    for grp in groups:
+        amt = round(max(grp.monthly_saving, grp.findings_saving), 2)
+        effort = "medium" if grp.kind in ("stopped_instance", "unused_ami", "idle_load_balancer") else "low"
+        out.append({
+            "id": f"group|{grp.id}", "what": f"Clean up: {grp.title}", "resource": _short(grp.anchor),
+            "full": grp.anchor, "service": GROUP_SERVICE.get(grp.kind, "EC2"), "region": grp.region or "",
+            "owner": grp.owner, "reason": " ".join(grp.evidence), "control": f"graph:{grp.kind}", "amount": amt,
+            "monthly": ch.money(amt, cur, compact=False), "yearly": ch.money(amt * 12, cur), "effort": effort,
+            "kind": "removal", "kind_label": KINDS["removal"][0], "band": _band(amt), "category": "Cleanup groups",
+            "source": "spendlens graph",
+            "also": f"{len(grp.findings)} waste alarm(s) included" if grp.findings else "",
+        })
+    return out
+
+
+def review_rows(d: Data, cfg: Config, groups: list[Any] | None = None) -> list[dict[str, Any]]:
+    """Every proposal to decide. A cleanup group replaces the waste alarms about its own resources, so a saving is
+    never counted twice."""
     cur = cfg.pricing.currency
     m = merged_savings(d)
-    if m is None:
+    covered = {(f["control"], f["resource"]) for grp in groups or [] for f in grp.findings}
+    if m is None and not groups:
         return []
     owners = _owners(d, cfg)
     out = []
-    for r in sorted(m[0], key=lambda r: -(r["est_monthly_saving"] or 0)):
+    for r in sorted((m or ([], []))[0], key=lambda r: -(r["est_monthly_saving"] or 0)):
+        if (r["control"], r["resource"]) in covered:
+            continue
         amt = r["est_monthly_saving"] or 0
         kind = _kind(r["control"], r.get("reason"))
         out.append({
@@ -157,6 +202,8 @@ def review_rows(d: Data, cfg: Config) -> list[dict[str, Any]]:
             "source": "AWS Cost Optimization Hub" if r["source"] == "cost_optimization_hub" else "spendlens",
             "also": r.get("also_flagged_by") or "",
         })
+    out += _group_rows(groups or [], cur)
+    out.sort(key=lambda r: -r["amount"])
     return out
 
 
@@ -186,7 +233,9 @@ def review_page(d: Data, cfg: Config, source: Source, analysis: Analysis, fx: di
     cur = cfg.pricing.currency
     vm = page(d, cfg, source, analysis, fx)  # everything the brief shows
     full = view_model(d, cfg, source)
-    rows = review_rows(d, cfg)
+    cl = extra.get("cleanup")
+    groups = cl["groups"] if cl else []
+    rows = review_rows(d, cfg, groups)
     notes = {(n.date, n.group): n.explanation for n in analysis.anomaly_notes}
     spikes = [r for r in _anomaly_rows(d) if r.get("direction", "spike") == "spike"]
     vm.update({
@@ -212,8 +261,22 @@ def review_page(d: Data, cfg: Config, source: Source, analysis: Analysis, fx: di
         "skip_tags": "tags" in extra.get("skipped", []),
         "review_key": d.account or ("demo" if source is Source.demo else "local"),
         "findings": {f: (full[f] or {}).get("hint") for f in ("rightsize", "waste")},
+        "cleanup": cleanup_view(cl, cur) if cl else None,
+        "skip_graph": "graph" in extra.get("skipped", []),
     })
     return vm
+
+
+def cleanup_view(cl: dict[str, Any], cur: str) -> dict[str, Any]:
+    from .graph_cmd import group_view
+
+    groups = cl["groups"]
+    total = round(sum(g.monthly_saving for g in groups), 2)
+    new = round(sum(max(g.monthly_saving - g.findings_saving, 0) for g in groups), 2)
+    return {"groups": [group_view(g, cl["graph"], cur, alarms=cl["alarms"]) for g in groups[:GROUPS_SHOWN]],
+            "count": len(groups), "more": max(len(groups) - GROUPS_SHOWN, 0), "total": ch.money(total, cur),
+            "new": ch.money(new, cur), "new_amount": new, "members": sum(len(g.members) for g in groups),
+            "run": cl["run"], "date": cl["date"]}
 
 
 def build(d: Data, cfg: Config, source: Source, analysis: Analysis, fx: dict[str, Any], extra: dict[str, Any]) -> str:
@@ -249,7 +312,7 @@ def review(
     max_steps: Annotated[int | None, typer.Option("--max-steps", help="Tool calls the AI may make (default 6).")] = None,
     fresh: Annotated[bool, typer.Option("--fresh", help="Write a new AI analysis even if one exists for this data.")] = False,
     skip: Annotated[list[str] | None, typer.Option(
-        "--skip", help=f"Leave a check out: not run, not sent to the AI, not shown (repeatable). One of: {', '.join(FEATURES)}.")] = None,
+        "--skip", help=f"Leave a check out: not run, not sent to the AI, not shown (repeatable). One of: {', '.join(REVIEW_FEATURES)}.")] = None,
     config: ConfigOpt = None,
     profile: ProfileOpt = None,
     sets: SetOpt = None,
@@ -268,9 +331,10 @@ def review(
       spendlens review --skip tags -o review.html     # no tagging check
     """
     skipped = sorted(set(skip or []))
-    if bad := [s for s in skipped if s not in FEATURES]:
-        raise typer.BadParameter(f"Unknown check(s): {', '.join(bad)}. Checks: {', '.join(FEATURES)}", param_hint="--skip")
-    features = tuple(f for f in FEATURES if f not in skipped)
+    if bad := [s for s in skipped if s not in REVIEW_FEATURES]:
+        raise typer.BadParameter(f"Unknown check(s): {', '.join(bad)}. Checks: {', '.join(REVIEW_FEATURES)}",
+                                 param_hint="--skip")
+    features = tuple(f for f in REVIEW_FEATURES if f not in skipped)
     cfg = load(config, profile, sets)
     path = demo_db_path() if source is Source.demo else history_path(cfg)
     if source is Source.live:
@@ -290,7 +354,8 @@ def review(
         for s in skipped:  # left out on request: not in the facts, the AI analysis or the page
             for part in (data.runs, data.findings, data.cost):
                 part.pop(s, None)
-        extra = {"breakdown": breakdown(store, cur), "skipped": skipped}
+        extra = {"breakdown": breakdown(store, cur), "skipped": skipped,
+                 "cleanup": None if "graph" in skipped else cleanup(store, data, cfg)}
     shown = Source.last if source is Source.live else source
     fx = facts(data, view_model(data, cfg, shown), cfg)
     analysis = rules(fx)
@@ -305,7 +370,9 @@ def review(
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(html)
     by = f"AI analysis by {analysis.model}" if analysis.by == "ai" else "rule-based summary"
-    err.print(f"[green]Wrote[/] {out} ({len(html) // 1024} KiB · {by} · {len(review_rows(data, cfg))} proposals to review)")
+    groups = (extra["cleanup"] or {}).get("groups") or []
+    err.print(f"[green]Wrote[/] {out} ({len(html) // 1024} KiB · {by} · {len(review_rows(data, cfg, groups))} proposals "
+              f"to review{f', {len(groups)} cleanup groups' if groups else ''})")
 
 
 def register(reg: Registry) -> None:

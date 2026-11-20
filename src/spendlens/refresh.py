@@ -28,6 +28,7 @@ REFRESH_ARGS: dict[str, list[str]] = {
     "forecast": ["forecast"],
     "savings_hub": ["savings", "hub"],
     "savings_commitments": ["savings", "commitments"],
+    "graph": ["graph", "orphans"],
 }
 
 

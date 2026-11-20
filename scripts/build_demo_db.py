@@ -442,7 +442,28 @@ def demo_phase5(store: HistoryStore, rng: random.Random) -> None:
     store.save_run("savings_commitments", findings, account_id=ACCOUNT, caller_arn=CALLER, started_at=started, meta=meta)
 
 
-GENERATORS = [demo_tags, demo_finops, demo_costs, demo_phase5]
+def demo_graph(store: HistoryStore, rng: random.Random) -> None:
+    """The resource graph, through the real collect() with Steampipe-shaped rows (spendlens.graph.demo). It reuses
+    some demo waste alarms' resources, so cleanup groups show which waste findings they include."""
+    from spendlens.config import Config
+    from spendlens.graph.collect import collect
+    from spendlens.graph.demo import FakeClient, rows
+
+    waste = store.findings(store.latest_run("waste").id)
+    alarms = [f for f in waste if f.status is Status.ALARM]
+
+    def pick(control: str, n: int) -> list[dict]:
+        return [{"arn": f.resource, "region": f.region, **f.dimensions} for f in alarms if f.control == control][:n]
+
+    link = {"volume": pick("ebs_volume_unattached", 2), "eip": pick("vpc_eip_unattached", 2),
+            "lb": pick("ec2_application_load_balancer_unused", 1)}
+    g, meta = collect(Config(), client=FakeClient(rows(link)))
+    run_id = store.save_run("graph", account_id=ACCOUNT, caller_arn=CALLER, params=Config().graph.model_dump(),
+                            meta={**meta, "demo": True}, started_at=datetime(2026, 11, 9, 6, 20, tzinfo=UTC))
+    store.save_graph(run_id, *g.to_rows())
+
+
+GENERATORS = [demo_tags, demo_finops, demo_costs, demo_phase5, demo_graph]
 
 
 def main() -> int:

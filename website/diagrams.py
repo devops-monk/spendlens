@@ -426,6 +426,33 @@ def seq_session() -> tuple[str, str]:
                  "tool results, so a follow-up stays cheap and works with every provider.")
 
 
+def graph_flow() -> tuple[str, str]:
+    u = "grf"
+    b = [_box(20, 60, 130, 80, "Steampipe", "AWS plugin, read-only", "23 queries", ext=True)]
+    stages = [
+        ("Collect", ["one query per type", "instances, volumes,", "snapshots, AMIs, IPs, LBs,", "RDS, ECS, Lambda"],
+         "graph collect"),
+        ("Link", ["edges from each row:", "mounts · eni · snapshot", "backed by · forwards to", "+ cost per resource"],
+         "saved to history"),
+        ("Group", ["7 rules, fixed order", "each resource once", "rule off if its data", "is missing"],
+         "graph orphans"),
+        ("Explain", ["waste alarms linked,", "not added", "evidence · action ·", "what to check first"],
+         "show · impact"),
+        ("Review", ["one queue item", "per group, replacing", "the alarms it covers", "you decide"],
+         "review · report"),
+    ]
+    x, w = 190, 168
+    for i, (title, lines, chip) in enumerate(stages):
+        b.append(_stage(x, 20, w, 160, i + 1, title, lines, chip))
+        b.append(_arrow(u, x - 38 if i == 0 else x - 26, 100, x - 2, 100))
+        x += w + 26
+    b.append(_t(600, 262, "Relationships follow the Steampipe AWS Insights mod, collected for the whole account at once; "
+                          "spendlens adds cost, findings and cleanup groups", 11.5, opacity=0.7))
+    svg = _svg(u, 1180, 276, "The resource graph: collect, link, group, explain, review", "".join(b))
+    return svg, ("From read-only queries to cleanup groups. Every step after collection works offline from the saved "
+                 "graph, and nothing in AWS is changed.")
+
+
 ALL = {"c4_context": c4_context, "c4_container": c4_container, "seq_report": seq_report, "seq_ask": seq_ask,
        "seq_ask_live": seq_ask_live, "ai_pipeline": ai_pipeline, "cli_flow": cli_flow, "ai_tools": ai_tools,
-       "seq_session": seq_session}
+       "seq_session": seq_session, "graph_flow": graph_flow}

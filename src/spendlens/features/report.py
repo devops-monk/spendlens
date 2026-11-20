@@ -25,6 +25,7 @@ STEPS: list[tuple[str, list[str]]] = [
     ("tags", ["tags", "--status", "all"]),
     ("rightsize", ["rightsize", "--status", "all"]),
     ("waste", ["waste", "--status", "all"]),
+    ("graph", ["graph", "orphans"]),
     ("cost_diff", ["cost", "diff", "--show", "all"]),
     ("cost_trend", ["cost", "trend"]),
     ("cost_showback", ["cost", "showback"]),
@@ -50,7 +51,7 @@ def report(
 ) -> None:
     """Run all checks, write <out>/*.json, the savings summary, <out>/report.html, <out>/brief.html and <out>/review.html.
 
-    Steps: tags, rightsize, waste, cost_diff, cost_trend, cost_showback, anomalies, forecast, savings_hub,
+    Steps: tags, rightsize, waste, graph (cleanup groups), cost_diff, cost_trend, cost_showback, anomalies, forecast, savings_hub,
     savings_commitments (then savings summary, dashboard, brief and the full review from the saved runs).
     Examples:
       spendlens report --out reports

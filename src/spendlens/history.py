@@ -20,7 +20,7 @@ from typing import Any, Self
 
 from .models import Finding
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 SCHEMA = """
 create table if not exists runs (
   id            integer primary key autoincrement,
@@ -60,11 +60,35 @@ create table if not exists cost_rows (
   currency  text not null default 'USD'
 );
 create index if not exists cost_rows_run on cost_rows(run_id);
+create table if not exists graph_nodes (
+  run_id        integer not null references runs(id) on delete cascade,
+  id            text not null,             -- ARN where the resource has one, else its AWS id
+  type          text not null,             -- ec2_instance, ebs_volume, ebs_snapshot ...
+  name          text,
+  account_id    text,
+  region        text,
+  state         text,
+  created       text,                      -- ISO-8601
+  monthly_cost  real,                      -- estimate (USD/month) or null
+  cost_basis    text,                      -- estimate | none
+  tags          text,                      -- JSON
+  attrs         text                       -- JSON: size_gb, instance_type, stopped_since ...
+);
+create index if not exists graph_nodes_run on graph_nodes(run_id, id);
+create table if not exists graph_edges (
+  run_id   integer not null references runs(id) on delete cascade,
+  from_id  text not null,
+  to_id    text not null,
+  label    text not null,                  -- mounts, eni, snapshot of, backed by ...
+  kind     text not null                   -- uses (from needs to) | contains (to needs from) | ref
+);
+create index if not exists graph_edges_run on graph_edges(run_id);
 """
 
 # Additive migrations: version -> statements to go from version-1 to version.
 MIGRATIONS: dict[int, tuple[str, ...]] = {
     2: ("alter table findings add column service text",),
+    3: tuple(f"create {x.strip()}" for x in SCHEMA.split("create ") if "graph_" in x),
 }
 
 _FINDING_COLS = ("control", "title", "check", "service", "resource_type", "resource", "account_id", "region", "status",
@@ -160,6 +184,32 @@ class HistoryStore:
                   r.get("currency", "USD")) for r in cost_rows],
             )
         return run_id
+
+    def save_graph(self, run_id: int, nodes: Iterable[dict[str, Any]], edges: Iterable[dict[str, Any]]) -> None:
+        """Nodes/edges of a `graph` run (see spendlens.graph)."""
+        with self.conn:
+            self.conn.executemany(
+                "insert into graph_nodes(run_id, id, type, name, account_id, region, state, created, monthly_cost, "
+                "cost_basis, tags, attrs) values (?,?,?,?,?,?,?,?,?,?,?,?)",
+                [(run_id, n["id"], n["type"], n.get("name"), n.get("account_id"), n.get("region"), n.get("state"),
+                  n.get("created"), n.get("monthly_cost"), n.get("cost_basis") or "none",
+                  json.dumps(n.get("tags") or {}, default=str), json.dumps(n.get("attrs") or {}, default=str))
+                 for n in nodes])
+            self.conn.executemany(
+                "insert into graph_edges(run_id, from_id, to_id, label, kind) values (?,?,?,?,?)",
+                [(run_id, e["from_id"], e["to_id"], e["label"], e["kind"]) for e in edges])
+
+    def graph(self, run_id: int) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+        nodes = []
+        for r in self.conn.execute("select * from graph_nodes where run_id = ?", (run_id,)).fetchall():
+            d = dict(r)
+            d.pop("run_id", None)
+            d["tags"] = json.loads(d["tags"] or "{}")
+            d["attrs"] = json.loads(d["attrs"] or "{}")
+            nodes.append(d)
+        edges = [dict(r) for r in self.conn.execute(
+            "select from_id, to_id, label, kind from graph_edges where run_id = ?", (run_id,)).fetchall()]
+        return nodes, edges
 
     def prune(self, keep_runs_per_feature: int) -> int:
         with self.conn:

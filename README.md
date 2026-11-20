@@ -201,6 +201,18 @@ spendlens rightsize --set sizing.ec2_cpu_low=10        # any threshold, for one 
 
 The full catalog is in [docs/controls.md](docs/controls.md), and the mapping from the legacy mods is in [docs/control-mapping.md](docs/control-mapping.md).
 
+### Clean up together
+
+A waste check sees one resource. `spendlens graph` sees how resources connect: a stopped instance with its volumes, its Elastic IP and the snapshots of those volumes is one **cleanup group** with one total saving. It also finds snapshots of deleted volumes, unused AMIs with their snapshots, load balancers with no targets, and manual snapshots of deleted databases. Each resource is in at most one group, and waste alarms about the same resources are listed with the group rather than added to its saving.
+
+```bash
+spendlens graph orphans                          # cleanup groups (read-only)
+spendlens graph show i-0abc123 -o graph.html     # what it connects to, and what the group costs
+spendlens graph impact vol-0abc123               # what breaks or is left behind if it is deleted
+```
+
+The review shows each group as a small graph, and each group is one item in its queue. More: [Resource graph & cleanup](https://spendlens.devops-monk.com/docs/graph/).
+
 ## Month-end, without surprises.
 
 Daily spikes are measured against a robust 30-day baseline. The projected month end is checked against your budget
@@ -376,6 +388,7 @@ Unknown keys, typos and out-of-range values are rejected, and the error names th
 |---|---|
 | `tags` | Tag compliance across 70 resource types |
 | `rightsize` · `waste` | 65 controls with $/month estimates |
+| `graph orphans` · `show` · `impact` | How resources connect: cleanup groups with one total saving each, a resource's neighbours drawn as a page, what deleting one affects |
 | `cost diff` · `trend` · `showback` · `resources` | What changed, where, and who owns it |
 | `anomalies` · `forecast` | Daily spikes; month-end projection against budgets |
 | `savings hub` · `commitments` · `summary` | AWS recommendations, coverage, one de-duplicated total (`summary --refresh`: re-check now) |
