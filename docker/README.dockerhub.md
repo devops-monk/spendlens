@@ -112,7 +112,7 @@ AWS Cost Optimization Hub, Savings Plan and RI coverage, and spendlens's own fin
 ![Dashboard savings](https://spendlens.devops-monk.com/static/screens/dashboard-savings.png)
 
 ### One command. The whole review.
-`spendlens review -o review.html` writes the full FinOps review on one page: the AI analyst's summary, AWS spend explained (a bridge from last month to this month, trends, a flow from each service to its workloads, owners), anomalies with their likely cause, and every saving by source, service, effort × value and kind of change. A review queue lets you approve, defer or reject each proposal with a note, then export your decisions as CSV. Nothing in AWS is changed. `spendlens report` also writes `review.html`.
+`spendlens review -o review.html` writes the full FinOps review on one page: the AI analyst's summary, AWS spend explained (a bridge from last month to this month, trends, a flow from each service to its workloads, owners), anomalies with their likely cause, and every saving by source, service, effort × value and kind of change. A review queue lets you approve, defer or reject each proposal with a note, then export your decisions as CSV. Nothing in AWS is changed. `spendlens report` also writes `review.html`. Add `--skip tags` (or any check) to leave a check out.
 
 ![FinOps review](https://spendlens.devops-monk.com/static/shots/review-light.webp)
 
@@ -156,7 +156,7 @@ Add `--fresh` to `ask` or `brief` to skip the cache once.
 
 | | |
 |---|---|
-| **Tags** | `latest`, `0.3.1`, `0.3` (plus `sha-<commit>` per build) |
+| **Tags** | `latest`, `0.3.2`, `0.3` (plus `sha-<commit>` per build) |
 | **Platforms** | `linux/amd64` and `linux/arm64` (Graviton, Apple silicon), each built natively and smoke-tested |
 | **License** | spendlens: Apache-2.0. The image also contains Steampipe and Powerpipe (AGPL-3.0, unmodified) and the AWS plugin (Apache-2.0); see `/usr/share/doc/spendlens/NOTICE` |
 | **User** | `finops` (uid 10001). Steampipe refuses to run as root |
@@ -179,7 +179,7 @@ If you bind-mount `/work` or `/data` on Linux, they must be writable by uid 1000
 ```yaml
 # GitLab
 spendlens:
-  image: { name: abhaypratap/spendlens:0.3.1, entrypoint: [""] }
+  image: { name: abhaypratap/spendlens:0.3.2, entrypoint: [""] }
   script:
     - spendlens-entrypoint report --out reports
     # report has just run every check: post from those saved runs, no second round of AWS calls

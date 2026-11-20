@@ -36,8 +36,12 @@
 <p align="center"><sub>One self-contained HTML report, shown with the bundled demo data.</sub></p>
 
 > [!NOTE]
-> v0.3.1. spendlens is tested end to end through Steampipe against an AWS emulator. Verification against a live
+> v0.3.2. spendlens is tested end to end through Steampipe against an AWS emulator. Verification against a live
 > account with a read-only role is next (see [PLAN.md](PLAN.md)).
+
+## New in 0.3.2
+
+- **Leave a check out of the review.** `spendlens review --skip tags -o review.html` doesn't run the tagging check, doesn't send it to the AI and doesn't show it. Works for any check and repeats (`--skip tags --skip savings_hub`); `spendlens report --skip …` passes it on to `review.html`.
 
 ## New in 0.3.1
 
