@@ -5,7 +5,7 @@
 #   docker run --rm spendlens tags --source demo --summary
 #   docker run --rm -e AWS_PROFILE=finops -v ~/.aws:/home/finops/.aws:ro -v "$PWD:/work" spendlens report --out reports
 #
-# Multi-arch: docker buildx build --platform linux/amd64,linux/arm64 -t <registry>/spendlens:0.4.1 --push .
+# Multi-arch: docker buildx build --platform linux/amd64,linux/arm64 -t <registry>/spendlens:0.4.2 --push .
 
 ARG PYTHON_VERSION=3.13
 

@@ -36,8 +36,12 @@
 <p align="center"><sub>One self-contained HTML report, shown with the bundled demo data.</sub></p>
 
 > [!NOTE]
-> v0.4.1. spendlens is tested end to end through Steampipe against an AWS emulator. Verification against a live
+> v0.4.2. spendlens is tested end to end through Steampipe against an AWS emulator. Verification against a live
 > account with a read-only role is next (see [PLAN.md](PLAN.md)).
+
+## New in 0.4.2
+
+- **Who created it (opt-in).** With `graph.owner_from_cloudtrail: true`, `spendlens graph collect` asks CloudTrail who created each resource. It runs bounded LookupEvents queries over the last 90 days at most. `spendlens graph owners` then suggests the creator for your `Owner` tag, with medium confidence, when nothing attached already names an owner. It is off by default: it is slower in busy accounts and needs `cloudtrail:LookupEvents`. [More](https://spendlens.devops-monk.com/docs/graph/#suggested-owners)
 
 ## New in 0.4.1
 
