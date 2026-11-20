@@ -200,16 +200,7 @@ class HistoryStore:
                 [(run_id, e["from_id"], e["to_id"], e["label"], e["kind"]) for e in edges])
 
     def graph(self, run_id: int) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-        nodes = []
-        for r in self.conn.execute("select * from graph_nodes where run_id = ?", (run_id,)).fetchall():
-            d = dict(r)
-            d.pop("run_id", None)
-            d["tags"] = json.loads(d["tags"] or "{}")
-            d["attrs"] = json.loads(d["attrs"] or "{}")
-            nodes.append(d)
-        edges = [dict(r) for r in self.conn.execute(
-            "select from_id, to_id, label, kind from graph_edges where run_id = ?", (run_id,)).fetchall()]
-        return nodes, edges
+        return read_graph(self.conn, run_id)
 
     def prune(self, keep_runs_per_feature: int) -> int:
         with self.conn:
@@ -240,10 +231,7 @@ class HistoryStore:
         return _run(r) if r else None
 
     def findings(self, run_id: int) -> list[Finding]:
-        rows = self.conn.execute(
-            f"select {', '.join(_q(c) for c in _FINDING_COLS)} from findings where run_id = ?", (run_id,)
-        ).fetchall()
-        return [_finding(r) for r in rows]
+        return read_findings(self.conn, run_id)
 
     def cost_rows(self, run_id: int, kind: str | None = None) -> list[dict[str, Any]]:
         sql = "select kind, period, dimension, grp, amount, currency from cost_rows where run_id = ?"
@@ -252,6 +240,28 @@ class HistoryStore:
             sql += " and kind = ?"
             args += (kind,)
         return [dict(r) for r in self.conn.execute(sql, args).fetchall()]
+
+
+def read_graph(conn: sqlite3.Connection, run_id: int) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Nodes and edges of a `graph` run, from any connection (also the AI's read-only one)."""
+    cols = ("id", "type", "name", "account_id", "region", "state", "created", "monthly_cost", "cost_basis", "tags",
+            "attrs")
+    nodes = []
+    for r in conn.execute(f"select {', '.join(cols)} from graph_nodes where run_id = ?", (run_id,)).fetchall():
+        d = dict(zip(cols, tuple(r), strict=True))
+        d["tags"] = json.loads(d["tags"] or "{}")
+        d["attrs"] = json.loads(d["attrs"] or "{}")
+        nodes.append(d)
+    edges = [dict(zip(("from_id", "to_id", "label", "kind"), tuple(r), strict=True)) for r in conn.execute(
+        "select from_id, to_id, label, kind from graph_edges where run_id = ?", (run_id,)).fetchall()]
+    return nodes, edges
+
+
+def read_findings(conn: sqlite3.Connection, run_id: int) -> list[Finding]:
+    rows = conn.execute(
+        f"select {', '.join(_q(c) for c in _FINDING_COLS)} from findings where run_id = ?", (run_id,)
+    ).fetchall()
+    return [_finding(r) for r in rows]
 
 
 def diff_findings(old: list[Finding], new: list[Finding]) -> list[dict[str, Any]]:

@@ -97,6 +97,29 @@ These all come from the saved graph, with no extra AWS calls.
 
 > spendlens never applies tags. `--script` writes `aws resourcegroupstaggingapi tag-resources` commands, one per resource, each with its reason as a comment. Low-confidence lines are commented out. Review the script before you run it with a role that is allowed to tag.
 
+## Shared costs
+
+A NAT gateway or a load balancer serves many resources. `graph show` splits its hourly charge equally:
+- **NAT gateway:** across the subnets that route through it, read from the route tables (the main table counts for the subnets without one of their own);
+- **load balancer:** across its target groups;
+- **classic load balancer:** across its instances.
+
+This is an allocation estimate, labelled as one. Data processing charges are not in the price book.
+
+## Ask about it
+
+The AI assistant has three tools on the saved graph:
+- `resource_context`: what a resource connects to, what it costs, its cleanup group, its owner, and what deleting it would affect;
+- `cleanup_groups`;
+- `suggested_owners`.
+
+Answers saved with `-o` draw the resources they talk about:
+
+```bash
+spendlens ask "What can we clean up in eu-west-1, and who owns it?" -o cleanup-answer.html
+spendlens ask "Why does prod-nat cost so much, and which subnets use it?"
+```
+
 ## In the review
 
 `spendlens review` has a **Cleanup groups** section with a small graph of each group. Each group is one item in the review queue and replaces the waste alarms it includes. The queue's total is every saving, counted once.
@@ -107,7 +130,7 @@ These all come from the saved graph, with no extra AWS calls.
 
 There is one read-only query per type:
 - EC2 instances, EBS volumes and snapshots, AMIs, network interfaces, Elastic IPs and NAT gateways;
-- VPCs, subnets and VPC endpoints;
+- VPCs, subnets, route tables and VPC endpoints;
 - application, network, gateway and classic load balancers, target groups and Auto Scaling groups;
 - RDS instances, clusters and snapshots;
 - ECS clusters and services (with their task definitions);
@@ -128,7 +151,7 @@ Costs are estimates from the `pricing:` price book in `finops.yaml`, the same nu
 ## Permissions
 
 These are all covered by `ReadOnlyAccess`. With a narrower role, the graph needs:
-- **EC2:** `ec2:DescribeInstances`, `ec2:DescribeVolumes`, `ec2:DescribeSnapshots`, `ec2:DescribeImages`, `ec2:DescribeNetworkInterfaces`, `ec2:DescribeAddresses`, `ec2:DescribeNatGateways`, `ec2:DescribeVpcs`, `ec2:DescribeSubnets`, `ec2:DescribeVpcEndpoints`;
+- **EC2:** `ec2:DescribeInstances`, `ec2:DescribeVolumes`, `ec2:DescribeSnapshots`, `ec2:DescribeImages`, `ec2:DescribeNetworkInterfaces`, `ec2:DescribeAddresses`, `ec2:DescribeNatGateways`, `ec2:DescribeVpcs`, `ec2:DescribeSubnets`, `ec2:DescribeRouteTables`, `ec2:DescribeVpcEndpoints`;
 - **Load balancing:** `elasticloadbalancing:Describe*`;
 - **Auto Scaling:** `autoscaling:DescribeAutoScalingGroups`;
 - **RDS:** `rds:DescribeDBInstances`, `rds:DescribeDBClusters`, `rds:DescribeDBSnapshots`, `rds:DescribeDBClusterSnapshots`;

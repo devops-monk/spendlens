@@ -5,14 +5,18 @@
   - Phase 1: graph collection, history tables, `graph collect | show | stats`.
   - Phase 2: `graph orphans | impact`, the review's "Cleanup groups" section and its queue items, and the `report` step.
 - **Two deviations from the plan below:**
-  1. Edges come from **one query per resource type** (23 queries) instead of one query per edge. Each row's own columns give its links, which is fewer AWS calls for the same relationships.
+  1. Edges come from **one query per resource type** (24 queries) instead of one query per edge. Each row's own columns give its links, which is fewer AWS calls for the same relationships.
   2. ECS task definitions without a service are not a cleanup group, because they cost nothing.
 - **Phase 3 is built:**
   - `graph owners`: high, medium and low confidence rules, plus a review script with low-confidence lines commented out;
   - a "suggested" column in `tags`;
   - "(suggested)" owners in the review queue and on cleanup groups, and a "Suggested tags" card in the review.
 - **Not built yet:** the CloudTrail creator rule waits on open question 2, and the showback owner map is folded into the review card.
-- **Next:** phase 4 (AI tools).
+- **Phase 4 is built:**
+  - AI tools `resource_context`, `cleanup_groups` and `suggested_owners`, with the graph tables in the `history_query` schema;
+  - ```` ```graph ```` blocks in answers are drawn in `-o` pages (an inline SVG, rather than Mermaid);
+  - route tables are collected, and NAT and load balancer shared costs appear in `graph show` and `resource_context`.
+- **Next:** phase 5 (CUR via Tailpipe), if CUR is set up.
 
 ## Context
 

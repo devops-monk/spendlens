@@ -50,6 +50,15 @@
 <section class="br-section"><div class="card"><h2>No cleanup groups</h2><p class="empty">Nothing found that can be removed together. Thresholds: <code>graph.*</code> in finops.yaml.</p></div></section>
 {% endif %}
 
+{% if vm.shared %}
+<section class="br-section">
+  <div class="card"><h2>Shared costs</h2>
+    <p class="hint">A NAT gateway's hourly charge split equally across the subnets that route through it, and a load balancer's across its target groups. An allocation estimate, not a measured figure; data processing is extra.</p>
+    <div class="tablewrap"><table><thead><tr><th>Shared resource</th><th>Used by</th><th class="num">Share</th><th>Basis</th></tr></thead><tbody>
+    {% for x in vm.shared %}<tr><td>{{ x.source_name }}</td><td>{{ x.target_name }}</td><td class="num">{{ x.amount_s }}</td><td>{{ x.basis }}</td></tr>{% endfor %}
+    </tbody></table></div></div>
+</section>
+{% endif %}
 {% if vm.rows %}
 <section class="br-section">
   <div class="card"><h2>Resources shown</h2>

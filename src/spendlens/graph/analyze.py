@@ -336,3 +336,29 @@ def impact(g: Graph, node_id: str) -> dict[str, Any]:
     return {"node": n.to_dict(), "breaks": breaks + first, "left_behind": left, "kept": kept,
             "monthly_cost": n.monthly_cost or 0.0,
             "left_behind_cost": round(sum(x["monthly_cost"] or 0 for x in left), 2)}
+
+
+# ------------------------------------------------------------------ shared costs
+
+
+def shared_costs(g: Graph) -> list[dict[str, Any]]:
+    """Split the cost of shared network resources across what uses them, as an allocation estimate:
+    a NAT gateway's hourly charge equally across the subnets that route through it, a load balancer's across its
+    target groups (a classic one's across its instances). Data processing charges are not in the price book."""
+    out: list[dict[str, Any]] = []
+    for n in g.nodes.values():
+        if not n.monthly_cost:
+            continue
+        if n.type == "vpc_nat_gateway":
+            users = sorted(e.from_id for e in g.into(n.id) if e.label == "routes via")
+            basis = f"equal split across {_plural(len(users), 'subnet')} routing through it"
+        elif n.type == "load_balancer":
+            users = sorted(e.to_id for e in g.out(n.id) if e.label in ("forwards to", "targets"))
+            what = "instance" if n.attrs.get("lb_type") == "classic" else "target group"
+            basis = f"equal split across {_plural(len(users), what)}"
+        else:
+            continue
+        for u in users:
+            out.append({"source": n.id, "source_name": n.label, "target": u, "target_name": g.nodes[u].label,
+                        "amount": round(n.monthly_cost / len(users), 2), "basis": basis})
+    return out

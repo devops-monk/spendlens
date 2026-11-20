@@ -39,7 +39,7 @@ def test_openai_compatible_full_loop_with_audit():
     assert [s["tool"] for s in doc["steps"]] == ["history_overview", "history_query"]
     assert all(s["ok"] for s in doc["steps"])
     first, last = stub.requests[0]["body"], stub.requests[-1]["body"]
-    assert {t["function"]["name"] for t in first["tools"]} == {"history_overview", "history_cost", "history_query"}
+    assert {t["function"]["name"] for t in first["tools"]} == {"history_overview", "history_cost", "history_query", "resource_context", "cleanup_groups", "suggested_owners"}
     assert first["tool_choice"] == "auto" and first["max_tokens"] == 16000 and "temperature" not in first
     assert first["messages"][0]["role"] == "system" and "read-only" in first["messages"][0]["content"]
     assert [m["role"] for m in last["messages"]][-2:] == ["assistant", "tool"]

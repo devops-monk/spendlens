@@ -88,11 +88,15 @@ HISTORY_SCHEMA_HINT = """\
 Tables (SQLite):
 - runs(id, feature, started_at ISO-UTC, account_id, caller_arn, params JSON, meta JSON)
   feature is one of: tags, rightsize, waste, anomalies, forecast, savings_hub, savings_commitments,
-  cost_diff, cost_trend, cost_showback, cost_resources.
+  cost_diff, cost_trend, cost_showback, cost_resources, graph.
 - findings(run_id, control, title, "check", service, resource_type, resource, account_id, region,
   status ['ok','alarm','info','skip','error'], reason, severity, est_monthly_saving REAL, tags JSON, dimensions JSON)
   dimensions holds per-control facts, e.g. json_extract(dimensions,'$.instance_type'), '$.size_gb', '$.delta'.
 - cost_rows(run_id, kind ['p0','p1',...: period index from runs.meta.periods], period, dimension, grp, amount, currency)
+- graph_nodes(run_id, id, type, name, account_id, region, state, created, monthly_cost, cost_basis, tags JSON,
+  attrs JSON) and graph_edges(run_id, from_id, to_id, label, kind ['uses','contains','ref']) for feature 'graph':
+  how resources connect (labels: mounts, eni, in subnet, routes via, snapshot, backed by, launched from, public ip,
+  forwards to, targets, manages, member, runs). Prefer resource_context / cleanup_groups / suggested_owners.
 The latest run of a feature: select max(id) from runs where feature = '...'.
 Always filter findings/cost_rows to one run_id (usually the latest), or you will double count across runs."""
 
@@ -154,6 +158,37 @@ class Toolbox:
                                           "description": "Service or group to match, e.g. 'rds' or 'Amazon Relational "
                                                          "Database Service' or a tag value."}}, ["service"]),
                      lambda a: self.history_cost(a["service"])),
+            ToolSpec("resource_context",
+                     "One AWS resource from the saved resource graph: what it is attached to and what uses it (with "
+                     "each neighbour's cost), what the whole group costs, its cleanup group if any, suggested owner "
+                     "tags, failing checks on it, what deleting it would affect, and shared costs (a NAT gateway or "
+                     "load balancer split across its users). Offline and free. Use it for 'what is X attached to', "
+                     "'who owns X', 'can I delete X', 'why does X cost so much'.",
+                     _schema({"resource": {"type": "string", "description": "ARN, AWS id (i-..., vol-..., snap-..., "
+                                                                            "ami-..., nat-...) or Name tag."},
+                              "depth": {"type": "integer", "description": "Links to follow, 1 or 2 (default 1)."}},
+                             ["resource"]),
+                     lambda a: self.resource_context(a["resource"], a.get("depth") or 1)),
+            ToolSpec("cleanup_groups",
+                     "Cleanup groups from the saved resource graph: connected resources that can be removed "
+                     "together (a stopped instance with its volumes, IP and snapshots; snapshots of deleted volumes; "
+                     "unused AMIs; load balancers without targets; unattached volumes and IPs; snapshots of deleted "
+                     "databases), each with one total monthly saving, counted once. Waste alarms they include are "
+                     "listed, not added. Offline and free.",
+                     _schema({"kind": {"type": "string", "description": "Optional: stopped_instance, idle_load_balancer, "
+                                                                        "unused_ami, orphan_snapshots, unattached_volume, "
+                                                                        "unassociated_eip or rds_orphan_snapshots."},
+                              "min_saving": {"type": "number", "description": "Optional minimum saving per month."},
+                              "top": {"type": "integer", "description": "Optional: only the largest N (default 15)."}}),
+                     lambda a: self.cleanup_groups(a.get("kind"), a.get("min_saving") or 0, a.get("top") or 15)),
+            ToolSpec("suggested_owners",
+                     "Suggested owner tags for untagged resources, from what they are attached to (a volume takes the "
+                     "Team of the instance that mounts it), each with its confidence (high, medium, low) and reason. "
+                     "Offline and free. Use it for 'who owns these untagged resources'.",
+                     _schema({"resource": {"type": "string", "description": "Optional: one resource (ARN, id or name)."},
+                              "key": {"type": "string", "description": "Optional: one tag key, e.g. Team."},
+                              "min_confidence": {"type": "string", "description": "Optional: high, medium or low."}}),
+                     lambda a: self.suggested_owners(a.get("resource"), a.get("key"), a.get("min_confidence") or "low")),
             ToolSpec("history_query",
                      "Run ONE read-only SQLite SELECT against the spendlens history database (saved findings and "
                      "cost data; no AWS calls, free).\n" + HISTORY_SCHEMA_HINT,
@@ -289,6 +324,142 @@ class Toolbox:
                 "cost_groups_by_spend": names,
                 "tip": "For one service's cost change use history_cost('<service>'); grp values are the exact names in "
                        "cost_groups_by_spend.", "row_count": len(features)}
+
+    # ----- resource graph (feature 'graph' in the history)
+
+    _graph_cache: Any = None
+
+    def _graph(self) -> Any:
+        """(Graph, run row, waste findings, collected sources) from the latest saved graph, or None."""
+        if self._graph_cache is None:
+            from ..graph.model import Graph
+            from ..history import read_findings, read_graph
+
+            con = self._history()
+            run = con.execute("select id, started_at, account_id, meta from runs where feature = 'graph' "
+                              "order by id desc limit 1").fetchone()
+            if run is None:
+                self._graph_cache = False
+                return None
+            g = Graph.from_rows(*read_graph(con, run["id"]))
+            findings: dict[str, list[Any]] = {}
+            for feat in ("tags", "rightsize", "waste"):
+                r = con.execute("select id from runs where feature = ? order by id desc limit 1", (feat,)).fetchone()
+                findings[feat] = read_findings(con, r["id"]) if r else []
+            meta = json.loads(run["meta"] or "{}")
+            counts = meta.get("counts")
+            self._graph_cache = (g, dict(run), findings, set(counts) if isinstance(counts, dict) else None)
+        return self._graph_cache or None
+
+    def _no_graph(self) -> dict[str, Any]:
+        return {"note": "No saved resource graph in this history. `spendlens graph collect` (read-only) or "
+                        "`spendlens graph orphans` saves one; `--source demo` has a sample.", "row_count": 0}
+
+    def _groups(self, loaded: Any) -> list[Any]:
+        from datetime import datetime
+
+        from ..features.graph_cmd import owner_keys
+        from ..graph.analyze import cleanup_groups
+
+        g, run, findings, collected = loaded
+        return cleanup_groups(g, self.cfg.graph, now=datetime.fromisoformat(run["started_at"]), collected=collected,
+                              findings=findings["waste"], owner_keys=owner_keys(self.cfg))
+
+    def resource_context(self, resource: str, depth: int = 1) -> dict[str, Any]:
+        from ..features.graph_cmd import suggestions_for
+        from ..graph.analyze import impact, shared_costs
+        from ..graph.model import type_label
+
+        loaded = self._graph()
+        if not loaded:
+            return self._no_graph()
+        g, run, findings, _ = loaded
+        found = g.find(resource)
+        if not found:
+            return {"note": f"No resource matching {resource!r} in graph run #{run['id']}. Use an ARN, an AWS id or a "
+                            "Name tag; history_query on graph_nodes can search by name.", "row_count": 0}
+        if len(found) > 1:
+            return {"note": f"{len(found)} resources match; call again with one id.", "row_count": len(found),
+                    "matches": [{"id": n.id, "type": n.type, "name": n.label} for n in found[:15]]}
+        n = found[0]
+        sub = g.around(n.id, max(1, min(int(depth), 2)))
+
+        def link(other: str) -> str:
+            for e in g.out(n.id):
+                if e.to_id == other:
+                    return f"{e.label} (this -> it)"
+            for e in g.into(n.id):
+                if e.from_id == other:
+                    return f"{e.label} (it -> this)"
+            return "2 links away"
+
+        neighbours = [{"id": m.short_id, "type": type_label(m.type), "name": m.label, "state": m.state,
+                       "monthly_cost": m.monthly_cost, "link": link(m.id)}
+                      for m in sorted(sub.nodes.values(), key=lambda m: -(m.monthly_cost or 0)) if m.id != n.id][:40]
+        short = n.short_id
+        alarms = [{"check": f.check, "control": f.control, "reason": f.reason, "est_monthly_saving": f.est_monthly_saving}
+                  for fs in findings.values() for f in fs if f.status.value == "alarm" and f.resource in (n.id, short)]
+        group = next((grp for grp in self._groups(loaded) if n.id in grp.members), None)
+        imp = impact(g, n.id)
+        return {
+            "graph_run": {"id": run["id"], "started_at": run["started_at"]},
+            "resource": {"id": n.id, "type": type_label(n.type), "name": n.label, "state": n.state,
+                         "region": n.region, "monthly_cost": n.monthly_cost, "cost_basis": n.cost_basis,
+                         "tags": n.tags, "facts": {k: v for k, v in n.attrs.items() if v not in (None, "", [])}},
+            "neighbours": neighbours, "group_monthly_cost": sub.total_cost(), "group_size": len(sub.nodes),
+            "cleanup_group": group.to_dict() | {"members": [g.nodes[m].short_id for m in group.members]} if group else None,
+            "suggested_tags": [x.to_dict() for x in suggestions_for(g, self.cfg) if x.resource == n.id],
+            "failing_checks": alarms,
+            "if_deleted": {"breaks": [x["why"] for x in imp["breaks"]],
+                           "left_behind": [x["why"] for x in imp["left_behind"]],
+                           "left_behind_monthly_cost": imp["left_behind_cost"], "stays": [x["why"] for x in imp["kept"]]},
+            "shared_costs": [x for x in shared_costs(g) if n.id in (x["source"], x["target"])],
+            "note": "Costs are monthly estimates from the finops.yaml price book (snapshots: upper bound). "
+                    "Read-only: nothing can be changed from here.",
+            "row_count": len(neighbours) + 1,
+        }
+
+    def cleanup_groups(self, kind: str | None, min_saving: float, top: int) -> dict[str, Any]:
+        loaded = self._graph()
+        if not loaded:
+            return self._no_graph()
+        g, run, _, _ = loaded
+        groups = [grp for grp in self._groups(loaded) if (not kind or grp.kind == kind)
+                  and grp.monthly_saving >= float(min_saving)]
+        rows = [{"kind": grp.kind, "title": grp.title, "monthly_saving": grp.monthly_saving,
+                 "resources": [g.nodes[m].short_id for m in grp.members], "region": grp.region, "owner": grp.owner,
+                 "waste_alarms_included": len(grp.findings), "waste_alarms_saving": grp.findings_saving,
+                 "evidence": grp.evidence, "action": grp.action, "check_first": grp.risk}
+                for grp in groups[: max(1, int(top))]]
+        return {"graph_run": {"id": run["id"], "started_at": run["started_at"]}, "groups": rows,
+                "total_monthly_saving": round(sum(grp.monthly_saving for grp in groups), 2),
+                "new_beyond_waste_alarms": round(sum(max(grp.monthly_saving - grp.findings_saving, 0)
+                                                     for grp in groups), 2),
+                "group_count": len(groups), "row_count": len(rows),
+                "note": "Estimates for human review; each resource is in at most one group."}
+
+    def suggested_owners(self, resource: str | None, key: str | None, min_confidence: str) -> dict[str, Any]:
+        from ..features.graph_cmd import suggestions_for
+
+        loaded = self._graph()
+        if not loaded:
+            return self._no_graph()
+        g, run, _, _ = loaded
+        if min_confidence not in ("high", "medium", "low"):
+            raise ToolError("min_confidence must be high, medium or low")
+        sugg = suggestions_for(g, self.cfg, min_confidence)
+        if resource:
+            ids = {n.id for n in g.find(resource)}
+            sugg = [x for x in sugg if x.resource in ids]
+        if key:
+            sugg = [x for x in sugg if x.key.lower() == key.lower()]
+        rows = [{"resource": g.nodes[x.resource].short_id, "type": x.type, "name": x.name, "tag": x.key,
+                 "suggested": x.value, "confidence": x.confidence, "because": x.reason}
+                for x in sugg[: self.cfg.llm.max_rows]]
+        return {"graph_run": {"id": run["id"], "started_at": run["started_at"]}, "suggestions": rows,
+                "resources": len({x.resource for x in sugg}), "row_count": len(rows),
+                "note": "Suggestions only; spendlens never applies tags. `spendlens graph owners --script "
+                        "tag-review.sh` writes the commands for a person to review."}
 
     def history_cost(self, service: str) -> dict[str, Any]:
         con = self._history()

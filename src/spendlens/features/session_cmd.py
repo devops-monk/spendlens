@@ -59,7 +59,9 @@ def session_show(
     if out:
         from ..render import answer as page
 
-        page.write(out, x.turns, title=f"Session {x.name}",
+        cfg = load(config)
+        page.write(out, x.turns, draw=page.graph_drawer(history_path(cfg), cfg.pricing.currency, cfg.graph.max_nodes),
+                   title=f"Session {x.name}",
                    subtitle=f"{len(x.turns)} question(s) · started {x.created[:16].replace('T', ' ')} UTC")
         err.print(f"[green]Wrote[/] {out}")
         return

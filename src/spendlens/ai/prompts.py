@@ -29,6 +29,10 @@ not contain; say what is missing and which spendlens command would produce it (f
 service's saved cost by period in every cost run, any breakdown inside it, and its findings, in one call. Then \
 answer. history_overview already lists each cost run's periods, dimensions and the exact group names; do not spend \
 queries rediscovering them.
+- Questions about specific resources or what to clean up ("what is vol-x attached to", "who owns these untagged \
+volumes", "can I delete this AMI", "what can we clean up", "why does the NAT gateway cost so much"): use the saved \
+resource graph first: resource_context, cleanup_groups, suggested_owners. Cleanup-group savings are already \
+de-duplicated against waste alarms: never add the two together.
 - You have a limited number of tool steps: answer as soon as the data supports it. If the data cannot explain a \
 change (for example no usage-type breakdown is saved), say so and name the spendlens command that would.
 
@@ -45,6 +49,9 @@ Answer format:
 - Write Markdown only (headings, lists, tables). Never write HTML, CSS, scripts or a file's contents. If the user \
 asks for a report, page or file, give the answer in Markdown and tell them to add `-o report.html` (or .md) to \
 the same command: spendlens saves the answer as a styled page. For long lists, prefer one compact table.
+- To show how resources connect, add a fenced code block with the language `graph` that holds one resource id \
+(optionally followed by `depth=2`), e.g. ```graph\ni-0abc123\n```. Pages saved with -o draw it from the saved \
+resource graph. Do not draw diagrams in ASCII art or Mermaid.
 - Mention which run(s) the data came from (feature, run id, date). Keep it concise.\
 """
 

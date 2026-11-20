@@ -36,7 +36,7 @@ def rows(link: dict[str, list[dict[str, Any]]] | None = None) -> dict[str, list[
     link = link or {}
     t: dict[str, list[dict[str, Any]]] = {k: [] for k in (
         "aws_ec2_instance", "aws_ebs_volume", "aws_ebs_snapshot", "aws_ec2_ami", "aws_ec2_network_interface",
-        "aws_vpc_eip", "aws_vpc_nat_gateway", "aws_vpc", "aws_vpc_subnet", "aws_vpc_endpoint",
+        "aws_vpc_eip", "aws_vpc_nat_gateway", "aws_vpc", "aws_vpc_subnet", "aws_vpc_endpoint", "aws_vpc_route_table",
         "aws_ec2_application_load_balancer", "aws_ec2_network_load_balancer", "aws_ec2_gateway_load_balancer",
         "aws_ec2_classic_load_balancer", "aws_ec2_target_group", "aws_ec2_autoscaling_group", "aws_rds_db_cluster",
         "aws_rds_db_instance", "aws_rds_db_snapshot", "aws_rds_db_cluster_snapshot", "aws_ecs_cluster",
@@ -53,6 +53,16 @@ def rows(link: dict[str, list[dict[str, Any]]] | None = None) -> dict[str, list[
                                   "service_name": f"com.amazonaws.{R}.s3", "vpc_endpoint_type": "Gateway",
                                   "state": "available", "creation_timestamp": "2025-02-01T09:00:00+00:00",
                                   "tags": _tags("platform")})
+    # private subnets route through the NAT gateway (b via the main table), the public one through the internet gateway
+    t["aws_vpc_route_table"] += [
+        {**_base(), "route_table_id": "rtb-0main", "vpc_id": "vpc-0prod", "associations": [{"Main": True}],
+         "routes": [{"DestinationCidrBlock": "0.0.0.0/0", "NatGatewayId": "nat-0prod"}]},
+        {**_base(), "route_table_id": "rtb-0priva", "vpc_id": "vpc-0prod",
+         "associations": [{"Main": False, "SubnetId": "subnet-0priv-a"}],
+         "routes": [{"DestinationCidrBlock": "0.0.0.0/0", "NatGatewayId": "nat-0prod"}]},
+        {**_base(), "route_table_id": "rtb-0pub", "vpc_id": "vpc-0prod",
+         "associations": [{"Main": False, "SubnetId": "subnet-0pub-a"}],
+         "routes": [{"DestinationCidrBlock": "0.0.0.0/0", "GatewayId": "igw-0prod"}]}]
     t["aws_vpc_nat_gateway"].append({**_base(), "arn": _arn("natgateway", "nat-0prod"), "nat_gateway_id": "nat-0prod",
                                      "state": "available", "create_time": "2025-02-01T09:00:00+00:00",
                                      "subnet_id": "subnet-0pub-a", "tags": _tags("platform", "prod-nat"),

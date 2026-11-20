@@ -39,7 +39,7 @@ from ..common import (
     load,
 )
 from ..config import Config
-from ..graph.analyze import OWNER_KEYS, Group, cleanup_groups, impact
+from ..graph.analyze import OWNER_KEYS, Group, cleanup_groups, impact, shared_costs
 from ..graph.model import Graph, type_label
 from ..graph.render import money
 from ..models import Finding, ReportMeta
@@ -250,7 +250,7 @@ def graph_collect(
     source: Annotated[Source, typer.Option("--source", help="live (default): collect now. Accepted for symmetry with "
                                                             "the other checks.")] = Source.live,
 ) -> None:
-    """Read the resources and how they link (read-only) and save them to history. About 23 Steampipe queries."""
+    """Read the resources and how they link (read-only) and save them to history. About 24 Steampipe queries."""
     cfg = load(config, profile, sets)
     ld = load_graph(source, cfg)
     _print_stats(ld)
@@ -288,6 +288,8 @@ def graph_show(
     in_groups = {m for grp in groups for m in grp.members}
     alarms = ld.alarms
     n = ld.g.nodes[root]
+    shared = [x for x in shared_costs(ld.g) if x["source"] == root or x["target"] == root
+              or (x["source"] in sub.nodes and x["target"] in sub.nodes)]
     if out is None:
         console.print(rd.tree(sub, root, currency=cur, alarms=alarms, groups=in_groups, depth=depth))
         console.print(f"[bold]{len(sub.nodes)}[/] resources · [bold]{money(sub.total_cost(), cur)}[/] together "
@@ -295,6 +297,9 @@ def graph_show(
         for grp in groups:
             console.print(f"[yellow]Cleanup group:[/] {grp.title} · {money(grp.monthly_saving, cur)} "
                           f"[dim](spendlens graph orphans)[/]")
+        for x in shared:
+            console.print(f"[cyan]Shared cost:[/] {money(x['amount'], cur)} of {x['source_name']} → {x['target_name']} "
+                          f"[dim]({x['basis']}; an allocation estimate)[/]")
         return
     suffix = out.suffix.lower()
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -307,7 +312,7 @@ def graph_show(
         out.write_text(rd.dot(sub, focus=root, currency=cur))
     elif suffix == ".json":
         out.write_text(rd.to_json(sub, focus=root, total_monthly_cost=sub.total_cost(),
-                                  cleanup_groups=[grp.to_dict() for grp in groups]))
+                                  cleanup_groups=[grp.to_dict() for grp in groups], shared_costs=shared))
     else:
         vm = {"focus": {"label": n.label, "type": type_label(n.type), "cost": money(n.monthly_cost, cur)},
               "total": money(sub.total_cost(), cur).removesuffix("/mo"), "count": len(sub.nodes), "depth": depth,
@@ -316,6 +321,7 @@ def graph_show(
               "groups": [group_view(grp, ld.g, cur, alarms=alarms, svg=False) for grp in groups],
               "groups_saving": money(sum(grp.monthly_saving for grp in groups), cur).removesuffix("/mo"),
               "rows": sorted((_row(x, cur) for x in sub.nodes.values()), key=lambda r: -r["amount"]),
+              "shared": [{**x, "amount_s": money(x["amount"], cur)} for x in shared],
               "notes": _notes(ld)}
         _page(out, vm, f"{n.label}", f"{type_label(n.type)} · {n.region or 'global'}", cfg)
         return
@@ -356,7 +362,7 @@ def graph_orphans(
                              "already_flagged_by_waste": flagged})
     if fmt is Format.html:
         alarms = ld.alarms
-        vm = {"focus": None, "rows": [], "groups": [group_view(grp, ld.g, cur, alarms=alarms) for grp in groups],
+        vm = {"focus": None, "rows": [], "shared": [], "groups": [group_view(grp, ld.g, cur, alarms=alarms) for grp in groups],
               "groups_saving": money(total, cur).removesuffix("/mo"), "members": sum(len(grp.members) for grp in groups),
               "flagged": money(flagged, cur).removesuffix("/mo"), "notes": _notes(ld)}
         _page(out or Path("spendlens-cleanup.html"), vm, "Cleanup groups",

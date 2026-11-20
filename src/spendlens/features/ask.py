@@ -213,7 +213,7 @@ def ask(
             if key and not fresh and (hit := cache.get("answer", key)):
                 _print_cached(hit, q, json_out)
                 if out:
-                    _save(out, q, hit[0]["answer"], hit[0].get("model") or "", live, hit[0].get("steps") or [])
+                    _save(out, q, hit[0]["answer"], hit[0].get("model") or "", live, hit[0].get("steps") or [], db, cfg)
                 if sess is not None:
                     sess.add(q, hit[0]["answer"], model=hit[0].get("model") or "", live=live, source=source.value,
                              tool_calls=0)
@@ -242,7 +242,7 @@ def ask(
                 cache.put("answer", key, {"answer": ans.text, "model": ans.model, "notes": ans.notes,
                                           "steps": [s.__dict__ for s in ans.steps]}, int(ttl), label=q)
             if out and ans.text.strip() and not ans.refused:
-                _save(out, q, ans.text, ans.model, live, [s.__dict__ for s in ans.steps])
+                _save(out, q, ans.text, ans.model, live, [s.__dict__ for s in ans.steps], db, cfg)
             if sess is not None and ans.text.strip() and not ans.refused:
                 sess.add(q, ans.text, model=ans.model, live=live, source=source.value, tool_calls=len(ans.steps),
                          steps=[s.__dict__ for s in ans.steps])
@@ -256,13 +256,14 @@ def ask(
                       f"spendlens ask -C \"...\" (or -S {sess.name})[/]")
 
 
-def _save(out: Path, q: str, answer: str, model: str, live: bool, steps: list) -> None:
+def _save(out: Path, q: str, answer: str, model: str, live: bool, steps: list, db: Path, cfg: Any) -> None:
     from datetime import UTC, datetime
 
     from ..render import answer as page
 
     page.write(out, [{"question": q, "answer": answer, "model": model, "live": live, "steps": steps,
-                      "at": datetime.now(UTC).isoformat(timespec="seconds")}])
+                      "at": datetime.now(UTC).isoformat(timespec="seconds")}],
+               draw=page.graph_drawer(db, cfg.pricing.currency, cfg.graph.max_nodes))
     err.print(f"[green]Wrote[/] {out}")
 
 

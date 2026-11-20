@@ -71,7 +71,7 @@ def test_readonly_connection_denies_writes_even_without_guard(db):
 
 def test_toolbox_history_tools_and_audit(db):
     tb = Toolbox(load_config(environ={}), db)
-    assert {s.name for s in tb.specs()} == {"history_overview", "history_cost", "history_query"}  # no live tools by default
+    assert {s.name for s in tb.specs()} == {"history_overview", "history_cost", "history_query", "resource_context", "cleanup_groups", "suggested_owners"}  # no live tools by default
     r = tb.execute("1", "history_query", {"sql": "select resource, est_monthly_saving from findings"})
     assert not r.is_error and '"eip-1"' in r.content and "3.65" in r.content
     ov = tb.execute("2", "history_overview", {})

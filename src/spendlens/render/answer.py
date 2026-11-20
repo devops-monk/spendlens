@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -11,13 +12,56 @@ from markupsafe import Markup
 
 from .html import render_template
 
+Drawer = Callable[[str, int], "Markup | None"]  # (resource, depth) -> inline SVG or None
 
-def _md_html(text: str) -> Markup:
+
+def _md_html(text: str, draw: Drawer | None = None) -> Markup:
     from markdown_it import MarkdownIt
 
     # raw HTML off: answers quote account data (names, tags), which must never become markup
     md = MarkdownIt("commonmark", {"html": False, "linkify": False}).enable("table").enable("strikethrough")
+    default = md.renderer.rules.get("fence")
+
+    def fence(tokens: Any, idx: int, options: Any, env: Any) -> str:
+        tok = tokens[idx]
+        if draw is not None and tok.info.strip().lower() == "graph":
+            words = tok.content.split()
+            depth = next((int(w.split("=", 1)[1]) for w in words if w.startswith("depth=") and
+                          w.split("=", 1)[1].isdigit()), 1)
+            target = next((w for w in words if not w.startswith("depth=")), "")
+            if target and (svg := draw(target, max(1, min(depth, 3)))):
+                return f'<div class="gw ans-graph">{svg}</div>\n'
+        return default(tokens, idx, options, env)  # type: ignore[misc]
+
+    md.renderer.rules["fence"] = fence
     return Markup(md.render(text))
+
+
+def graph_drawer(history_db: Path, currency: str = "USD", max_nodes: int = 150) -> Drawer | None:
+    """Draws ```graph blocks from the latest saved resource graph; None when there is no saved graph."""
+    from ..graph.model import Graph
+    from ..graph.render import svg
+    from ..history import HistoryStore
+
+    try:
+        with HistoryStore(history_db, read_only=True) as store:
+            run = store.latest_run("graph")
+            if run is None:
+                return None
+            g = Graph.from_rows(*store.graph(run.id))
+    except (FileNotFoundError, OSError):
+        return None
+
+    def draw(target: str, depth: int) -> Markup | None:
+        found = g.find(target)
+        if len(found) != 1:
+            return None
+        sub = g.around(found[0].id, depth)
+        if len(sub.nodes) > max_nodes:
+            sub = g.around(found[0].id, 1)
+        return svg(sub, focus=found[0].id, currency=currency, in_page=True, title=f"{found[0].label} and its links")
+
+    return draw
 
 
 def _step(s: Any) -> dict[str, str]:
@@ -37,14 +81,15 @@ def _meta(t: dict[str, Any]) -> str:
     return " · ".join(p for p in parts if p)
 
 
-def write(path: Path, turns: list[dict[str, Any]], *, title: str = "FinOps answer", subtitle: str = "") -> None:
+def write(path: Path, turns: list[dict[str, Any]], *, title: str = "FinOps answer", subtitle: str = "",
+          draw: Drawer | None = None) -> None:
     """turns: [{question, answer, model, at, live, steps}] -> .md (Markdown) or anything else (HTML page)."""
     path.parent.mkdir(parents=True, exist_ok=True)
     if path.suffix.lower() in (".md", ".markdown"):
         path.write_text("\n\n---\n\n".join(f"## {t['question']}\n\n{t['answer']}\n\n_{_meta(t)}_" for t in turns) + "\n")
         return
     gen = datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC")
-    page = [{"question": t["question"], "html": _md_html(t["answer"]), "meta": _meta(t),
+    page = [{"question": t["question"], "html": _md_html(t["answer"], draw), "meta": _meta(t),
              "steps": [_step(s) for s in t.get("steps") or []]} for t in turns]
     path.write_text(render_template(
         "answer.html.j2", title=title, subtitle=subtitle or gen, turns=page,

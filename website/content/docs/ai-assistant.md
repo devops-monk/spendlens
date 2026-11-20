@@ -57,6 +57,12 @@ spendlens session show ecs -o ecs-session.html     # the whole conversation on o
 
 Raw HTML in an answer is shown as text, so names and tags from your account can never become markup.
 
+When an answer is about how resources connect, the assistant adds a ```` ```graph ```` block naming a resource. The saved page draws that resource and its links from the saved [resource graph](../graph/); the terminal shows just the id:
+
+```bash
+spendlens ask "What is attached to legacy-reporting, and can it go?" -o legacy.html
+```
+
 ## The executive brief
 
 `spendlens brief` uses the same FinOps analyst profile to write a one-page summary for managers: a headline, key insights, recommended next steps, risks, and a likely cause for each anomaly. spendlens computes every figure first; the AI only writes the words, using the same read-only history tools (never live AWS). See [spendlens brief](../dashboard/#spendlens-brief-one-page-for-managers).
@@ -69,9 +75,13 @@ spendlens brief -o brief.html
 
 1. It reads `history_overview`: which saved runs exist, each cost run's periods and dimensions, and the exact service names.
 2. For "why did a service's cost change", `history_cost` returns that service's saved cost in every cost run (diff, trend, the breakdown inside it), plus its findings, in one call. Short names work: `rds`, `ec2`, `s3`, `nat`.
-3. Anything else comes from the history database with `history_query`. All three are offline and free.
-4. Only with `--live`, and only when history can't answer, it queries AWS live through Steampipe (below).
-5. It answers with the key numbers, the evidence, and the run each number came from. Savings are labelled as estimates with their source.
+3. For questions about specific resources ("what is vol-0abc attached to?", "who owns these untagged volumes?", "what can we clean up?", "why does the NAT gateway cost so much?"), it uses the saved [resource graph](../graph/):
+   - `resource_context`: a resource's links, the group's cost, its cleanup group, suggested owner, impact and shared NAT or load balancer cost;
+   - `cleanup_groups`: what can be removed together;
+   - `suggested_owners`: owner tags for untagged resources.
+4. Anything else comes from the history database with `history_query`. All six history tools are offline and free.
+5. Only with `--live`, and only when history can't answer, it queries AWS live through Steampipe (below).
+6. It answers with the key numbers, the evidence, and the run each number came from. Savings are labelled as estimates with their source.
 
 Text in tool results (resource names, tags) is treated as data, never as instructions.
 

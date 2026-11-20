@@ -361,39 +361,44 @@ def ai_tools() -> tuple[str, str]:
     u = "ait"
     b = [_box(20, 175, 140, 90, "LLM", "plans · writes SQL", "Your provider", ext=True)]
     # history tools
-    b.append(f'<rect x="220" y="20" width="440" height="160" rx="16" fill="none" stroke="{ACCENT}" stroke-opacity="0.8" '
+    b.append(f'<rect x="220" y="20" width="440" height="274" rx="16" fill="none" stroke="{ACCENT}" stroke-opacity="0.8" '
              f'stroke-width="1.5"/>')
     b.append(_t(240, 44, "Always · your saved runs (offline, free)", 12, anchor="start", weight=700, fill=ACCENT))
     for i, (n, wht) in enumerate([("history_overview", "what was run, when · DB schema"),
                                   ("history_cost", "one service's cost story"),
-                                  ("history_query", "any read-only SQLite SELECT")]):
+                                  ("history_query", "any read-only SQLite SELECT"),
+                                  ("resource_context", "links · cost · owner · impact"),
+                                  ("cleanup_groups", "what can go together"),
+                                  ("suggested_owners", "tags for untagged resources")]):
         b.append(_pill(240, 58 + i * 38, n, wht))
     # live tools
-    b.append(f'<rect x="220" y="200" width="440" height="240" rx="16" fill="none" stroke="{ACCENT}" stroke-opacity="0.8" '
+    b.append(f'<rect x="220" y="314" width="440" height="240" rx="16" fill="none" stroke="{ACCENT}" stroke-opacity="0.8" '
              f'stroke-width="1.5" stroke-dasharray="7 5"/>')
-    b.append(_t(240, 224, "Added by --live · read-only AWS", 12, anchor="start", weight=700, fill=ACCENT))
+    b.append(_t(240, 338, "Added by --live · read-only AWS", 12, anchor="start", weight=700, fill=ACCENT))
     for i, (n, wht) in enumerate([("aws_find_tables", "search 589 tables"),
                                   ("aws_describe_table", "columns · filters · examples"),
                                   ("aws_check_query", "check SQL, no AWS call"),
                                   ("aws_query", "check · cache · run as a job"),
                                   ("aws_query_result", "wait for a slow query")]):
-        b.append(_pill(240, 238 + i * 38, n, wht))
-    b.append(_arrow(u, 160, 205, 218, 110, "tool calls", 186, 150, anchor="middle"))
-    b.append(_arrow(u, 160, 235, 218, 320, "", None, None))
+        b.append(_pill(240, 352 + i * 38, n, wht))
+    b.append(_arrow(u, 160, 245, 218, 160, "tool calls", 186, 190, anchor="middle"))
+    b.append(_arrow(u, 160, 275, 218, 430, "", None, None))
     # sources
-    b.append(_box(740, 65, 190, 70, "History DB", "runs · findings · cost", "SQLite, read-only"))
-    b.append(_box(740, 210, 190, 70, "AWS table catalog", "589 tables · 12.7k columns", "Bundled with spendlens",
+    b.append(_box(740, 60, 190, 70, "History DB", "runs · findings · cost", "SQLite, read-only"))
+    b.append(_box(740, 180, 190, 70, "Resource graph", "nodes · links · cost", "In the history", accent=True))
+    b.append(_box(740, 324, 190, 70, "AWS table catalog", "589 tables · 12.7k columns", "Bundled with spendlens",
                   accent=True))
-    b.append(_box(740, 350, 190, 70, "Steampipe", "AWS plugin · read-only", "Local Postgres"))
-    b.append(_box(990, 210, 170, 70, "Plugin source", "Go code + docs v1.35.0", "Built at release", ext=True))
-    b.append(_box(990, 350, 170, 70, "AWS APIs", "Describe* · List*", "Your IAM role", ext=True))
-    b.append(_arrow(u, 662, 100, 738, 100))
-    b.append(_arrow(u, 662, 260, 738, 245))
-    b.append(_arrow(u, 662, 390, 738, 385))
-    b.append(_arrow(u, 988, 245, 932, 245))
-    b.append(_arrow(u, 835, 348, 835, 282, "installed columns, daily", 845, 318, anchor="start"))
-    b.append(_arrow(u, 932, 385, 988, 385))
-    svg = _svg(u, 1180, 460, "The assistant's tools: three history tools always, five AWS tools with --live, and the "
+    b.append(_box(740, 464, 190, 70, "Steampipe", "AWS plugin · read-only", "Local Postgres"))
+    b.append(_box(990, 324, 170, 70, "Plugin source", "Go code + docs v1.35.0", "Built at release", ext=True))
+    b.append(_box(990, 464, 170, 70, "AWS APIs", "Describe* · List*", "Your IAM role", ext=True))
+    b.append(_arrow(u, 662, 95, 738, 95))
+    b.append(_arrow(u, 662, 215, 738, 215))
+    b.append(_arrow(u, 662, 374, 738, 359))
+    b.append(_arrow(u, 662, 504, 738, 499))
+    b.append(_arrow(u, 988, 359, 932, 359))
+    b.append(_arrow(u, 835, 462, 835, 396, "installed columns, daily", 845, 432, anchor="start"))
+    b.append(_arrow(u, 932, 499, 988, 499))
+    svg = _svg(u, 1180, 574, "The assistant's tools: six history and graph tools always, five AWS tools with --live, and the "
                              "data sources behind them", "".join(b))
     return svg, ("The model knows only what its tools tell it. The history tools carry the database schema; the AWS "
                  "tools search a catalog built from the Steampipe AWS plugin's own source and checked against the columns "
@@ -428,7 +433,7 @@ def seq_session() -> tuple[str, str]:
 
 def graph_flow() -> tuple[str, str]:
     u = "grf"
-    b = [_box(20, 60, 130, 80, "Steampipe", "AWS plugin, read-only", "23 queries", ext=True)]
+    b = [_box(20, 60, 130, 80, "Steampipe", "AWS plugin, read-only", "24 queries", ext=True)]
     stages = [
         ("Collect", ["one query per type", "instances, volumes,", "snapshots, AMIs, IPs, LBs,", "RDS, ECS, Lambda"],
          "graph collect"),

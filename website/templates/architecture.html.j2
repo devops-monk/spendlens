@@ -234,9 +234,9 @@
       <div class="sc-copy">
         <p>The model doesn't come with your account in its head. Every question is sent with instructions and a list
           of <b>tools</b>; the model replies "call this tool", spendlens runs it and returns the result, and the model
-          decides the next step. Without <code>--live</code> it has three tools over your saved runs. With
+          decides the next step. Without <code>--live</code> it has six tools over your saved runs and the resource graph. With
           <code>--live</code> it gets five more that cover the whole Steampipe AWS plugin.</p>
-        <ul class="chips"><li>8 tools</li><li>All read-only</li><li>Schema from the plugin's source</li></ul>
+        <ul class="chips"><li>11 tools</li><li>All read-only</li><li>Schema from the plugin's source</li></ul>
       </div>
     </div>
     <div class="sc-media">{{ diagram("ai_tools") }}</div>
@@ -292,6 +292,13 @@
         <tr><td><code>history_cost</code></td><td>always</td><td>One service's saved cost in every cost run, any
           breakdown inside it, and its rightsizing, waste, savings and tag findings. Short names work:
           <code>rds</code>, <code>ec2</code>, <code>nat</code>.</td></tr>
+        <tr><td><code>resource_context</code></td><td>always</td><td>One resource from the saved graph: what it is
+          attached to and what uses it, each with its cost, the group's cost, its cleanup group, suggested tags, failing
+          checks, what deleting it would affect, and shared NAT or load balancer costs.</td></tr>
+        <tr><td><code>cleanup_groups</code></td><td>always</td><td>Connected resources that can be removed together,
+          each with one saving, counted once against the waste alarms they include.</td></tr>
+        <tr><td><code>suggested_owners</code></td><td>always</td><td>Owner tags for untagged resources, from what they are
+          attached to, with a confidence and the reason.</td></tr>
         <tr><td><code>history_query</code></td><td>always</td><td>Rows from one read-only SQLite <code>SELECT</code> over
           runs, findings and cost rows.</td></tr>
         <tr><td><code>aws_find_tables</code></td><td><code>--live</code></td><td>The best ~8 of 589 tables for the
