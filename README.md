@@ -403,6 +403,7 @@ Unknown keys, typos and out-of-range values are rejected, and the error names th
 | `cache show` · `clear` | What the AI assistant has cached and when it expires; forget it |
 | `report` · `notify` | Run everything; post Slack or Teams summaries (`notify --refresh`: re-check first) |
 | `history list` · `diff` | Saved runs, and new or resolved alarms between them |
+| `find` · `open` | Everything saved about one resource (findings, cost, links, cleanup group, owner); build a report from saved runs and open it in the browser |
 | `init` · `doctor` · `params` · `config` | Set up, check, and inspect configuration |
 
 Every report command accepts:

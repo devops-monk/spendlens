@@ -28,8 +28,9 @@ CATEGORIES: list[tuple[str, str, list[str]]] = [
      "Steampipe queries). The schema and cache commands are the assistant's own tools, for you.",
      ["ask", "session list", "session show", "session delete", "session clear", "schema find", "schema show",
       "schema check", "cache show", "cache clear"]),
-    ("History", "Every live run is saved locally, so you can compare runs and re-render reports without AWS calls.",
-     ["history list", "history diff", "history path"]),
+    ("History", "Every live run is saved locally, so you can compare runs, search them and re-render reports without "
+     "AWS calls.",
+     ["find", "open", "history list", "history diff", "history path"]),
 ]
 
 # Task index at the top of the page: (I want to..., command path).
@@ -61,6 +62,8 @@ TASKS: list[tuple[str, str]] = [
     ("Find which AWS table answers a question", "schema find"),
     ("Check a Steampipe query before running it", "schema check"),
     ("See what changed since the last run", "history diff"),
+    ("Find everything saved about one resource", "find"),
+    ("Open the review (or any report) in my browser", "open"),
     ("See or change a threshold", "params"),
 ]
 
@@ -142,6 +145,18 @@ RECIPES: dict[str, list[tuple[str, str]]] = {
         ("Only the sure ones, as CSV", "spendlens graph owners --min-confidence high -f csv -o owners.csv"),
         ("Write the tagging commands to review and run yourself", "spendlens graph owners --script tag-review.sh"),
         ("Only the Team tag", "spendlens graph owners -k Team"),
+    ],
+    "find": [
+        ("Everything saved about one resource", "spendlens find vol-0abc123"),
+        ("Every resource tagged with a team", "spendlens find payments"),
+        ("As JSON", "spendlens find payments-api --json"),
+        ("Try it on the bundled demo data", "spendlens find legacy --source demo"),
+    ],
+    "open": [
+        ("Build the review from saved runs and open it", "spendlens open"),
+        ("The cleanup groups page", "spendlens open cleanup"),
+        ("The dashboard from the bundled demo data", "spendlens open dashboard --source demo"),
+        ("Only build it, print the path", "spendlens open review --no-browser"),
     ],
     "graph traffic": [
         ("Data transfer paths from the last week of VPC flow logs", "spendlens graph traffic"),

@@ -165,6 +165,11 @@ def make_control_app(feat: ControlFeature) -> typer.Typer:
             emit(rows, fmt, out, feat.title, columns=COLUMNS, meta=meta)
         err.print(f"[bold]{headline(scoped)}[/] · est. saving [bold]{cfg.pricing.currency} "
                   f"{total_saving(scoped):,.2f}/month[/] (indicative, review before acting)")
+        if fmt is Format.table and not summary:
+            from .graph_cmd import graph_hints
+
+            for line in graph_hints(scoped, source, cfg):
+                err.print(f"[dim]{line}[/]")
         if fail_on_alarm and any(f.status is Status.ALARM for f in scoped):
             raise typer.Exit(3)
 

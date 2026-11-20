@@ -27,7 +27,11 @@
   - It proposes a gateway endpoint where S3 or DynamoDB traffic goes through a NAT gateway.
   - Results show in the review's "Data transfer" section and its queue, and the AI has a `traffic_paths` tool.
   - It needs route tables (collected since phase 4) and network-interface IPs and AZs (added).
-- **Phase 7** (`open`, `find`, report hints) remains.
+- **Phase 7 is built:**
+  - `spendlens find <text>` searches the saved findings, Cost Explorer resource costs and the graph;
+  - `spendlens open [review|dashboard|brief|cleanup|traffic]` builds the page from saved runs (no AWS calls, no AI unless `--ai`) under `reports/` next to the history, and opens it;
+  - `waste` and `rightsize` print cleanup-group hints in their table output.
+- **All seven phases are built.** The remaining open item is the CloudTrail owner rule (question 2).
 
 ## Context
 

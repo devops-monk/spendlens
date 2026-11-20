@@ -98,6 +98,26 @@ These all come from the saved graph, with no extra AWS calls.
 
 > spendlens never applies tags. `--script` writes `aws resourcegroupstaggingapi tag-resources` commands, one per resource, each with its reason as a comment. Low-confidence lines are commented out. Review the script before you run it with a role that is allowed to tag.
 
+## Find one resource, open a page
+
+`spendlens find` searches everything saved for a resource id, ARN, Name or tag value:
+- its findings from every check;
+- its cost and where the figure came from;
+- what it is linked to;
+- its cleanup group and suggested tags.
+
+`spendlens open` builds a page from the saved runs and opens it in your browser: `review` (the default), `dashboard`, `brief`, `cleanup` or `traffic`.
+
+Neither command calls AWS.
+
+```bash
+spendlens find vol-0abc123
+spendlens find payments          # every resource tagged payments
+spendlens open cleanup
+```
+
+When a saved graph exists, `waste` and `rightsize` end their table output with a hint: which of their alarms belong to cleanup groups, and a `graph show` command for one of them.
+
 ## Shared costs
 
 A NAT gateway or a load balancer serves many resources. `graph show` splits its hourly charge equally:

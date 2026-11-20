@@ -14,7 +14,7 @@ fi
 needs_service() {
   # Commands that never query Steampipe.
   case "${1:-}" in
-    ""|-h|--help|--version|--install-completion|--show-completion|init|params|config|plugins|history|schema|cache|session)
+    ""|-h|--help|--version|--install-completion|--show-completion|init|params|config|plugins|history|schema|cache|session|find|open)
       return 1 ;;
   esac
   # The graph's explore commands read the saved graph.

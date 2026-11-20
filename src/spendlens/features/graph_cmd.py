@@ -103,10 +103,9 @@ def suggestions_for(g: Graph, cfg: Config, min_confidence: str = "low") -> list[
     return suggest_owners(g, tag_keys(cfg), min_confidence=min_confidence)
 
 
-def saved_suggestions(source: Source, cfg: Config) -> dict[str, list[Any]]:
-    """Owner suggestions from the latest saved graph (demo DB for --source demo), quietly; {} when there is none.
-    Never collects: other commands use this to annotate their output without extra AWS calls."""
-    from ..graph.owners import by_resource
+def saved_graph(source: Source, cfg: Config) -> Loaded | None:
+    """The latest saved graph (demo DB for --source demo) with the latest waste findings, quietly; None when there
+    is none. Never collects: other commands use it to annotate their output without extra AWS calls."""
     from ..history import HistoryStore, demo_db_path
 
     path = demo_db_path() if source is Source.demo else history_path(cfg)
@@ -114,11 +113,49 @@ def saved_suggestions(source: Source, cfg: Config) -> dict[str, list[Any]]:
         with HistoryStore(path, read_only=True) as store:
             run = store.latest_run("graph")
             if run is None:
-                return {}
+                return None
             g = Graph.from_rows(*store.graph(run.id))
+            waste = _latest_waste(store)
     except (FileNotFoundError, OSError):
-        return {}
-    return by_resource(suggestions_for(g, cfg))
+        return None
+    return Loaded(g, run.meta, run.id, run.started_at, run.account_id, waste, source)
+
+
+def saved_suggestions(source: Source, cfg: Config) -> dict[str, list[Any]]:
+    """Owner suggestions from the latest saved graph, quietly; {} when there is none."""
+    from ..graph.owners import by_resource
+
+    ld = saved_graph(source, cfg)
+    return by_resource(suggestions_for(ld.g, cfg)) if ld else {}
+
+
+def graph_hints(findings: list[Finding], source: Source, cfg: Config) -> list[str]:
+    """One or two lines for a check's table output: which of its alarms belong to cleanup groups, and how to see
+    what a resource connects to. From the saved graph only; [] when there is none or nothing to say."""
+    alarms = [f for f in findings if f.status.value == "alarm"]
+    if not alarms:
+        return []
+    ld = saved_graph(source, cfg)
+    if ld is None:
+        return []
+    cur = cfg.pricing.currency
+    src = "demo" if source is Source.demo else "last"
+    short = {r.rsplit("/", 1)[-1].rsplit(":", 1)[-1]: r for r in (f.resource for f in alarms)}
+    ids = {n.id for n in ld.g.nodes.values() if n.id in {f.resource for f in alarms} or n.short_id in short}
+    out = []
+    groups = [grp for grp in groups_for(ld, cfg) if ids & set(grp.members)]
+    if groups:
+        hit = sum(1 for f in alarms if f.resource in {m for grp in groups for m in grp.members}
+                  or f.resource.rsplit("/", 1)[-1] in {ld.g.nodes[m].short_id for grp in groups for m in grp.members})
+        out.append(f"{hit} of these alarm(s) belong to {len(groups)} cleanup group(s): "
+                   f"{money(sum(grp.monthly_saving for grp in groups), cur)} with what is attached to them. "
+                   f"See: spendlens graph orphans --source {src}")
+    linked = sorted((n for n in (ld.g.nodes[i] for i in ids) if ld.g.neighbours(n.id)),
+                    key=lambda n: -(n.monthly_cost or 0))
+    if linked:
+        out.append(f"What one connects to: spendlens graph show {linked[0].short_id}"
+                   + (" --source demo" if source is Source.demo else ""))
+    return out
 
 
 def describe(sugg: list[Any]) -> str:
