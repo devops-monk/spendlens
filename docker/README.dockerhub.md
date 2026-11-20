@@ -111,6 +111,11 @@ AWS Cost Optimization Hub, Savings Plan and RI coverage, and spendlens's own fin
 
 ![Dashboard savings](https://spendlens.devops-monk.com/static/screens/dashboard-savings.png)
 
+### One command. The whole review.
+`spendlens review -o review.html` writes the full FinOps review on one page: the AI analyst's summary, AWS spend explained (a bridge from last month to this month, trends, a flow from each service to its workloads, owners), anomalies with their likely cause, and every saving by source, service, effort × value and kind of change. A review queue lets you approve, defer or reject each proposal with a note, then export your decisions as CSV. Nothing in AWS is changed. `spendlens report` also writes `review.html`.
+
+![FinOps review](https://spendlens.devops-monk.com/static/shots/review-light.webp)
+
 ### One page for managers
 `spendlens brief -o brief.html` writes a printable executive brief: an analyst summary written by the FinOps AI profile, five headline numbers, key insights, monthly spend against the budget, anomalies, and a checklist of the largest savings to review. spendlens computes every figure; `--no-ai` uses a built-in rule-based summary and sends nothing to an AI provider. `spendlens report` also writes `brief.html`.
 
@@ -151,13 +156,13 @@ Add `--fresh` to `ask` or `brief` to skip the cache once.
 
 | | |
 |---|---|
-| **Tags** | `latest`, `0.3.0`, `0.3` (plus `sha-<commit>` per build) |
+| **Tags** | `latest`, `0.3.1`, `0.3` (plus `sha-<commit>` per build) |
 | **Platforms** | `linux/amd64` and `linux/arm64` (Graviton, Apple silicon), each built natively and smoke-tested |
 | **License** | spendlens: Apache-2.0. The image also contains Steampipe and Powerpipe (AGPL-3.0, unmodified) and the AWS plugin (Apache-2.0); see `/usr/share/doc/spendlens/NOTICE` |
 | **User** | `finops` (uid 10001). Steampipe refuses to run as root |
 | **Working directory** | `/work`: put `finops.yaml` here; reports are written here |
 | **Volume** | `/data`: the run history (`/data/spendlens.db`), which keeps trends and "what changed" between runs, and the AI cache (`/data/ai-cache.db`) |
-| **Entrypoint** | Starts the local Steampipe service only when a command needs live data, then stops it. `dashboard`, `brief`, `notify` and `savings summary` need it unless you pass `--source last` or `--source demo`; `schema` and `cache` never do. Exit codes pass through (`--fail-on-alarm` → 3, for CI gates) |
+| **Entrypoint** | Starts the local Steampipe service only when a command needs live data, then stops it. `dashboard`, `brief`, `review`, `notify` and `savings summary` need it unless you pass `--source last` or `--source demo`; `schema` and `cache` never do. Exit codes pass through (`--fail-on-alarm` → 3, for CI gates) |
 
 | Environment variable | Purpose |
 |---|---|
@@ -174,7 +179,7 @@ If you bind-mount `/work` or `/data` on Linux, they must be writable by uid 1000
 ```yaml
 # GitLab
 spendlens:
-  image: { name: abhaypratap/spendlens:0.3.0, entrypoint: [""] }
+  image: { name: abhaypratap/spendlens:0.3.1, entrypoint: [""] }
   script:
     - spendlens-entrypoint report --out reports
     # report has just run every check: post from those saved runs, no second round of AWS calls

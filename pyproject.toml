@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "spendlens"
-version = "0.3.0"
+version = "0.3.1"
 description = "FinOps CLI for AWS on Steampipe/Powerpipe: tag compliance, rightsizing, cost diff, savings and AI Q&A."
 readme = "README.md"
 license = "Apache-2.0"

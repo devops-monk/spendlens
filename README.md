@@ -36,8 +36,14 @@
 <p align="center"><sub>One self-contained HTML report, shown with the bundled demo data.</sub></p>
 
 > [!NOTE]
-> v0.3.0. spendlens is tested end to end through Steampipe against an AWS emulator. Verification against a live
+> v0.3.1. spendlens is tested end to end through Steampipe against an AWS emulator. Verification against a live
 > account with a read-only role is next (see [PLAN.md](PLAN.md)).
+
+## New in 0.3.1
+
+- **One command. The whole review.** `spendlens review -o review.html` writes the full FinOps review on one page: the AI analyst's summary, AWS spend explained (a bridge from last month to this month, trends, a flow from each service to the workloads behind it, owners), anomalies with their usual vs actual spend and likely cause, and every saving by source, service, effort × value and kind of change. A review queue lets you approve, defer or reject each proposal with a note and export the decisions as CSV. spendlens computes every figure; `--no-ai` uses the rule-based summary. [More](#one-command-the-whole-review)
+- **`spendlens report` also writes `review.html`**, sharing the brief's AI analysis (same data, asked once).
+- Savings Plan and reservation purchases now count as high effort in `brief` too.
 
 ## New in 0.3.0
 
