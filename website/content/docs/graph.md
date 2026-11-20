@@ -6,6 +6,7 @@ spendlens reads how your resources connect, read-only, and saves the result to i
 - **`graph orphans`** finds **cleanup groups**: connected resources that can be removed together.
 - **`graph show`** draws any resource with everything it connects to, and what the group costs.
 - **`graph impact`** says what would break, or be left behind, if one resource were deleted.
+- **`graph owners`** suggests owner tags for untagged resources, from what they are attached to.
 
 The relationships follow the [Steampipe AWS Insights mod](https://hub.powerpipe.io/mods/turbot/aws_insights)'s relationship graphs, collected for the whole account at once. spendlens adds the monthly cost of every resource and the waste alarms about it.
 
@@ -61,6 +62,40 @@ Subnets and VPCs are shown but not walked through, so unrelated resources in the
 - what breaks or must be removed first (the instance that mounts this volume);
 - what would be left unused (the volumes of an instance you terminate);
 - what stays (the snapshots taken from a volume).
+
+## Suggested owners
+
+An untagged volume belongs to whoever owns the instance that mounts it. `graph owners` suggests the missing tags of every untagged resource from what it is attached to:
+- the tags in your policy (`tagging.mandatory`);
+- the usual owner tags (`Owner`, `Team`, `Service Owner`, `CostCentre` and your showback keys).
+
+```bash
+spendlens graph owners
+spendlens graph owners --min-confidence high -f csv -o owners.csv
+spendlens graph owners --script tag-review.sh      # commands for a person to review and run
+spendlens graph owners --source demo
+```
+
+| Confidence | Where the value comes from |
+|---|---|
+| high | Directly attached or managed: a volume from the instance that mounts it, a network interface or Elastic IP from its instance or NAT gateway, an instance from its Auto Scaling group, a target group from its load balancer, an RDS instance from its cluster |
+| medium | One step removed: a snapshot from its volume (or that volume's instance), a snapshot behind an AMI from the AMI, an RDS snapshot from its database, an AMI from the instances launched from it |
+| low | The subnet: the value that most tagged resources in the same subnet carry (at least 3, at least 60% agreeing) |
+
+How a value is chosen:
+- **Each missing tag gets the strongest rule that finds a value.**
+- **Related resources must agree.** If a volume is attached to instances of two different teams, nothing is suggested.
+- **Spelling is copied.** The key is spelled as on the resource the value comes from.
+- **AWS-managed network interfaces are skipped.**
+
+The same suggestions appear in three places:
+- a **suggested** column in `spendlens tags`, for its missing-tag alarms;
+- as "(suggested)" owners in the review queue and on cleanup groups;
+- in a **Suggested tags** card in the review.
+
+These all come from the saved graph, with no extra AWS calls.
+
+> spendlens never applies tags. `--script` writes `aws resourcegroupstaggingapi tag-resources` commands, one per resource, each with its reason as a comment. Low-confidence lines are commented out. Review the script before you run it with a role that is allowed to tag.
 
 ## In the review
 

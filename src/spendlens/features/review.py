@@ -146,7 +146,8 @@ def cleanup(store: HistoryStore, d: Data, cfg: Config) -> dict[str, Any] | None:
     """Cleanup groups from the latest saved resource graph (spendlens graph orphans), linked to the waste alarms."""
     from ..graph.analyze import cleanup_groups
     from ..graph.model import Graph
-    from .graph_cmd import Loaded, owner_keys
+    from ..graph.owners import by_resource
+    from .graph_cmd import Loaded, owner_keys, suggestions_for
 
     run = store.latest_run("graph")
     if run is None:
@@ -155,8 +156,17 @@ def cleanup(store: HistoryStore, d: Data, cfg: Config) -> dict[str, Any] | None:
     ld = Loaded(g, run.meta, run.id, run.started_at, run.account_id, d.findings.get("waste", []), Source.last)
     groups = cleanup_groups(g, cfg.graph, now=ld.now, collected=ld.collected, findings=ld.waste,
                             owner_keys=owner_keys(cfg))
+    sugg = suggestions_for(g, cfg)
+    okeys = {k.lower() for k in owner_keys(cfg)}
+    owner: dict[str, str] = {}  # resource (ARN and short id) -> suggested owner, from what it is attached to
+    for res, xs in by_resource(sugg).items():
+        if v := next((x.value for x in xs if x.key.lower() in okeys), None):
+            owner[res] = v
+    for grp in groups:
+        if not grp.owner and (v := next((owner[m] for m in grp.members if m in owner), None)):
+            grp.owner = f"{v} (suggested)"
     return {"graph": g, "groups": groups, "alarms": ld.alarms, "run": run.id,
-            "date": run.started_at[:16].replace("T", " ")}
+            "date": run.started_at[:16].replace("T", " "), "suggestions": sugg, "owner": owner}
 
 
 def _group_rows(groups: list[Any], cur: str) -> list[dict[str, Any]]:
@@ -176,7 +186,8 @@ def _group_rows(groups: list[Any], cur: str) -> list[dict[str, Any]]:
     return out
 
 
-def review_rows(d: Data, cfg: Config, groups: list[Any] | None = None) -> list[dict[str, Any]]:
+def review_rows(d: Data, cfg: Config, groups: list[Any] | None = None,
+                suggested: dict[str, str] | None = None) -> list[dict[str, Any]]:
     """Every proposal to decide. A cleanup group replaces the waste alarms about its own resources, so a saving is
     never counted twice."""
     cur = cfg.pricing.currency
@@ -185,6 +196,8 @@ def review_rows(d: Data, cfg: Config, groups: list[Any] | None = None) -> list[d
     if m is None and not groups:
         return []
     owners = _owners(d, cfg)
+    for res, v in (suggested or {}).items():  # untagged: the owner of what it is attached to
+        owners.setdefault(res, f"{v} (suggested)")
     out = []
     for r in sorted((m or ([], []))[0], key=lambda r: -(r["est_monthly_saving"] or 0)):
         if (r["control"], r["resource"]) in covered:
@@ -194,7 +207,8 @@ def review_rows(d: Data, cfg: Config, groups: list[Any] | None = None) -> list[d
         out.append({
             "id": f"{r['control']}|{r['resource']}", "what": _human(r["control"], r.get("reason")),
             "resource": _short(r["resource"]), "full": r["resource"], "service": service_name(r["service"]),
-            "region": _region(r["resource"]), "owner": owners.get(r["resource"], ""),
+            "region": _region(r["resource"]),
+            "owner": owners.get(r["resource"]) or owners.get(_short(r["resource"]), ""),
             "reason": r.get("reason") or "", "control": r["control"], "amount": round(amt, 2),
             "monthly": ch.money(amt, cur, compact=False), "yearly": ch.money(amt * 12, cur),
             "effort": _effort(r["control"]), "kind": kind,
@@ -235,7 +249,7 @@ def review_page(d: Data, cfg: Config, source: Source, analysis: Analysis, fx: di
     full = view_model(d, cfg, source)
     cl = extra.get("cleanup")
     groups = cl["groups"] if cl else []
-    rows = review_rows(d, cfg, groups)
+    rows = review_rows(d, cfg, groups, cl["owner"] if cl else None)
     notes = {(n.date, n.group): n.explanation for n in analysis.anomaly_notes}
     spikes = [r for r in _anomaly_rows(d) if r.get("direction", "spike") == "spike"]
     vm.update({
@@ -262,9 +276,25 @@ def review_page(d: Data, cfg: Config, source: Source, analysis: Analysis, fx: di
         "review_key": d.account or ("demo" if source is Source.demo else "local"),
         "findings": {f: (full[f] or {}).get("hint") for f in ("rightsize", "waste")},
         "cleanup": cleanup_view(cl, cur) if cl else None,
+        "suggested_tags": suggested_view(cl["suggestions"], cl["graph"]) if cl and cl["suggestions"] else None,
         "skip_graph": "graph" in extra.get("skipped", []),
     })
     return vm
+
+
+def suggested_view(sugg: list[Any], g: Any) -> dict[str, Any]:
+    from ..graph.model import type_label
+
+    keys: dict[str, int] = defaultdict(int)
+    for x in sugg:
+        keys[x.key] += 1
+    shown = [x for x in sugg if x.confidence != "low"][:12] or sugg[:12]
+    return {"resources": len({x.resource for x in sugg}), "count": len(sugg),
+            "by_key": [{"label": k, "value": v, "tip": f"{k}: {v} resource(s)"} for k, v in
+                       sorted(keys.items(), key=lambda kv: -kv[1])],
+            "high": sum(1 for x in sugg if x.confidence == "high"),
+            "rows": [{"resource": g.nodes[x.resource].short_id, "type": type_label(x.type), "tag": x.key,
+                      "value": x.value, "confidence": x.confidence, "because": x.reason} for x in shown]}
 
 
 def cleanup_view(cl: dict[str, Any], cur: str) -> dict[str, Any]:
@@ -371,7 +401,8 @@ def review(
     out.write_text(html)
     by = f"AI analysis by {analysis.model}" if analysis.by == "ai" else "rule-based summary"
     groups = (extra["cleanup"] or {}).get("groups") or []
-    err.print(f"[green]Wrote[/] {out} ({len(html) // 1024} KiB · {by} · {len(review_rows(data, cfg, groups))} proposals "
+    n = len(review_rows(data, cfg, groups, (extra["cleanup"] or {}).get("owner")))
+    err.print(f"[green]Wrote[/] {out} ({len(html) // 1024} KiB · {by} · {n} proposals "
               f"to review{f', {len(groups)} cleanup groups' if groups else ''})")
 
 

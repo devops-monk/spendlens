@@ -12,8 +12,8 @@ CATEGORIES: list[tuple[str, str, list[str]]] = [
      "with a reason, the resource, account, region and, where it applies, a monthly saving estimate.",
      ["tags", "tags types", "rightsize", "rightsize controls", "waste", "waste controls"]),
     ("Resource graph", "How resources connect and what they cost together: cleanup groups of resources that can be "
-     "removed together, and what deleting one would affect. show, impact and stats read the saved graph.",
-     ["graph orphans", "graph show", "graph impact", "graph collect", "graph stats"]),
+     "removed together, suggested owner tags for untagged resources, and what deleting one would affect. show, impact, owners and stats read the saved graph.",
+     ["graph orphans", "graph owners", "graph show", "graph impact", "graph collect", "graph stats"]),
     ("Cost analysis", "What changed, where, and who owns it, from Cost Explorer. Each period is one bounded request "
      "($0.01 each, billed by AWS).",
      ["cost diff", "cost trend", "cost showback", "cost resources"]),
@@ -40,6 +40,7 @@ TASKS: list[tuple[str, str]] = [
     ("Find idle and orphaned resources I'm paying for", "waste"),
     ("Find groups of resources I can clean up together", "graph orphans"),
     ("See what a resource is connected to before deleting it", "graph impact"),
+    ("Find who owns untagged resources", "graph owners"),
     ("See what changed in my bill since last month", "cost diff"),
     ("See which resources or apps changed inside each service", "cost diff"),
     ("See spend per team, environment or cost centre", "cost showback"),
@@ -133,6 +134,12 @@ RECIPES: dict[str, list[tuple[str, str]]] = {
         ("A resource and its neighbours, as a tree", "spendlens graph show i-0abc123"),
         ("Three links deep, as an interactive page", "spendlens graph show payments-api -d 3 -o payments.html"),
         ("As Mermaid for a wiki or pull request", "spendlens graph show vol-0abc123 -o vol.mmd"),
+    ],
+    "graph owners": [
+        ("Suggested owner tags for untagged resources", "spendlens graph owners"),
+        ("Only the sure ones, as CSV", "spendlens graph owners --min-confidence high -f csv -o owners.csv"),
+        ("Write the tagging commands to review and run yourself", "spendlens graph owners --script tag-review.sh"),
+        ("Only the Team tag", "spendlens graph owners -k Team"),
     ],
     "graph impact": [("What breaks or is left behind if it is deleted", "spendlens graph impact vol-0abc123")],
     "graph collect": [("Read the resources and their links, save them", "spendlens graph collect")],

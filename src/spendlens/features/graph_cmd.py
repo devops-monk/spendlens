@@ -4,9 +4,10 @@
   graph show <id|name>   a resource and its neighbours: terminal tree, or -o graph.html/.svg/.mmd/.dot/.json
   graph orphans          cleanup groups: connected resources that can be removed together, with one total saving
   graph impact <id>      if this resource is deleted: what breaks, what is left behind unused, what stays
+  graph owners           suggested owner tags for untagged resources, from what they are attached to
   graph stats            what was collected, and which sources were skipped (and why)
 
-show, impact and stats read the saved graph (no AWS calls). orphans collects first by default (--source live),
+show, impact, owners and stats read the saved graph (no AWS calls). orphans collects first by default (--source live),
 like the other checks; --source last/demo replays a saved run.
 """
 
@@ -14,6 +15,7 @@ from __future__ import annotations
 
 import json
 from datetime import UTC, datetime
+from enum import Enum
 from pathlib import Path
 from typing import Annotated, Any
 
@@ -87,6 +89,43 @@ def owner_keys(cfg: Config) -> tuple[str, ...]:
     """Tags that name an owner: Owner/Team first, then the showback keys that are not environments."""
     extra = [k for k in cfg.cost.showback_tag_keys if k.lower() not in NOT_OWNERS]
     return tuple(dict.fromkeys([*OWNER_KEYS, *extra]))
+
+
+def tag_keys(cfg: Config) -> list[str]:
+    """Tags worth suggesting: the policy's mandatory tags, then the usual owner tags."""
+    return [*cfg.tagging.mandatory, *owner_keys(cfg)]
+
+
+def suggestions_for(g: Graph, cfg: Config, min_confidence: str = "low") -> list[Any]:
+    from ..graph.owners import suggest_owners
+
+    return suggest_owners(g, tag_keys(cfg), min_confidence=min_confidence)
+
+
+def saved_suggestions(source: Source, cfg: Config) -> dict[str, list[Any]]:
+    """Owner suggestions from the latest saved graph (demo DB for --source demo), quietly; {} when there is none.
+    Never collects: other commands use this to annotate their output without extra AWS calls."""
+    from ..graph.owners import by_resource
+    from ..history import HistoryStore, demo_db_path
+
+    path = demo_db_path() if source is Source.demo else history_path(cfg)
+    try:
+        with HistoryStore(path, read_only=True) as store:
+            run = store.latest_run("graph")
+            if run is None:
+                return {}
+            g = Graph.from_rows(*store.graph(run.id))
+    except (FileNotFoundError, OSError):
+        return {}
+    return by_resource(suggestions_for(g, cfg))
+
+
+def describe(sugg: list[Any]) -> str:
+    """'Team=payments, Environment=prod (from EC2 instance payments-api-1)'."""
+    if not sugg:
+        return ""
+    tags = ", ".join(f"{x.key}={x.value}" for x in sugg)
+    return f"{tags} ({sugg[0].confidence}: {sugg[0].reason})"
 
 
 def _latest_waste(store: Any) -> list[Finding]:
@@ -382,6 +421,70 @@ def graph_impact(
     console.print(f"Saves [bold]{money(r['monthly_cost'], cur) or 'no estimate'}[/]"
                   + (f", plus {money(r['left_behind_cost'], cur)} if what is left behind is removed too"
                      if r["left_behind_cost"] else "") + ". [dim]Read-only: nothing was changed.[/]")
+
+
+class Confidence(str, Enum):
+    high = "high"
+    medium = "medium"
+    low = "low"
+
+
+@graph_app.command("owners")
+def graph_owners(
+    source: GraphSource = Source.last,
+    key: Annotated[list[str] | None, typer.Option("--key", "-k", help="Only these tag keys (repeatable).")] = None,
+    min_confidence: Annotated[Confidence, typer.Option("--min-confidence", help="high: directly attached or "
+                                                       "managed; medium: one step removed; low: the subnet's "
+                                                       "majority.")] = Confidence.low,
+    script: Annotated[Path | None, typer.Option("--script", help="Also write the tagging commands as a shell script "
+                                                "for a person to review and run (spendlens never runs it).")] = None,
+    fmt: FormatOpt = Format.table,
+    out: OutOpt = None,
+    config: ConfigOpt = None,
+    sets: SetOpt = None,
+) -> None:
+    """Suggested owner tags for untagged resources, from what they are attached to.
+
+    A volume without a Team tag gets the Team of the instance that mounts it; a network interface or Elastic IP
+    the tags of its instance; an instance those of its Auto Scaling group; a snapshot those of its volume. Each
+    suggestion says where it came from and how sure it is. Suggests the tagging.mandatory tags and owner tags
+    (Owner, Team, Service Owner, CostCentre, the showback keys).
+    Examples:
+      spendlens graph owners
+      spendlens graph owners --min-confidence high -f csv -o owners.csv
+      spendlens graph owners --script tag-review.sh
+      spendlens graph owners --source demo
+    """
+    from ..graph.owners import script as make_script
+
+    cfg = load(config, None, sets)
+    ld = load_graph(source, cfg)
+    sugg = suggestions_for(ld.g, cfg, min_confidence.value)
+    if key:
+        wanted = {k.lower() for k in key}
+        sugg = [x for x in sugg if x.key.lower() in wanted]
+    resources = len({x.resource for x in sugg})
+    meta = ReportMeta(title="Suggested owner tags", account_id=ld.account,
+                      extra={"source": ld.source.value, "run_id": ld.run_id, "resources": resources})
+    rows = [{"resource": ld.g.nodes[x.resource].short_id, "type": type_label(x.type), "name": x.name, "tag": x.key,
+             "suggested": x.value, "confidence": x.confidence, "because": x.reason, "region": x.region,
+             "arn": x.resource} for x in sugg]
+    if fmt is Format.table and not rows:
+        console.print("[green]No suggestions:[/] every collected resource has the policy and owner tags, or nothing "
+                      "related carries them.")
+    elif fmt is Format.table:
+        emit(rows, fmt, out, f"Suggested owner tags · {resources} resource(s)", meta=meta,
+             columns=["resource", "type", "tag", "suggested", "confidence", "because"])
+        by_conf = {c: sum(1 for x in sugg if x.confidence == c) for c in ("high", "medium", "low")}
+        err.print(f"{len(sugg)} tag(s) for {resources} resource(s): {by_conf['high']} high, {by_conf['medium']} "
+                  f"medium, {by_conf['low']} low confidence. Apply after review: --script tag-review.sh")
+    else:
+        emit(rows if fmt is not Format.json else [x.to_dict() for x in sugg], fmt, out, "Suggested owner tags",
+             meta=meta)
+    if script:
+        script.parent.mkdir(parents=True, exist_ok=True)
+        script.write_text(make_script(sugg))
+        err.print(f"[green]Wrote[/] {script} [dim](review it before running; spendlens never runs it)[/]")
 
 
 @graph_app.command("stats")

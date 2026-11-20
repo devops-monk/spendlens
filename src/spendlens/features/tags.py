@@ -124,11 +124,36 @@ def tags(
     if summary:
         emit(summarise(scoped), fmt, out, "Tag compliance summary", meta=meta)
     else:
-        emit(select(scoped, checks, rtypes, statuses), fmt, out, "Tag compliance", columns=FINDING_COLUMNS,
-             meta=meta)
+        rows: list = select(scoped, checks, rtypes, statuses)
+        columns = FINDING_COLUMNS
+        if sugg := _suggested(rows, source, cfg):
+            rows = [{**f.model_dump(mode="json"), "suggested": sugg.get(f.resource, "")} for f in rows]
+            columns = [*FINDING_COLUMNS[:5], "suggested", *FINDING_COLUMNS[5:]]
+        emit(rows, fmt, out, "Tag compliance", columns=columns, meta=meta)
+        if sugg:
+            err.print(f"[dim]{len(sugg)} resource(s) have suggested tags from what they are attached to "
+                      "(the saved resource graph). Review and apply: spendlens graph owners --script tag-review.sh[/]")
     err.print(f"[bold]{headline(scoped)}[/]")
     if fail_on_alarm and any(f.status is Status.ALARM for f in scoped):
         raise typer.Exit(3)
+
+
+def _suggested(findings: list[Finding], source: Source, cfg: Config) -> dict[str, str]:
+    """resource -> suggested tags, for missing-tag alarms, from the saved resource graph (no AWS calls)."""
+    wanted = [f for f in findings if f.status is Status.ALARM and f.check in ("tags_mandatory", "tags_untagged")]
+    if not wanted:
+        return {}
+    from .graph_cmd import describe, saved_suggestions
+
+    by = saved_suggestions(source, cfg)
+    if not by:
+        return {}
+    out = {}
+    for f in wanted:
+        short = f.resource.rsplit("/", 1)[-1].rsplit(":", 1)[-1] if f.resource.startswith("arn:") else f.resource
+        if s := by.get(f.resource) or by.get(short):
+            out[f.resource] = describe(s)
+    return out
 
 
 @app.command("types")

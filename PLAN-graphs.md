@@ -7,7 +7,12 @@
 - **Two deviations from the plan below:**
   1. Edges come from **one query per resource type** (23 queries) instead of one query per edge. Each row's own columns give its links, which is fewer AWS calls for the same relationships.
   2. ECS task definitions without a service are not a cleanup group, because they cost nothing.
-- **Next:** phase 3 (owners).
+- **Phase 3 is built:**
+  - `graph owners`: high, medium and low confidence rules, plus a review script with low-confidence lines commented out;
+  - a "suggested" column in `tags`;
+  - "(suggested)" owners in the review queue and on cleanup groups, and a "Suggested tags" card in the review.
+- **Not built yet:** the CloudTrail creator rule waits on open question 2, and the showback owner map is folded into the review card.
+- **Next:** phase 4 (AI tools).
 
 ## Context
 

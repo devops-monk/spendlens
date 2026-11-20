@@ -88,6 +88,8 @@ SECTIONS: list[tuple[str, str, str, list[tuple[str, str, str]]]] = [
         ("What a resource connects to, and what the group costs", "spendlens graph show i-0abc123", "offline"),
         ("Draw it as a page", "spendlens graph show payments-api -o payments.html", "offline"),
         ("What breaks if I delete this?", "spendlens graph impact vol-0abc123", "offline"),
+        ("Who owns untagged volumes, snapshots and IPs?", "spendlens graph owners", "offline"),
+        ("Tagging commands to review and run yourself", "spendlens graph owners --script tag-review.sh", "offline"),
         ("Try it on sample data", "spendlens graph orphans --source demo", "offline"),
     ]),
     ("hunt", "Find one kind of waste", "Run a single check when you already know what you're looking for.", [

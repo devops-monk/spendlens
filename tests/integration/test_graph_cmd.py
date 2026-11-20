@@ -114,3 +114,43 @@ def test_review_shows_cleanup_groups_and_queues_them_once(tmp_path):
         assert not any(x["control"] == "ebs_volume_unattached" and x["full"] == grp["full"] for x in data["review"])
     r = run("review", "--source", "demo", "--no-ai", "--skip", "graph", "-o", str(out))
     assert 'id="cleanup"' not in out.read_text()
+
+
+def test_owners_demo_table_script_json(tmp_path):
+    r = run("graph", "owners", "--source", "demo")
+    assert "vol-0payapi1" in r.output and "payments" in r.output and "mounted by EC2 instance payments-api-1" in r.output
+    assert "high" in r.output and "medium" in r.output and "low" in r.output
+    sh = tmp_path / "tag.sh"
+    run("graph", "owners", "--source", "demo", "--min-confidence", "high", "-k", "Team", "--script", str(sh),
+        "-f", "json", "-o", str(tmp_path / "o.json"))
+    doc = json.loads((tmp_path / "o.json").read_text())
+    items = doc["rows"] if isinstance(doc, dict) else doc
+    assert items and all(x["confidence"] == "high" and x["key"] == "Team" for x in items)
+    text = sh.read_text()
+    assert "REVIEW BEFORE RUNNING" in text and "aws resourcegroupstaggingapi tag-resources" in text
+    assert "report-export" not in text  # low confidence filtered out
+
+
+def test_tags_shows_suggestions_from_the_saved_graph(fake_steampipe):
+    from spendlens.common import history_path
+    from spendlens.config import load_config
+    from spendlens.history import HistoryStore
+    from spendlens.models import Finding, Status
+
+    run("graph", "collect")
+    vol = "arn:aws:ec2:eu-west-1:123456789012:volume/vol-0payapi1"
+    with HistoryStore(history_path(load_config())) as s:
+        s.save_run("tags", [Finding(control="tags_mandatory_ebs_volume", check="tags_mandatory", resource_type="ebs_volume",
+                                    resource=vol, status=Status.ALARM, reason="vol-0payapi1 is missing tags: Team.")])
+    r = run("tags", "--source", "last")
+    assert "suggested" in r.output and "Team=payments" in r.output and "spendlens graph owners" in r.output
+    r = run("tags", "--source", "last", "-f", "json")
+    assert "Team=payments" in r.stdout
+
+
+def test_review_has_suggested_tags_card(tmp_path):
+    out = tmp_path / "review.html"
+    run("review", "--source", "demo", "--no-ai", "-o", str(out))
+    html = out.read_text()
+    assert "Suggested tags" in html and "mounted by EC2 instance payments-api-1" in html
+    assert "spendlens graph owners --script tag-review.sh" in html

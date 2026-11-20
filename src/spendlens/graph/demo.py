@@ -134,7 +134,9 @@ def rows(link: dict[str, list[dict[str, Any]]] | None = None) -> dict[str, list[
              stopped="2026-08-02T17:40:00+00:00", image="ami-0golden2024", eip="eipalloc-0rpt",
              launched="2024-03-11T09:00:00+00:00")
     for i, d in enumerate(("2026-05-01", "2026-06-01", "2026-07-01", "2026-08-01")):
-        snapshot(f"snap-0rptdata{i}", "vol-0rptdata", 500, f"{d}T02:00:00+00:00", "data", "nightly backup")
+        # the two newest were taken by a script that does not copy tags
+        snapshot(f"snap-0rptdata{i}", "vol-0rptdata", 500, f"{d}T02:00:00+00:00", "data" if i < 2 else None,
+                 "nightly backup")
 
     # stopped last week: not a group yet (graph.stopped_days)
     instance("i-0batchwkr", "batch-worker", "t3.large", "data", "subnet-0priv-b", [("vol-0batch", "gp3", 80, None)],
@@ -233,6 +235,13 @@ def rows(link: dict[str, list[dict[str, Any]]] | None = None) -> dict[str, list[
                                          "db_instance_identifier": "reports-db-2023", "type": "manual",
                                          "status": "available", "allocated_storage": 100,
                                          "create_time": f"{d}T22:00:00+00:00", "tags": _tags("data")})
+
+    # platform functions in the public subnet, and one nobody tagged
+    for name, team in (("log-shipper", "platform"), ("dns-sync", "platform"), ("report-export", None)):
+        t["aws_lambda_function"].append({**_base(), "arn": f"arn:aws:lambda:{R}:{ACCOUNT}:function:{name}",
+                                         "name": name, "state": "Active", "runtime": "python3.12", "memory_size": 256,
+                                         "last_modified": "2026-09-01T09:00:00+00:00", "tags": _tags(team),
+                                         "vpc_subnet_ids": ["subnet-0pub-a"]})
 
     # a function in the VPC
     t["aws_lambda_function"].append({**_base(), "arn": f"arn:aws:lambda:{R}:{ACCOUNT}:function:thumbnailer",

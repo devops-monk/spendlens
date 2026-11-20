@@ -231,6 +231,16 @@
   {% if vm.tags_by_type and not vm.skip_tags %}
   {% call card("Where tags are missing", "Tag alarms by resource type") %}{{ charts.hbars(vm.tags_by_type, label="Tag alarms by resource type", fill="var(--series-2)", width=1080, fmt=charts.count) }}{% endcall %}
   {% endif %}
+  {% set st = vm.suggested_tags %}
+  {% if st and not vm.skip_tags %}
+  {% call card("Suggested tags", st.resources ~ " untagged resource" ~ ("s" if st.resources != 1 else "") ~ " can take their tags from what they are attached to (" ~ st.high ~ " of " ~ st.count ~ " tags with high confidence)") %}
+    {{ charts.hbars(st.by_key, label="Suggested tags by key", fill="var(--series-3)", width=1080, fmt=charts.count) }}
+    <div class="tablewrap"><table><thead><tr><th>Resource</th><th>Type</th><th>Tag</th><th>Suggested</th><th>Confidence</th><th>Because</th></tr></thead><tbody>
+    {% for r in st.rows %}<tr><td><code>{{ r.resource }}</code></td><td>{{ r.type }}</td><td>{{ r.tag }}</td><td><b>{{ r.value }}</b></td><td>{{ r.confidence }}</td><td>{{ r.because }}</td></tr>{% endfor %}
+    </tbody></table></div>
+    <p class="note">From the resource graph: a volume takes the tags of the instance that mounts it, a snapshot those of its volume, an instance those of its Auto Scaling group. Review, then apply: <code>spendlens graph owners --script tag-review.sh</code> (spendlens never applies tags itself).</p>
+  {% endcall %}
+  {% endif %}
   {% if a.risks %}
   {% call card("Risks to watch") %}<ul class="br-risks">{% for r in a.risks %}<li>{{ r }}</li>{% endfor %}</ul>{% endcall %}
   {% endif %}
