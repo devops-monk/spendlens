@@ -36,8 +36,16 @@
 <p align="center"><sub>One self-contained HTML report, shown with the bundled demo data.</sub></p>
 
 > [!NOTE]
-> v0.3.3. spendlens is tested end to end through Steampipe against an AWS emulator. Verification against a live
+> v0.3.4. spendlens is tested end to end through Steampipe against an AWS emulator. Verification against a live
 > account with a read-only role is next (see [PLAN.md](PLAN.md)).
+
+## New in 0.3.4
+
+- **Sessions: follow-up questions that remember.** `spendlens ask --new "…"` starts a session; `spendlens ask -C "…"` continues it in a later command, even another day; `-S NAME` keeps topics apart. `spendlens session list|show|delete|clear` manages them. Works with every provider.
+- **Save an answer as a page.** `spendlens ask "…" -o answer.html` writes a styled page with the tool calls behind it (or `.md`); `spendlens session show NAME -o session.html` saves a whole conversation. The assistant answers in Markdown and never writes HTML, so long answers no longer hit the token limit.
+- **Answers stay on the question.** No unrequested savings queries; configuration questions (e.g. Aurora ACU min/max) use live AWS with `--live`, or say that `--live` is needed.
+- **ECS findings with structure.** ECS task sizing findings now carry the service, task family, launch type, vCPU, memory and the company maximum as fields.
+- **Architecture page** explains how a command runs, what each flag changes, how the assistant knows the AWS tables, and sessions.
 
 ## New in 0.3.3
 
