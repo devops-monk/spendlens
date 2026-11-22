@@ -13,8 +13,8 @@ CATEGORIES: list[tuple[str, str, list[str]]] = [
      ["tags", "tags types", "rightsize", "rightsize controls", "waste", "waste controls"]),
     ("Resource graph", "How resources connect and what they cost together: cleanup groups of resources that can be "
      "removed together, suggested owner tags for untagged resources, and what deleting one would affect. show, impact, owners and stats read the saved graph.",
-     ["graph orphans", "graph owners", "graph traffic", "graph show", "graph impact", "graph collect",
-      "graph stats"]),
+     ["graph orphans", "graph owners", "graph traffic", "graph age", "graph show", "graph impact",
+      "graph collect", "graph stats"]),
     ("Cost analysis", "What changed, where, and who owns it, from Cost Explorer. Each period is one bounded request "
      "($0.01 each, billed by AWS).",
      ["cost diff", "cost trend", "cost showback", "cost resources"]),
@@ -44,6 +44,7 @@ TASKS: list[tuple[str, str]] = [
     ("See what a resource is connected to before deleting it", "graph impact"),
     ("Find who owns untagged resources", "graph owners"),
     ("See what NAT gateways and cross-AZ traffic cost", "graph traffic"),
+    ("Find old resources that still cost money", "graph age"),
     ("See what changed in my bill since last month", "cost diff"),
     ("See which resources or apps changed inside each service", "cost diff"),
     ("See spend per team, environment or cost centre", "cost showback"),
@@ -163,6 +164,12 @@ RECIPES: dict[str, list[tuple[str, str]]] = {
         ("Only cross-AZ traffic", "spendlens graph traffic --path cross_az"),
         ("As a page with the costliest paths drawn", "spendlens graph traffic -f html -o traffic.html"),
         ("Try it on the bundled demo data", "spendlens graph traffic --source demo"),
+    ],
+    "graph age": [
+        ("How old resources are and what they cost", "spendlens graph age"),
+        ("Only resources older than a year", "spendlens graph age --min-days 365"),
+        ("Old snapshots and AMIs, as CSV", "spendlens graph age -t ebs_snapshot -t ec2_ami --min-days 180 -f csv -o old.csv"),
+        ("As a page", "spendlens graph age -f html -o age.html"),
     ],
     "graph impact": [("What breaks or is left behind if it is deleted", "spendlens graph impact vol-0abc123")],
     "graph collect": [

@@ -31,6 +31,11 @@
   - `spendlens find <text>` searches the saved findings, Cost Explorer resource costs and the graph;
   - `spendlens open [review|dashboard|brief|cleanup|traffic]` builds the page from saved runs (no AWS calls, no AI unless `--ai`) under `reports/` next to the history, and opens it;
   - `waste` and `rightsize` print cleanup-group hints in their table output.
+- **Built after the phases:**
+  - `graph age`: resource age with cost, also `open age`;
+  - the AI's `cloudtrail_logs` tool on Tailpipe CloudTrail logs: guarded DuckDB queries, only offered when Tailpipe is installed;
+  - flow-log custom fields (`pkt-*`, `pkt-*-aws-service`), with a fallback for default-format logs;
+  - gateway-endpoint coverage per route table, with "associate" proposals.
 - **All seven phases are built.** The CloudTrail owner rule is also built, opt-in as decided (`graph.owner_from_cloudtrail`, question 2): LookupEvents creation events over `graph.cloudtrail_days`, suggested for `graph.cloudtrail_owner_key` with medium confidence.
 
 ## Context

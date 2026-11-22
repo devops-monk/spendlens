@@ -216,7 +216,7 @@ def test_traffic_ai_tool_and_review_section(tmp_path):
 
     tb = Toolbox(load_config(environ={}), demo_db_path())
     d = json.loads(tb.execute("1", "traffic_paths", {"path": "nat"}).content)
-    assert {r["peer_name"] for r in d["rows"]} == {"DynamoDB", "Internet"} and d["proposals"][0]["service"] == "DynamoDB"
+    assert {r["peer_name"] for r in d["rows"]} == {"DynamoDB", "Internet", "S3"} and d["proposals"][0]["service"] == "DynamoDB"
     out = tmp_path / "r.html"
     run("review", "--source", "demo", "--no-ai", "-o", str(out))
     html = out.read_text()

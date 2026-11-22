@@ -51,11 +51,39 @@ def test_paths_and_prices(g):
     assert res["monthly_cost"] == round(sum(r["monthly_cost"] for r in res["rows"]), 2)
 
 
-def test_endpoint_proposal_only_where_traffic_goes_through_nat(g):
+def test_endpoint_proposals_add_or_associate(g):
     props = result(g)["proposals"]
-    assert [(p["service"], p["vpc"]) for p in props] == [("DynamoDB", "vpc-0prod")]
-    assert props[0]["monthly_saving"] == row(result(g), "payments-api-2", "nat")["monthly_cost"]
-    assert "free" in props[0]["why"] and "route tables" in props[0]["check_first"]
+    assert [(p["service"], p["endpoint"]) for p in props] == [("DynamoDB", None), ("S3", "vpce-0s3")]
+    add, assoc = props
+    assert add["title"] == "Add a DynamoDB gateway endpoint to vpc-0prod"
+    assert add["monthly_saving"] == next(r for r in result(g)["rows"] if r["peer"] == "DynamoDB")["monthly_cost"]
+    # the VPC has an S3 endpoint, on the main route table only: priv-a (its own table) pays NAT for S3
+    assert assoc["title"] == "Associate S3 gateway endpoint vpce-0s3 with route table rtb-0priva"
+    assert "an S3 gateway endpoint" in assoc["why"] and assoc["resources"] == ["payments-api-1"]
+    assert row(result(g), "payments-api-2", "endpoint")["monthly_cost"] == 0  # priv-b uses the main table
+
+
+def test_flow_log_custom_fields(g):
+    from spendlens.graph.costs import CostSourceError
+    from spendlens.graph.traffic import read_flows
+
+    # AWS names the service itself: trusted even for an address outside the bundled ranges
+    res = result(g, [{"interface_id": "eni-0payapi2", "src_addr": IPS["i-0payapi2"], "dst_addr": "198.51.100.7",
+                      "pkt_dst_aws_service": "DYNAMODB", "bytes": 10 * GB}])
+    assert row(res, "payments-api-2", "nat")["peer_name"] == "DynamoDB"
+    # through a middlebox: the original packet addresses identify the resource
+    res = result(g, [{"interface_id": "eni-0searchidx", "src_addr": "10.20.9.9", "dst_addr": "93.184.216.34",
+                      "pkt_src_addr": IPS["i-0searchidx"], "pkt_dst_addr": "93.184.216.34", "bytes": 10 * GB}])
+    assert row(res, "search-indexer", "nat")["gb_out_month"] > 0
+    calls = []
+
+    def run(sql):
+        calls.append(sql)
+        if "pkt_src_addr" in sql:
+            raise CostSourceError('Binder Error: column "pkt_src_addr" not found')
+        return []
+
+    assert read_flows(run, 7) == ([], False) and len(calls) == 2  # default-format logs: falls back
 
 
 def test_public_subnet_goes_straight_out_and_unknown_private_peers_are_not_priced(g):

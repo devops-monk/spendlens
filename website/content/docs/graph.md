@@ -8,6 +8,7 @@ spendlens reads how your resources connect, read-only, and saves the result to i
 - **`graph impact`** says what would break, or be left behind, if one resource were deleted.
 - **`graph owners`** suggests owner tags for untagged resources, from what they are attached to.
 - **`graph traffic`** prices data transfer from VPC flow logs: cross-AZ, through NAT gateways, out to the internet.
+- **`graph age`** shows how old resources are and what they cost.
 
 The relationships follow the [Steampipe AWS Insights mod](https://hub.powerpipe.io/mods/turbot/aws_insights)'s relationship graphs, collected for the whole account at once. spendlens adds the monthly cost of every resource and the waste alarms about it.
 
@@ -111,6 +112,25 @@ It is off by default, for three reasons:
 
 > spendlens never applies tags. `--script` writes `aws resourcegroupstaggingapi tag-resources` commands, one per resource, each with its reason as a comment. Low-confidence lines are commented out. Review the script before you run it with a role that is allowed to tag.
 
+## Resource age
+
+Old is not wrong, but old and costly is worth a look: a two-year-old snapshot, an instance launched in 2023 that nobody touches. `graph age` groups the saved graph's resources by age and shows:
+- the monthly cost of each age band and each type;
+- the costliest resources, with their owner (or a suggested one) and their cleanup group.
+
+```bash
+spendlens graph age
+spendlens graph age --min-days 365
+spendlens graph age -t ebs_snapshot -t ec2_ami --min-days 180 -f csv -o old.csv
+spendlens open age
+```
+
+Ages come from each resource's own date: creation, launch or snapshot time. The API has no creation date for two types, which use other dates:
+- **Lambda functions:** age since their last change.
+- **Network interfaces:** age since they were attached.
+
+Subnets, Elastic IPs and target groups have no date at all and are counted separately.
+
 ## Find one resource, open a page
 
 `spendlens find` searches everything saved for a resource id, ARN, Name or tag value:
@@ -160,11 +180,15 @@ spendlens graph traffic --source demo -f html -o traffic.html
 | Inside the VPC (not collected) | A private address spendlens did not collect, such as peering or an RDS interface | Not priced |
 
 How the numbers are counted:
-- **Recognising S3 and DynamoDB.** Their addresses come from AWS's public `ip-ranges.json`, bundled with spendlens.
+- **Custom flow-log formats.** When your flow logs include the extra fields (`pkt-src-addr`, `pkt-dst-addr`, `pkt-src-aws-service`, `pkt-dst-aws-service`), spendlens uses the service AWS itself names, and the original packet addresses for traffic through a middlebox. With the default format it falls back to address matching.
+- **Recognising S3 and DynamoDB.** Their addresses come from AWS's public `ip-ranges.json`, bundled with spendlens, unless the flow log names the service.
+- **Endpoint coverage.** A gateway endpoint counts only for subnets whose route table it is associated with (read from the route tables).
 - **Counted at the sender.** Traffic between two collected resources is counted once, by the one that sent it. A NAT gateway's own interface is skipped, because its traffic is already counted at the resource behind it.
 - **Monthly rates.** Costs are monthly rates from the window.
 
-**Proposals.** Where S3 or DynamoDB traffic goes through a NAT gateway and the VPC has no gateway endpoint for it, spendlens proposes adding one. Gateway endpoints for S3 and DynamoDB are free, so the NAT processing charge on that traffic goes away. The proposal appears in `graph traffic`, in the review's **Data transfer** section and in its queue.
+**Proposals.** Where S3 or DynamoDB traffic goes through a NAT gateway, spendlens proposes one of two fixes:
+- **Add an endpoint:** the VPC has no gateway endpoint for that service.
+- **Associate an endpoint:** the VPC has one, but the sending subnet's route table doesn't use it, so the proposal names the route table to add it to. Gateway endpoints for S3 and DynamoDB are free, so the NAT processing charge on that traffic goes away. The proposal appears in `graph traffic`, in the review's **Data transfer** section and in its queue.
 
 **Requirements:**
 - Tailpipe with the AWS plugin, with the flow logs collected (`tailpipe collect aws_vpc_flow_log`);

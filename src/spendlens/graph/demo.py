@@ -52,6 +52,8 @@ def flows() -> list[dict[str, Any]]:
         f("eni-0payapi2", pay2, DDB_IP, 100), f("eni-0payapi2", DDB_IP, pay2, 300),
         # ... and S3, through the VPC's S3 gateway endpoint: free
         f("eni-0payapi2", pay2, S3_IP, 50), f("eni-0payapi2", S3_IP, pay2, 400),
+        # payments-api-1 sits in priv-a, whose route table does not use the S3 endpoint: its S3 traffic pays NAT
+        f("eni-0payapi1", pay1, S3_IP, 30), f("eni-0payapi1", S3_IP, pay1, 120),
         # search-indexer fetches from the internet through the NAT gateway
         f("eni-0searchidx", search, WEB_IP, 50), f("eni-0searchidx", WEB_IP, search, 20),
         # batch-worker and search-indexer share AZ b: free
@@ -82,6 +84,7 @@ def rows(link: dict[str, list[dict[str, Any]]] | None = None) -> dict[str, list[
                                     "tags": _tags("platform", sid.removeprefix("subnet-0"))})
     t["aws_vpc_endpoint"].append({**_base(), "vpc_endpoint_id": "vpce-0s3", "vpc_id": "vpc-0prod",
                                   "service_name": f"com.amazonaws.{R}.s3", "vpc_endpoint_type": "Gateway",
+                                  "route_table_ids": ["rtb-0main"],  # not on priv-a's own table
                                   "state": "available", "creation_timestamp": "2025-02-01T09:00:00+00:00",
                                   "tags": _tags("platform")})
     # private subnets route through the NAT gateway (b via the main table), the public one through the internet gateway

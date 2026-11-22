@@ -6,6 +6,7 @@
   graph impact <id>      if this resource is deleted: what breaks, what is left behind unused, what stays
   graph owners           suggested owner tags for untagged resources, from what they are attached to
   graph traffic          data transfer paths from VPC flow logs (Tailpipe): cross-AZ, NAT, internet, with costs
+  graph age              how old resources are and what they cost, by age band and type
   graph stats            what was collected, and which sources were skipped (and why)
 
 show, impact, owners and stats read the saved graph (no AWS calls). orphans collects first by default (--source live),
@@ -384,7 +385,7 @@ def graph_show(
         out.write_text(rd.to_json(sub, focus=root, total_monthly_cost=sub.total_cost(),
                                   cleanup_groups=[grp.to_dict() for grp in groups], shared_costs=shared))
     else:
-        vm = {"traffic": None, "focus": {"label": n.label, "type": type_label(n.type), "cost": money(n.monthly_cost, cur),
+        vm = {"age": None, "traffic": None, "focus": {"label": n.label, "type": type_label(n.type), "cost": money(n.monthly_cost, cur),
                         "basis": BASIS.get(n.cost_basis, "estimate").replace("price-book estimates", "estimate")},
               "total": money(sub.total_cost(), cur).removesuffix("/mo"), "count": len(sub.nodes), "depth": depth,
               "svg": rd.svg(sub, focus=root, highlight=in_groups, alarms=alarms, currency=cur, in_page=True,
@@ -433,7 +434,7 @@ def graph_orphans(
                              "already_flagged_by_waste": flagged})
     if fmt is Format.html:
         alarms = ld.alarms
-        vm = {"traffic": None, "focus": None, "rows": [], "shared": [], "groups": [group_view(grp, ld.g, cur, alarms=alarms) for grp in groups],
+        vm = {"age": None, "traffic": None, "focus": None, "rows": [], "shared": [], "groups": [group_view(grp, ld.g, cur, alarms=alarms) for grp in groups],
               "groups_saving": money(total, cur).removesuffix("/mo"), "members": sum(len(grp.members) for grp in groups),
               "flagged": money(flagged, cur).removesuffix("/mo"), "notes": _notes(ld)}
         _page(out or Path("spendlens-cleanup.html"), vm, "Cleanup groups",
@@ -506,14 +507,14 @@ def load_traffic(source: Source, cfg: Config) -> tuple[dict[str, Any], Loaded]:
 
     if source is Source.live:
         from ..graph.costs import CostSourceError, tailpipe_runner
-        from ..graph.traffic import analyse, flow_sql
+        from ..graph.traffic import analyse, read_flows
         from ..ui import activity
 
         ld = load_graph(Source.last, cfg)
         try:
             run = tailpipe_runner(cfg.graph.tailpipe_path)
             with activity(f"Reading {cfg.graph.flow_days} days of VPC flow logs [dim](Tailpipe, local)[/]"):
-                flows = run(flow_sql(cfg.graph.flow_days))
+                flows, _ = read_flows(run, cfg.graph.flow_days)
         except CostSourceError as e:
             err.print(f"[red]VPC flow logs unavailable:[/] {e}\n[dim]Needs Tailpipe with the AWS plugin and the "
                       "aws_vpc_flow_log table collected (see the Resource graph docs). Try --source demo.[/]")
@@ -583,7 +584,7 @@ def graph_traffic(
               "cost_per_month": r["monthly_cost"], "region": r["region"]} for r in rows[:top]]
     if fmt is Format.html:
         pic, cols = drawing(ld.g, result)
-        vm = {"focus": None, "rows": [], "shared": [], "groups": [], "notes": [],
+        vm = {"age": None, "focus": None, "rows": [], "shared": [], "groups": [], "notes": [],
               "traffic": {**result, "rows": rows[:top], "total": money(result["monthly_cost"], cur).removesuffix("/mo"),
                           "svg": draw(pic, currency=cur, in_page=True, title="Costliest data transfer paths",
                                       columns=cols)
@@ -610,6 +611,84 @@ def graph_traffic(
     if result["unmatched_interfaces"]:
         err.print(f"[dim]{result['unmatched_interfaces']} interface(s) in the flow logs are not in the saved graph "
                   "(another account or region, or collected since): `spendlens graph collect` refreshes it.[/]")
+
+
+@graph_app.command("age")
+def graph_age(
+    min_days: Annotated[int, typer.Option("--min-days", help="Only resources at least this many days old.")] = 0,
+    rtype: Annotated[list[str] | None, typer.Option("--type", "-t", help="Only these types, e.g. ebs_snapshot "
+                                                                       "(repeatable).")] = None,
+    top: Annotated[int, typer.Option("--top", help="Resources to list.")] = 30,
+    source: GraphSource = Source.last,
+    fmt: FormatOpt = Format.table,
+    out: OutOpt = None,
+    config: ConfigOpt = None,
+    sets: SetOpt = None,
+) -> None:
+    """How old resources are and what they cost: by age band, by type, and the costliest old ones.
+
+    From the saved graph (no AWS calls). Old and costly is worth a look; old alone is not wrong.
+    Examples:
+      spendlens graph age
+      spendlens graph age --min-days 365
+      spendlens graph age -t ebs_snapshot -t ec2_ami --min-days 180 -f csv -o old.csv
+      spendlens graph age --source demo -f html -o age.html
+    """
+    from ..graph.age import age_report
+    from ..graph.analyze import owner_of
+    from ..graph.model import TYPES
+
+    if bad := [t for t in rtype or [] if t not in TYPES]:
+        raise typer.BadParameter(f"unknown type(s) {', '.join(bad)}; one of: {', '.join(TYPES)}", param_hint="--type")
+    cfg = load(config, None, sets)
+    cur = cfg.pricing.currency
+    ld = load_graph(source, cfg)
+    keys = owner_keys(cfg)
+    sugg = {}
+    for x in suggestions_for(ld.g, cfg):
+        if x.key.lower() in {k.lower() for k in keys}:
+            sugg.setdefault(x.resource, x.value)
+
+    def owner(n: Any) -> str:
+        return owner_of([n], keys) or (f"{sugg[n.id]} (suggested)" if n.id in sugg else "")
+
+    groups = {m: grp.title for grp in groups_for(ld, cfg) for m in grp.members}
+    rep = age_report(ld.g, now=ld.now, min_days=min_days, types=rtype, owner=owner, groups=groups)
+    cols = ["name", "type", "age", "created", "monthly_cost", "owner", "cleanup_group", "region"]
+    meta = ReportMeta(title="Resource age", account_id=ld.account,
+                      extra={"source": ld.source.value, "as_of": rep["as_of"], "monthly_cost": rep["monthly_cost"]})
+    if fmt is Format.html:
+        vm = {"traffic": None, "focus": None, "rows": [], "shared": [], "groups": [], "notes": _notes(ld),
+              "age": {**rep, "rows": rep["rows"][:top], "count": len(rep["rows"]), "total": money(rep["monthly_cost"], cur).removesuffix("/mo"),
+                      "bars": [{"label": b["age"], "value": b["monthly_cost"],
+                                "tip": f"{b['age']}: {b['count']} resource(s), {money(b['monthly_cost'], cur)}"}
+                               for b in rep["buckets"]]}}
+        _page(out or Path("spendlens-age.html"), vm, "Resource age",
+              f"as of {rep['as_of']}" + (f" · at least {min_days} days old" if min_days else ""), cfg)
+        return
+    if fmt is Format.json:
+        emit([rep], fmt, out, "Resource age", meta=meta)
+        return
+    if fmt is not Format.table:
+        emit(rep["rows"], fmt, out, "Resource age", columns=cols, meta=meta)
+        return
+    if not rep["rows"]:
+        console.print("[green]No resources match.[/]")
+        return
+    t = Table(title=f"By age · {money(rep['monthly_cost'], cur)} in {len(rep['rows'])} resource(s)",
+              header_style=f"bold {BRAND}")
+    for c in ("age", "resources", "cost/month"):
+        t.add_column(c, justify="right" if c != "age" else "left")
+    for b in rep["buckets"]:
+        t.add_row(b["age"], str(b["count"]), money(b["monthly_cost"], cur))
+    console.print(t)
+    emit(rep["rows"][:top], fmt, None, f"Costliest of them (top {min(top, len(rep['rows']))})",
+         columns=["name", "type", "age", "created", "monthly_cost", "owner", "cleanup_group"], meta=meta)
+    since = sorted({f"{r['type']} {r['since']}" for r in rep["rows"] if r["since"]})
+    if since:
+        err.print(f"[dim]Ages: {'; '.join(since)} (no creation date in the API).[/]")
+    if rep["undated"]:
+        err.print(f"[dim]{rep['undated']} resource(s) have no date (subnets, Elastic IPs, target groups ...).[/]")
 
 
 class Confidence(str, Enum):

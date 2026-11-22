@@ -299,6 +299,8 @@
           each with one saving, counted once against the waste alarms they include.</td></tr>
         <tr><td><code>suggested_owners</code></td><td>always</td><td>Owner tags for untagged resources, from what they are
           attached to, with a confidence and the reason.</td></tr>
+        <tr><td><code>cloudtrail_logs</code></td><td>with Tailpipe</td><td>CloudTrail logs Tailpipe collected:
+          full history and S3 data events, one bounded DuckDB query on <code>aws_cloudtrail_log</code>.</td></tr>
         <tr><td><code>history_query</code></td><td>always</td><td>Rows from one read-only SQLite <code>SELECT</code> over
           runs, findings and cost rows.</td></tr>
         <tr><td><code>aws_find_tables</code></td><td><code>--live</code></td><td>The best ~8 of 589 tables for the

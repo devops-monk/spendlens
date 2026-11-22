@@ -34,6 +34,8 @@ volumes", "can I delete this AMI", "what can we clean up", "why does the NAT gat
 resource graph first: resource_context, cleanup_groups, suggested_owners. Cleanup-group savings are already \
 de-duplicated against waste alarms: never add the two together. For data transfer, NAT gateway traffic or \
 cross-AZ traffic, use traffic_paths.
+- If a cloudtrail_logs tool is listed, Tailpipe has the trail's own logs: use it for "who did what" beyond 90 days \
+and for data events (S3 object reads/writes); describe=true lists its columns; always bound tp_date.
 - You have a limited number of tool steps: answer as soon as the data supports it. If the data cannot explain a \
 change (for example no usage-type breakdown is saved), say so and name the spendlens command that would.
 

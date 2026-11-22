@@ -58,6 +58,10 @@ def _isolate(request, tmp_path, monkeypatch):
     # processes (`spendlens report` steps, `savings summary` refreshes), which never see in-process fakes.
     monkeypatch.setenv("SPENDLENS__STEAMPIPE__DSN", "postgresql://steampipe:testing@127.0.0.1:9/steampipe")
     monkeypatch.setenv("STEAMPIPE_DATABASE_PASSWORD", "testing")
+    # a Tailpipe installed on this machine must not be used either: only tests that bring a fake one see one
+    monkeypatch.setenv("SPENDLENS__GRAPH__TAILPIPE_PATH", "/nonexistent/tailpipe")
+    monkeypatch.setattr("spendlens.ai.tailpipe_tools.available",
+                        lambda path: os.path.isabs(path) and os.access(path, os.X_OK))
     monkeypatch.delenv("STEAMPIPE_INSTALL_DIR", raising=False)
     monkeypatch.setattr("spendlens.common.caller_identity", lambda: {"Account": "999", "Arn": "arn:test"})
 

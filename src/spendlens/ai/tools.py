@@ -205,6 +205,21 @@ class Toolbox:
                      _schema({"sql": {"type": "string", "description": "A single SELECT statement."}}, ["sql"]),
                      lambda a: self.history_query(a["sql"])),
         ]
+        if self._tailpipe_available():
+            specs.append(ToolSpec(
+                "cloudtrail_logs",
+                "CloudTrail logs collected by Tailpipe (local; no AWS calls): full history and data events (S3 object "
+                "reads/writes), beyond the 90 days of management events that LookupEvents keeps. ONE DuckDB SELECT "
+                "on the table aws_cloudtrail_log, with a time range on tp_date (partition date; always add one, e.g. "
+                "tp_date >= current_date - interval 30 day) or tp_timestamp / event_time. Useful columns: event_time, "
+                "event_name, event_source, aws_region, tp_index (account id), source_ip_address, user_agent, "
+                "error_code, read_only, user_identity (struct: user_identity.arn, user_identity.type, "
+                "user_identity.user_name), request_parameters and response_elements (JSON: "
+                "request_parameters ->> 'bucketName'), resources (list of structs). Call with describe=true first "
+                "to list the exact columns of the installed table.",
+                _schema({"sql": {"type": "string", "description": "One DuckDB SELECT on aws_cloudtrail_log."},
+                         "describe": {"type": "boolean", "description": "true: return the table's columns instead."}}),
+                lambda a: self.cloudtrail_logs(a.get("sql") or "", bool(a.get("describe")))))
         if self.live:
             q = {"sql": {"type": "string", "description": "One read-only PostgreSQL SELECT on aws_* tables."}}
             specs += [
@@ -334,6 +349,36 @@ class Toolbox:
                 "cost_groups_by_spend": names,
                 "tip": "For one service's cost change use history_cost('<service>'); grp values are the exact names in "
                        "cost_groups_by_spend.", "row_count": len(features)}
+
+    # ----- CloudTrail logs collected by Tailpipe
+
+    _tailpipe_ok: Any = None
+
+    def _tailpipe_available(self) -> bool:
+        if self._tailpipe_ok is None:
+            from .tailpipe_tools import available
+
+            self._tailpipe_ok = available(self.cfg.graph.tailpipe_path)
+        return bool(self._tailpipe_ok)
+
+    def cloudtrail_logs(self, sql: str, describe: bool = False) -> dict[str, Any]:
+        from ..graph.costs import CostSourceError, tailpipe_runner
+        from .tailpipe_tools import COLUMNS_SQL, run
+
+        try:
+            runner = tailpipe_runner(self.cfg.graph.tailpipe_path, timeout=int(self.cfg.llm.query_timeout_s))
+            if describe:
+                rows = runner(COLUMNS_SQL)
+                if not rows:
+                    return {"note": "Tailpipe has no aws_cloudtrail_log table: collect it with `tailpipe collect "
+                                    "aws_cloudtrail_log` (or use aws_cloudtrail_lookup_event with --live).",
+                            "row_count": 0}
+                return {"columns": [[r.get("column_name"), r.get("data_type")] for r in rows], "row_count": len(rows)}
+            if not sql.strip():
+                raise ToolError("give sql, or describe=true")
+            return run(sql, runner=runner, max_rows=self.cfg.llm.max_rows)
+        except CostSourceError as e:
+            raise ToolError(f"tailpipe: {e}") from e
 
     # ----- resource graph (feature 'graph' in the history)
 

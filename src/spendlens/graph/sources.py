@@ -242,7 +242,8 @@ def _endpoint(r: dict[str, Any], p: PricingConfig) -> Built:
              _name(tags, f"{svc} endpoint" if svc else eid), state=r.get("state"),
              created=_ts(r.get("creation_timestamp")), tags=tags,
              attrs={"vpc_endpoint_id": eid, "service_name": r.get("service_name"),
-                    "endpoint_type": r.get("vpc_endpoint_type")}, **_common(r))
+                    "endpoint_type": r.get("vpc_endpoint_type"),
+                    "route_tables": [str(x) for x in _list(r.get("route_table_ids"))]}, **_common(r))
     return [n], ([(n.id, r["vpc_id"], "in vpc", "uses")] if r.get("vpc_id") else [])
 
 
@@ -250,13 +251,16 @@ def _route_table(r: dict[str, Any], p: PricingConfig) -> Built:
     """No node: a route table only says which subnets send traffic through which NAT gateway. The main table applies
     to the subnets of its VPC that have no table of their own (resolved in resolve())."""
     nats = sorted({str(x["NatGatewayId"]) for x in _list(r.get("routes")) if (x or {}).get("NatGatewayId")})
+    rtb = str(r.get("route_table_id") or "")
     refs: list[Ref] = []
     for a in _list(r.get("associations")):
         a = a or {}
         if a.get("Main"):
+            refs.append((f"main:{r.get('vpc_id')}", rtb, "_rt", "_rt"))
             refs += [(f"main:{r.get('vpc_id')}", n, "routes via", "uses") for n in nats]
         elif a.get("SubnetId"):
             refs.append((a["SubnetId"], "", "_explicit", "_explicit"))  # this subnet does not use the main table
+            refs.append((a["SubnetId"], rtb, "_rt", "_rt"))
             refs += [(a["SubnetId"], n, "routes via", "uses") for n in nats]
     return [], refs
 
@@ -430,7 +434,8 @@ SOURCES: tuple[Source, ...] = (
         "aws_vpc_subnet", "subnet_arn, subnet_id, vpc_id, availability_zone, cidr_block, state, tags"),
         _subnet, "subnets"),
     Source("vpc_endpoint", "aws_vpc_endpoint", _sql(
-        "aws_vpc_endpoint", "vpc_endpoint_id, vpc_id, service_name, vpc_endpoint_type, state, creation_timestamp, tags"),
+        "aws_vpc_endpoint", "vpc_endpoint_id, vpc_id, service_name, vpc_endpoint_type, state, creation_timestamp, "
+        "route_table_ids, tags"),
         _endpoint, "VPC endpoints"),
     Source("vpc_route_table", "aws_vpc_route_table", _sql(
         "aws_vpc_route_table", "route_table_id, vpc_id, associations, routes"), _route_table, "route tables"),
@@ -505,13 +510,22 @@ def resolve(nodes: list[Node], refs: list[Ref]) -> list[Edge]:
         for a in aliases(n):
             index.setdefault(a, n.id)
     explicit = {f for f, _, label, _ in refs if label == "_explicit"}
+    # which route table each subnet uses (its own, else its VPC's main table): kept on the subnet
+    main_rt = {f[5:]: t for f, t, label, _ in refs if label == "_rt" and f.startswith("main:")}
+    own_rt = {f: t for f, t, label, _ in refs if label == "_rt" and not f.startswith("main:")}
+    for n in nodes:
+        if n.type == "vpc_subnet":
+            sid = str(n.attrs.get("subnet_id"))
+            rt = own_rt.get(sid) or main_rt.get(str(n.attrs.get("vpc_id") or ""))
+            if rt:
+                n.attrs["route_table"] = rt
     by_vpc: dict[str, list[str]] = {}
     for n in nodes:
         if n.type == "vpc_subnet":
             by_vpc.setdefault(str(n.attrs.get("vpc_id") or ""), []).append(str(n.attrs.get("subnet_id")))
     expanded: list[Ref] = []
     for f, t, label, kind in refs:
-        if label == "_explicit":
+        if label in ("_explicit", "_rt"):
             continue
         if f.startswith("main:"):  # the main route table: every subnet of the VPC without a table of its own
             expanded += [(sub, t, label, kind) for sub in by_vpc.get(f[5:], []) if sub not in explicit]

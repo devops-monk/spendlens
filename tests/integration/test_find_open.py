@@ -57,3 +57,14 @@ def test_check_output_points_at_cleanup_groups():
     assert "What one connects to: spendlens graph show" in r.flat and "--source demo" in r.flat
     r = run("waste", "--source", "demo", "-f", "json")
     assert "cleanup group" not in r.stdout  # hints only with the table
+
+
+def test_graph_age_and_open_age(tmp_path):
+    r = run("graph", "age", "--source", "demo", "--min-days", "365")
+    assert "2+ years" in r.flat and "experiment-gpu-2023" in r.flat and "no creation date" in r.flat
+    run("graph", "age", "--source", "demo", "-f", "html", "-o", str(tmp_path / "a.html"))
+    html = (tmp_path / "a.html").read_text()
+    assert "Monthly cost by age" in html and "The costliest" in html
+    assert runner.invoke(app, ["graph", "age", "--source", "demo", "-t", "nope"]).exit_code == 2
+    run("open", "age", "--source", "demo", "--no-browser")
+    assert (tmp_path / "reports" / "demo-age.html").is_file()

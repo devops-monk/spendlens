@@ -91,6 +91,7 @@ SECTIONS: list[tuple[str, str, str, list[tuple[str, str, str]]]] = [
         ("Who owns untagged volumes, snapshots and IPs?", "spendlens graph owners", "offline"),
         ("Tagging commands to review and run yourself", "spendlens graph owners --script tag-review.sh", "offline"),
         ("What NAT gateways and cross-AZ traffic cost (VPC flow logs via Tailpipe)", "spendlens graph traffic", "offline"),
+        ("Old resources that still cost money", "spendlens graph age --min-days 365", "offline"),
         ("Try it on sample data", "spendlens graph orphans --source demo", "offline"),
         ("Everything saved about one resource", "spendlens find vol-0abc123", "offline"),
         ("Open the review in the browser, from saved runs", "spendlens open", "offline"),

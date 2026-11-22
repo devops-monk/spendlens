@@ -3,6 +3,25 @@
     name escaped, so they are emitted as markup. -#}
 {% extends "base.html.j2" %}
 {% block main %}
+{% if vm.age %}{% set a = vm.age %}
+<section class="br-section">
+  <div class="br-kpis">
+    <div class="br-kpi tone-warn"><div class="k">Cost of these resources</div><div class="v">{{ a.total }}</div><div class="d">per month, {{ a.count }} resource{{ "s" if a.count != 1 }}</div></div>
+    {% for b in a.buckets %}<div class="br-kpi"><div class="k">{{ b.age }}</div><div class="v">{{ b.count }}</div><div class="d">${{ "{:,.2f}".format(b.monthly_cost) }}/month</div></div>{% endfor %}
+  </div>
+  {% if a.bars %}<div class="card"><h2>Monthly cost by age</h2><p class="hint">What resources of each age cost; old and costly is worth a look.</p>{{ charts.hbars(a.bars, label="Monthly cost by age", fill="var(--series-4)", width=1080) }}</div>{% endif %}
+  <div class="grid2">
+    <div class="card"><h2>By type</h2><div class="tablewrap"><table><thead><tr><th>Type</th><th class="num">Resources</th><th class="num">Cost/month</th><th class="num">Oldest</th></tr></thead><tbody>
+    {% for t in a.by_type %}<tr><td>{{ t.type }}</td><td class="num">{{ t.count }}</td><td class="num">${{ "{:,.2f}".format(t.monthly_cost) }}</td><td class="num">{{ t.oldest_days }} days</td></tr>{% endfor %}
+    </tbody></table></div></div>
+    <div class="card"><h2>How ages are read</h2><p class="hint">From each resource's own date: creation, launch or snapshot time. Lambda functions: since their last change; network interfaces: since attached (no creation date in the API). {{ a.undated }} resource(s) have no date.</p></div>
+  </div>
+  <div class="card"><h2>The costliest</h2>
+    <div class="tablewrap"><table class="sortable"><thead><tr><th>Resource</th><th>Type</th><th>Age</th><th>Created</th><th class="num">Cost/month</th><th>Owner</th><th>Cleanup group</th></tr></thead><tbody>
+    {% for r in a.rows %}<tr><td>{{ r.name }}</td><td>{{ r.type }}</td><td data-v="{{ r.age_days }}">{{ r.age }}</td><td>{{ r.created }}</td><td class="num" data-v="{{ r.monthly_cost }}">${{ "{:,.2f}".format(r.monthly_cost) }}</td><td>{{ r.owner }}</td><td>{{ r.cleanup_group }}</td></tr>{% endfor %}
+    </tbody></table></div></div>
+</section>
+{% endif %}
 {% if vm.traffic %}{% set t = vm.traffic %}
 <section class="br-section">
   <div class="br-kpis">
@@ -67,7 +86,7 @@
   {% endfor %}
   <p class="note">Costs are estimates from the finops.yaml price book (snapshot costs are an upper bound). Each resource is in at most one group. spendlens never deletes anything: review each group with its owner.</p>
 </section>
-{% elif not vm.focus and not vm.traffic %}
+{% elif not vm.focus and not vm.traffic and not vm.age %}
 <section class="br-section"><div class="card"><h2>No cleanup groups</h2><p class="empty">Nothing found that can be removed together. Thresholds: <code>graph.*</code> in finops.yaml.</p></div></section>
 {% endif %}
 

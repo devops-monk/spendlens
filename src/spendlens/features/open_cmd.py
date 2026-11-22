@@ -26,11 +26,13 @@ class Page(str, Enum):
     brief = "brief"
     cleanup = "cleanup"
     traffic = "traffic"
+    age = "age"
 
 
 ARGS = {
     Page.review: ["review"], Page.dashboard: ["dashboard"], Page.brief: ["brief"],
     Page.cleanup: ["graph", "orphans", "-f", "html"], Page.traffic: ["graph", "traffic", "-f", "html"],
+    Page.age: ["graph", "age", "-f", "html"],
 }
 AI_PAGES = (Page.review, Page.brief)
 
@@ -44,7 +46,7 @@ def open_page(
     config: ConfigOpt = None,
     sets: SetOpt = None,
 ) -> None:
-    """Build a page from the saved runs and open it: review (default), dashboard, brief, cleanup or traffic.
+    """Build a page from the saved runs and open it: review (default), dashboard, brief, cleanup, traffic or age.
 
     No AWS calls: it uses what the checks already saved (run `spendlens report` or the checks first).
     Examples:

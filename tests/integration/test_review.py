@@ -33,17 +33,17 @@ def test_rule_based_review_has_every_section(tmp_path):
                  "Trend of the top services", "Service → Name", "Biggest movers by Name", "Spend by Service Owner",
                  "Spend by Environment", "Every service: 2026-09 → 2026-10", "Usual vs on the day",
                  "Effort vs value", "Where the savings come from", "Recommended next steps", "Review queue",
-                 "46 proposals to decide", "Export decisions (CSV)", "Month-end forecast vs budgets",
+                 "47 proposals to decide", "Export decisions (CSV)", "Month-end forecast vs budgets",
                  "Where tags are missing", "Data and method", "You decide"):
         assert text in html, text
-    assert html.count('<tr data-id="') == 46 and 'data-d="approve"' in html and 'class="rv-note"' in html
+    assert html.count('<tr data-id="') == 47 and 'data-d="approve"' in html and 'class="rv-note"' in html
     assert "Total 2026-09" in html and "Total 2026-10" in html  # the spend bridge
     assert 'class="chart flow"' in html and 'class="mx"' in html and "Savings Plans" in html  # readable services
     data = payload(html)
-    assert len(data["review"]) == 46 and data["key"] == "123456789012"
+    assert len(data["review"]) == 47 and data["key"] == "123456789012"
     # the queue = every saving, plus what only cleanup groups find (their included waste alarms are not counted twice)
     groups_new = 258.15  # demo: snapshots of a stopped instance's volumes, deleted volumes and databases, unused AMI
-    groups_new += 78.27  # and a DynamoDB gateway endpoint (graph traffic)
+    groups_new += 78.27 + 29.35  # and two gateway-endpoint proposals (graph traffic): add DynamoDB, associate S3
     assert round(sum(x["amount"] for x in data["review"]), 2) == round(
         data["facts"]["savings"]["monthly_total"] + groups_new, 2)
     assert "Cleanup groups</a> add <b>$258" in html
@@ -73,7 +73,7 @@ def test_skip_leaves_a_check_out(tmp_path):
     assert "left out (--skip)" in html and "Month-end forecast vs budgets" in html
     data = payload(html)
     assert "tag_compliance_pct" not in data["facts"] and "mandatory_tags" not in data["facts"]
-    assert len(data["review"]) == 46  # the savings are untouched
+    assert len(data["review"]) == 47  # the savings are untouched
     assert run("--source", "demo", "--skip", "nope").exit_code == 2
 
 

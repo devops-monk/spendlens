@@ -38,14 +38,30 @@ PATHS = {"same_az": "Same AZ", "cross_az": "Cross-AZ", "endpoint": "Gateway endp
 SERVICE_NAMES = {"S3": "S3", "DYNAMODB": "DynamoDB"}
 
 
-def flow_sql(days: int, limit: int = 20000) -> str:
+EXTENDED = ("pkt_src_addr", "pkt_dst_addr", "pkt_src_aws_service", "pkt_dst_aws_service")
+
+
+def flow_sql(days: int, limit: int = 20000, *, extended: bool = False) -> str:
+    """extended: also the custom-format fields (v3+): the original packet addresses, and the AWS service AWS itself
+    names. The default format has no such columns; collect() falls back to the basic query when they are missing."""
     days, limit = int(days), int(limit)
     if not 1 <= days <= 31:
         raise ValueError("graph.flow_days must be between 1 and 31")
-    return ("select interface_id, src_addr, dst_addr, sum(bytes) as bytes from aws_vpc_flow_log "
+    keys = ["interface_id", "src_addr", "dst_addr", *(EXTENDED if extended else ())]
+    return (f"select {', '.join(keys)}, sum(bytes) as bytes from aws_vpc_flow_log "
             "where action = 'ACCEPT' and interface_id is not null "
             f"and tp_timestamp >= current_date - interval {days} day and tp_timestamp < current_date "
-            f"group by interface_id, src_addr, dst_addr order by bytes desc limit {limit}")
+            f"group by {', '.join(keys)} order by bytes desc limit {limit}")
+
+
+def read_flows(run: Any, days: int) -> tuple[list[dict[str, Any]], bool]:
+    """(rows, extended): the custom-format fields when the logs have them, else the default ones."""
+    from .costs import CostSourceError
+
+    try:
+        return run(flow_sql(days, extended=True)), True
+    except CostSourceError:
+        return run(flow_sql(days)), False
 
 
 @cache
@@ -83,13 +99,14 @@ class Traffic:
             for ip in n.attrs.get("ips") or []:
                 self.by_ip.setdefault(ip, n)
         self.subnets = {n.attrs.get("subnet_id"): n for n in g.of_type("vpc_subnet")}
-        self.endpoints: dict[str, set[str]] = defaultdict(set)  # vpc id -> {"S3", "DynamoDB"} gateway endpoints
+        # vpc id -> [(service, endpoint node)] gateway endpoints
+        self.endpoints: dict[str, list[tuple[str, Node]]] = defaultdict(list)
         for n in g.of_type("vpc_endpoint"):
             if str(n.attrs.get("endpoint_type") or "").lower() == "gateway":
                 svc = str(n.attrs.get("service_name") or "").rsplit(".", 1)[-1].upper()
                 for e in g.out(n.id):
                     if e.label == "in vpc":
-                        self.endpoints[g.nodes[e.to_id].attrs.get("vpc_id")].add(SERVICE_NAMES.get(svc, svc))
+                        self.endpoints[g.nodes[e.to_id].attrs.get("vpc_id")].append((SERVICE_NAMES.get(svc, svc), n))
 
     def owner(self, eni: Node) -> Node:
         users = [self.g.nodes[e.from_id] for e in self.g.into(eni.id) if e.label == "eni"]
@@ -120,17 +137,19 @@ class Traffic:
                 continue
             src, dst = str(f.get("src_addr") or ""), str(f.get("dst_addr") or "")
             own = set(eni.attrs.get("ips") or [])
+            if src not in own and dst not in own:  # through a middlebox: the original packet addresses tell
+                src, dst = str(f.get("pkt_src_addr") or src), str(f.get("pkt_dst_addr") or dst)
             if src in own:
-                direction, peer = "out", dst
+                direction, peer, named = "out", dst, f.get("pkt_dst_aws_service")
             elif dst in own:
-                direction, peer = "in", src
+                direction, peer, named = "in", src, f.get("pkt_src_aws_service")
             else:
                 continue
             try:
                 nbytes = float(f.get("bytes") or 0)
             except (TypeError, ValueError):
                 continue
-            path, peer_id, via = self.classify(eni, peer)
+            path, peer_id, via = self.classify(eni, peer, str(named or "") or None)
             agg[(self.owner(eni).id, path, peer_id, via)][direction] += nbytes
         rows = []
         for (rid, path, peer_id, via), b in agg.items():
@@ -156,17 +175,28 @@ class Traffic:
                 "proposals": self.proposals(rows), "unmatched_interfaces": len(unmatched),
                 "skipped_managed": skipped_managed}
 
-    def classify(self, eni: Node, peer: str) -> tuple[str, str, str]:
-        """(path, peer id or label, NAT gateway id or '')."""
-        if _private(peer):
+    def endpoint_for(self, eni: Node, svc: str) -> tuple[bool, Node | None]:
+        """(the interface's subnet uses a gateway endpoint for svc, an endpoint in its VPC it could use)."""
+        sub = self.subnets.get(eni.attrs.get("subnet_id"))
+        rt = sub.attrs.get("route_table") if sub else None
+        cands = [ep for s, ep in self.endpoints.get(self.vpc_of(eni) or "", []) if s == svc]
+        for ep in cands:
+            tables = ep.attrs.get("route_tables")
+            if not tables or not rt or rt in tables:  # unknown associations: assume the whole VPC (older graphs)
+                return True, ep
+        return False, cands[0] if cands else None
+
+    def classify(self, eni: Node, peer: str, named: str | None = None) -> tuple[str, str, str]:
+        """(path, peer id or label, NAT gateway id or ''). named: the AWS service the flow log itself names."""
+        if _private(peer) and not named:
             other = self.by_ip.get(peer)
             if other is None:
                 return "vpc_other", peer, ""
             target = self.owner(other)
             same = (other.attrs.get("az") or "") == (eni.attrs.get("az") or "")
             return ("same_az" if same else "cross_az"), target.id, ""
-        svc = aws_service(peer)
-        if svc and svc in self.endpoints.get(self.vpc_of(eni) or "", set()):
+        svc = SERVICE_NAMES.get(named.upper(), named) if named else aws_service(peer)
+        if svc and self.endpoint_for(eni, svc)[0]:
             return "endpoint", svc, ""
         nat = self.nat_of(eni)
         if nat is not None:
@@ -188,22 +218,36 @@ class Traffic:
         for r in rows:
             if r["path"] != "nat" or r["peer"] not in SERVICE_NAMES.values():
                 continue
-            eni_vpc = next((self.vpc_of(n) for n in self.enis.values() if self.owner(n).id == r["resource"]), None)
-            key = (eni_vpc or "", r["peer"])
+            eni = next((n for n in self.enis.values() if self.owner(n).id == r["resource"]), None)
+            eni_vpc = self.vpc_of(eni) if eni else None
+            existing = self.endpoint_for(eni, r["peer"])[1] if eni else None
+            sub = self.subnets.get(eni.attrs.get("subnet_id")) if eni else None
+            rt = (sub.attrs.get("route_table") if sub else None) or ""
+            key = (eni_vpc or "", r["peer"], existing.short_id if existing else "", rt if existing else "")
             p = by.setdefault(key, {"vpc": eni_vpc, "service": r["peer"], "gb_month": 0.0, "monthly_saving": 0.0,
-                                    "nat": r["via_name"], "resources": []})
+                                    "nat": r["via_name"], "resources": [],
+                                    "endpoint": existing.short_id if existing else None,
+                                    "route_table": rt if existing else None})
             p["gb_month"] += r["gb_in_month"] + r["gb_out_month"]
             p["monthly_saving"] += r["monthly_cost"]
             p["resources"].append(r["resource_name"])
         out = []
         for p in by.values():
             p["gb_month"], p["monthly_saving"] = round(p["gb_month"], 2), round(p["monthly_saving"], 2)
-            p["title"] = f"Add a {p['service']} gateway endpoint to {p['vpc']}"
-            p["why"] = (f"{p['gb_month']:,.0f} GB/month of {p['service']} traffic goes through NAT gateway {p['nat']} "
-                        f"(from {', '.join(sorted(set(p['resources']))[:5])}). Gateway endpoints for {p['service']} "
-                        "are free, so the NAT processing charge goes away.")
-            p["check_first"] = ("Associate it with the route tables of these subnets; check bucket or table policies "
-                                "that restrict by source IP or VPC.")
+            src = ", ".join(sorted(set(p["resources"]))[:5])
+            if p["endpoint"]:
+                p["title"] = f"Associate {p['service']} gateway endpoint {p['endpoint']} with route table {p['route_table']}"
+                p["why"] = (f"{p['gb_month']:,.0f} GB/month of {p['service']} traffic from {src} goes through NAT "
+                            f"gateway {p['nat']}: the VPC has {'an' if p['service'] == 'S3' else 'a'} {p['service']} gateway endpoint, but this subnet's "
+                            "route table does not use it. Gateway endpoints are free.")
+                p["check_first"] = ("Check endpoint and bucket or table policies that restrict by source IP or VPC.")
+            else:
+                p["title"] = f"Add {'an' if p['service'] == 'S3' else 'a'} {p['service']} gateway endpoint to {p['vpc']}"
+                p["why"] = (f"{p['gb_month']:,.0f} GB/month of {p['service']} traffic goes through NAT gateway "
+                            f"{p['nat']} (from {src}). Gateway endpoints for {p['service']} are free, so the NAT "
+                            "processing charge goes away.")
+                p["check_first"] = ("Associate it with the route tables of these subnets; check bucket or table "
+                                    "policies that restrict by source IP or VPC.")
             out.append(p)
         return sorted(out, key=lambda p: -p["monthly_saving"])
 
