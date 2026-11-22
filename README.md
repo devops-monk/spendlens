@@ -36,8 +36,14 @@
 <p align="center"><sub>One self-contained HTML report, shown with the bundled demo data.</sub></p>
 
 > [!NOTE]
-> v0.4.2. spendlens is tested end to end through Steampipe against an AWS emulator. Verification against a live
+> v0.4.3. spendlens is tested end to end through Steampipe against an AWS emulator. Verification against a live
 > account with a read-only role is next (see [PLAN.md](PLAN.md)).
+
+## New in 0.4.3
+
+- **Resource age with cost.** `spendlens graph age` shows how old resources are and what they cost: by age band, by type, and the costliest old ones, each with its owner and cleanup group. `--min-days 365` lists what is over a year old; `spendlens open age` gives the page.
+- **CloudTrail beyond 90 days.** If [Tailpipe](https://tailpipe.io) has collected your trail's logs, the AI assistant gets a `cloudtrail_logs` tool covering the full history and S3 data events. It runs locally and queries only `aws_cloudtrail_log`, always with a time range.
+- **Sharper data transfer.** `graph traffic` uses the custom flow-log fields when they are present: the service AWS names, and the original packet addresses. It also checks which route tables each gateway endpoint is on, so it can propose "associate the S3 endpoint with route table rtb-…" where an endpoint exists but a subnet doesn't use it.
 
 ## New in 0.4.2
 
