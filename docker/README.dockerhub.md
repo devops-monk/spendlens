@@ -156,7 +156,7 @@ Add `--fresh` to `ask` or `brief` to skip the cache once.
 
 | | |
 |---|---|
-| **Tags** | `latest`, `0.4.3`, `0.4` (plus `sha-<commit>` per build) |
+| **Tags** | `latest`, `0.4.4`, `0.4` (plus `sha-<commit>` per build) |
 | **Platforms** | `linux/amd64` and `linux/arm64` (Graviton, Apple silicon), each built natively and smoke-tested |
 | **License** | spendlens: Apache-2.0. The image also contains Steampipe and Powerpipe (AGPL-3.0, unmodified) and the AWS plugin (Apache-2.0); see `/usr/share/doc/spendlens/NOTICE` |
 | **User** | `finops` (uid 10001). Steampipe refuses to run as root |
@@ -179,7 +179,7 @@ If you bind-mount `/work` or `/data` on Linux, they must be writable by uid 1000
 ```yaml
 # GitLab
 spendlens:
-  image: { name: abhaypratap/spendlens:0.4.3, entrypoint: [""] }
+  image: { name: abhaypratap/spendlens:0.4.4, entrypoint: [""] }
   script:
     - spendlens-entrypoint report --out reports
     # report has just run every check: post from those saved runs, no second round of AWS calls

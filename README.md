@@ -36,8 +36,14 @@
 <p align="center"><sub>One self-contained HTML report, shown with the bundled demo data.</sub></p>
 
 > [!NOTE]
-> v0.4.3. spendlens is tested end to end through Steampipe against an AWS emulator. Verification against a live
+> v0.4.4. spendlens is tested end to end through Steampipe against an AWS emulator. Verification against a live
 > account with a read-only role is next (see [PLAN.md](PLAN.md)).
+
+## New in 0.4.4
+
+- **Small fixes from a full offline smoke test of every command.**
+  - `spendlens schema find` takes plain words without quotes (`spendlens schema find who deleted the bucket`).
+  - `spendlens history` says what to do when nothing has been saved yet.
 
 ## New in 0.4.3
 
