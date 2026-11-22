@@ -68,3 +68,10 @@ def test_graph_age_and_open_age(tmp_path):
     assert runner.invoke(app, ["graph", "age", "--source", "demo", "-t", "nope"]).exit_code == 2
     run("open", "age", "--source", "demo", "--no-browser")
     assert (tmp_path / "reports" / "demo-age.html").is_file()
+
+
+def test_schema_find_takes_words_without_quotes_and_history_says_what_to_do():
+    r = run("schema", "find", "who", "deleted", "the", "bucket", "-n", "2", "--json")
+    assert json.loads(r.stdout)[0]["table"] == "aws_cloudtrail_lookup_event"
+    r = run("history", "list", code=1)
+    assert "Nothing is saved yet" in r.flat and "--source demo" in r.flat

@@ -34,7 +34,8 @@ def _catalog():
 
 @schema_app.command("find")
 def find(
-    question: Annotated[str, typer.Argument(help="A question or keywords, e.g. \"unattached volumes\".")],
+    question: Annotated[list[str], typer.Argument(help="A question or keywords, e.g. unattached volumes (quotes "
+                                                       "optional).")],
     limit: Annotated[int, typer.Option("--limit", "-n", help="How many tables.")] = 8,
     json_out: Annotated[bool, typer.Option("--json", help="Machine-readable output.")] = False,
 ) -> None:
@@ -42,9 +43,11 @@ def find(
 
     Examples:
       spendlens schema find "unattached EBS volumes"
+      spendlens schema find who deleted the bucket
       spendlens schema find "IAM users without MFA"
       spendlens schema find "monthly cost by service" --limit 3
     """
+    question = " ".join(question)  # type: ignore[assignment]
     hits = _catalog().find(question, limit)
     if json_out:
         typer.echo(json.dumps(hits, indent=2))

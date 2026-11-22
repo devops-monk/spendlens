@@ -21,7 +21,8 @@ def _open(cfg_path, source: Source) -> HistoryStore:
     try:
         return HistoryStore(path, read_only=True)
     except FileNotFoundError as e:
-        err.print(f"[red]{e}[/]")
+        err.print(f"[red]{e}[/]\n[dim]Nothing is saved yet: run a check (spendlens report, or spendlens tags), or "
+                  "look at the sample data with --source demo.[/]")
         raise typer.Exit(1) from e
 
 
