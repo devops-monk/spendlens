@@ -29,7 +29,7 @@ spendlens uses [Steampipe](https://steampipe.io) to expose AWS APIs as SQL table
 
 ## Present it to your team
 
-A 13-slide PowerPoint deck introduces spendlens to colleagues and proposes a read-only pilot:
+A 14-slide PowerPoint deck introduces spendlens to colleagues and proposes a read-only pilot:
 - the problem, what spendlens checks, the resource graph, suggested owners and data transfer;
 - the AI assistant, the review page and how it stays read-only;
 - how it runs, and a three-step rollout.

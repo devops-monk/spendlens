@@ -458,7 +458,7 @@ Every report command accepts:
 
 ## Present it to your team
 
-[docs/ppt/spendlens FinOps for our AWS estate.pptx](docs/ppt/spendlens%20FinOps%20for%20our%20AWS%20estate.pptx) is a 13-slide deck, with speaker notes, that introduces spendlens and proposes a read-only pilot. Fill in the bracketed placeholders before presenting.
+[docs/ppt/spendlens FinOps for our AWS estate.pptx](docs/ppt/spendlens%20FinOps%20for%20our%20AWS%20estate.pptx) is a 14-slide deck, with speaker notes, that introduces spendlens and proposes a read-only pilot. Fill in the bracketed placeholders before presenting.
 
 ## Extending
 
