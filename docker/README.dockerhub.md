@@ -2,7 +2,7 @@
 
 **spendlens** finds untagged resources, oversized instances, idle waste and unexpected cost spikes in your AWS accounts, puts a dollar figure on each one, and answers your questions in plain English. **It is read-only by design**: it never creates, changes, tags or deletes anything.
 
-This image is ready to run. It includes spendlens with its AI assistant, plus pinned versions of [Steampipe](https://steampipe.io) 2.5.0, [Powerpipe](https://powerpipe.io) 1.6.0 and the Steampipe AWS plugin 1.35.0. Steampipe's database is set up when the image is built, so a container starts without downloading anything.
+This image is ready to run. It includes spendlens with its AI assistant, plus pinned versions of [Steampipe](https://steampipe.io) 2.5.0, [Powerpipe](https://powerpipe.io) 1.6.0, the Steampipe AWS plugin 1.35.0, [Tailpipe](https://tailpipe.io) 0.7.6 and the Tailpipe AWS plugin 0.14.2. Steampipe's database is set up when the image is built, so a container starts without downloading anything.
 
 📖 **Docs:** https://spendlens.devops-monk.com · **Architecture:** https://spendlens.devops-monk.com/architecture/ · **Source:** https://github.com/devops-monk/spendlens
 
@@ -121,6 +121,40 @@ AWS Cost Optimization Hub, Savings Plan and RI coverage, and spendlens's own fin
 
 ![Executive brief](https://spendlens.devops-monk.com/static/shots/brief-light.webp)
 
+### What changed, and who changed it
+`spendlens changes` lists CloudTrail write events, newest first, with who made each one: filter by user, resource, service or API call. Routine calls (role assumptions, KMS, log delivery) are left out. The AI assistant answers the same questions in plain English.
+
+```bash
+docker run --rm -v ~/.aws:/home/finops/.aws:ro -e AWS_PROFILE -e AWS_REGION \
+  abhaypratap/spendlens changes --days 7 --service ec2
+docker run --rm -v ~/.aws:/home/finops/.aws:ro -e AWS_PROFILE -e AWS_REGION \
+  abhaypratap/spendlens ask "What changed in the account today, and who did it?"   # AI via Bedrock, same role
+```
+
+Without setup it uses CloudTrail LookupEvents (the last 90 days of management events). With Tailpipe, it reads the trail's own logs: any age, and data events too.
+
+### Tailpipe: CloudTrail logs, flow logs and the CUR, queried locally
+Tailpipe and its AWS plugin are in the image. `spendlens tailpipe init` finds where your CloudTrail logs, VPC flow logs and Cost and Usage Reports land in S3 (read-only) and writes the Tailpipe config; `spendlens tailpipe collect` copies them for local queries. Keep a volume on `/home/finops/.tailpipe` so the collected data outlives the container:
+
+```bash
+docker run --rm -v ~/.aws:/home/finops/.aws:ro -e AWS_PROFILE -e AWS_REGION \
+  -v spendlens-tailpipe:/home/finops/.tailpipe abhaypratap/spendlens tailpipe init
+docker run --rm -v ~/.aws:/home/finops/.aws:ro -e AWS_PROFILE -e AWS_REGION \
+  -v spendlens-tailpipe:/home/finops/.tailpipe abhaypratap/spendlens tailpipe collect
+```
+
+That gives `graph` billed per-resource costs, `graph traffic` NAT and cross-AZ costs, and the assistant CloudTrail history beyond 90 days.
+
+### Files in, files out
+The assistant reads files you give it (`-a`, or a path in the question): CSV, Excel, JSON, YAML, PDF, Word, logs, Terraform. Ask for a file and it writes it to `spendlens-output/` in the mounted folder: Excel, CSV, Word, Markdown, HTML, JSON, scripts or Terraform for review. It never overwrites a file and never runs what it writes.
+
+```bash
+docker run --rm -v ~/.aws:/home/finops/.aws:ro -e AWS_PROFILE -e AWS_REGION \
+  -v "$PWD:/work" -v spendlens-data:/data abhaypratap/spendlens \
+  ask -a budget.xlsx "Compare this budget with last month's cost per service, and export it to Excel"
+# writes ./spendlens-output/<name>.xlsx
+```
+
 ### The assistant's tools and cache, for you
 The table search, table description and query checker the AI assistant uses also run as commands. They work offline from the catalog built into the image, so you can run them with `--network none`. They need no AWS credentials, and Steampipe never starts:
 
@@ -143,7 +177,7 @@ docker run --rm -v spendlens-data:/data abhaypratap/spendlens cache clear --quer
 Add `--fresh` to `ask` or `brief` to skip the cache once.
 
 ### And more
-- **`spendlens ask "why did EC2 go up?"`:** an AI assistant that answers from your data (Amazon Bedrock with your AWS role, Anthropic, OpenAI, Azure OpenAI or any OpenAI-compatible model). With `--live` it can answer from any of the AWS plugin's 589 tables: it looks up the real columns and required filters in a catalog built from the plugin's source, every query is checked before it reaches AWS, slow queries are waited for, and fresh results and repeated answers come from a cache (keep `-v spendlens-data:/data` to reuse it). Its SQL is read-only at three layers.
+- **`spendlens ask "why did EC2 go up?"`:** an AI assistant that answers from your data (Amazon Bedrock with your AWS role, Anthropic, OpenAI, Azure OpenAI or any OpenAI-compatible model). It answers from saved runs first and, when they can't answer, from any of the AWS plugin's 589 tables, live and read-only (`--no-live` turns that off): it looks up the real columns and required filters in a catalog built from the plugin's source, every query is checked before it reaches AWS, slow queries are waited for, and fresh results and repeated answers come from a cache (keep `-v spendlens-data:/data` to reuse it). Its SQL is read-only at three layers.
 - **`spendlens notify --slack --teams`:** a summary of what changed, posted to your channel. Like the dashboard, it reuses today's checks and runs the rest (`--refresh` re-checks everything first).
 - **`spendlens init --ci gitlab|github`:** a scheduled pipeline on a read-only OIDC role.
 - **Table, CSV, JSON or HTML** output from every command, and every threshold set from one `finops.yaml`.
