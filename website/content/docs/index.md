@@ -27,4 +27,15 @@ spendlens uses [Steampipe](https://steampipe.io) to expose AWS APIs as SQL table
 - **Your standards.** Every threshold is a parameter, set in `finops.yaml`, through environment variables, or with `--set` on any command.
 - **Try before you connect.** Every command accepts `--source demo` and runs against bundled sample data.
 
+## Present it to your team
+
+A 13-slide PowerPoint deck introduces spendlens to colleagues and proposes a read-only pilot:
+- the problem, what spendlens checks, the resource graph, suggested owners and data transfer;
+- the AI assistant, the review page and how it stays read-only;
+- how it runs, and a three-step rollout.
+
+Every slide has speaker notes. Before presenting, fill in the bracketed placeholders (presenter, account, dates, channel, teams). The dollar figures in it come from the bundled sample data and are labelled that way.
+
+[Download the deck (.pptx)](https://github.com/devops-monk/spendlens/raw/main/docs/ppt/spendlens%20FinOps%20for%20our%20AWS%20estate.pptx)
+
 Next: [Getting started](getting-started/).

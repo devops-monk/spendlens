@@ -444,6 +444,10 @@ Every report command accepts:
 
 `--source last` replays your latest saved run offline. `dashboard`, `notify` and `savings summary` also accept `--refresh` (see [Always fresh](#always-fresh-never-half-empty)). The full reference is the [CLI reference](https://spendlens.devops-monk.com/docs/cli/).
 
+## Present it to your team
+
+[docs/ppt/spendlens FinOps for our AWS estate.pptx](docs/ppt/spendlens%20FinOps%20for%20our%20AWS%20estate.pptx) is a 13-slide deck, with speaker notes, that introduces spendlens and proposes a read-only pilot. Fill in the bracketed placeholders before presenting.
+
 ## Extending
 
 spendlens's own features are plugins. A package can add commands, Powerpipe controls, savings estimators, AI tools,
