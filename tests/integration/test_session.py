@@ -112,9 +112,9 @@ def test_whole_session_saved_as_one_page(tmp_path):
     assert "Session pg" in html and "Question 1" in html and "q two" in html and "second answer" in html
 
 
-def test_prompt_never_writes_html():
+def test_prompt_answers_in_markdown_and_files_go_through_write_file():
     from spendlens.ai.prompts import system_prompt
     from spendlens.config import load_config
 
     p = system_prompt(load_config(environ={}), False)
-    assert "Never write HTML" in p and "-o report.html" in p
+    assert "no HTML in the answer itself" in p and "write_file" in p and "-o answer.html" in p

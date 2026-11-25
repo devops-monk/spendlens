@@ -6,14 +6,16 @@
 # Installs, without sudo and without touching other Python environments:
 #   1. Steampipe + Powerpipe (pinned): via Homebrew when available, otherwise into ~/.local/bin
 #   2. the Steampipe AWS plugin (pinned)
-#   3. spendlens with the AI extras, isolated: pipx > uv tool > a private venv
+#   3. Tailpipe + its AWS plugin (pinned): CloudTrail logs, Cost and Usage Reports, VPC flow logs
+#   4. spendlens with the AI extras, isolated: pipx > uv tool > a private venv
 #
 # It installs tools only. It never reads AWS credentials or calls AWS.
 #
 # Options (environment variables):
 #   SPENDLENS_REF=main            git branch/tag to install
 #   SPENDLENS_EXTRAS=ai           pip extras ("" for none)
-#   SPENDLENS_SKIP_ENGINES=1      don't install Steampipe/Powerpipe/plugin
+#   SPENDLENS_SKIP_ENGINES=1      don't install Steampipe/Powerpipe/Tailpipe or their plugins
+#   SPENDLENS_SKIP_TAILPIPE=1     don't install Tailpipe
 #   SPENDLENS_BIN_DIR=~/.local/bin
 #   SPENDLENS_PACKAGE=<path|url>  install spendlens from this wheel/sdist instead of GitHub
 #   SPENDLENS_DRY_RUN=1           print what would run, change nothing
@@ -23,6 +25,8 @@ REPO="https://github.com/devops-monk/spendlens"
 STEAMPIPE_VERSION="2.5.0"
 POWERPIPE_VERSION="1.6.0"
 AWS_PLUGIN_VERSION="1.35.0"
+TAILPIPE_VERSION="0.7.6"
+TAILPIPE_AWS_PLUGIN_VERSION="0.14.2"
 REF="${SPENDLENS_REF:-main}"
 EXTRAS="${SPENDLENS_EXTRAS-ai}"
 BIN_DIR="${SPENDLENS_BIN_DIR:-$HOME/.local/bin}"
@@ -90,6 +94,21 @@ if [ "${SPENDLENS_SKIP_ENGINES:-0}" != "1" ]; then
   SP=$(command -v steampipe 2>/dev/null || echo "$BIN_DIR/steampipe")
   say "Installing the Steampipe AWS plugin v$AWS_PLUGIN_VERSION"
   run "$SP" plugin install "aws@$AWS_PLUGIN_VERSION"
+
+  if [ "${SPENDLENS_SKIP_TAILPIPE:-0}" != "1" ]; then
+    if have tailpipe; then
+      say "Tailpipe already installed ($(tailpipe --version 2>/dev/null | head -1))"
+    elif have brew; then
+      say "Installing Tailpipe with Homebrew"
+      run brew install turbot/tap/tailpipe
+    else
+      say "Installing Tailpipe v$TAILPIPE_VERSION into $BIN_DIR"
+      fetch_bin "https://github.com/turbot/tailpipe/releases/download/v$TAILPIPE_VERSION/tailpipe.${OS}.${ARCH}.tar.gz" tgz tailpipe
+    fi
+    TP=$(command -v tailpipe 2>/dev/null || echo "$BIN_DIR/tailpipe")
+    say "Installing the Tailpipe AWS plugin v$TAILPIPE_AWS_PLUGIN_VERSION"
+    run "$TP" plugin install "aws@$TAILPIPE_AWS_PLUGIN_VERSION"
+  fi
 fi
 
 # ---------------------------------------------------------------- spendlens

@@ -137,6 +137,9 @@ class Toolbox:
     cache: Any = None  # AICache | None
     live_ttls: list[float] = field(default_factory=list)  # remaining freshness (s) of each live result used
     on_event: Any = None  # callable(kind: "start" | "done", name, args, entry=None, content=None): live display
+    inputs: list[Any] = field(default_factory=list)  # files.InputFile the person attached
+    outdir: Any = None  # files.OutputDir: where write_file puts files (None: no write_file tool)
+    _results: dict[str, Any] = field(default_factory=dict)  # result_id -> (columns, rows) for write_file
     _sqlite: sqlite3.Connection | None = None
     _steampipe: Any = None
     _catalog: Any = None
@@ -205,21 +208,32 @@ class Toolbox:
                      _schema({"sql": {"type": "string", "description": "A single SELECT statement."}}, ["sql"]),
                      lambda a: self.history_query(a["sql"])),
         ]
+        if self.live or self._tailpipe_available():  # CloudTrail needs one of the two
+            specs.append(ToolSpec(
+                "aws_changes",
+                "What changed in the AWS account and who changed it: CloudTrail write events, newest first, with counts "
+                "by who and by API call. Uses the trail's logs in Tailpipe when collected (any age, data events), else "
+                "CloudTrail LookupEvents (last 90 days, management events). Routine calls (role assumptions, KMS, log "
+                "delivery) are left out. Use it first for 'what changed', 'who changed X', 'who deleted ...'.",
+                _schema({"hours": {"type": "integer", "description": "How far back (default 24; 168 = a week)."},
+                         "user": {"type": "string", "description": "Optional: part of a user or role name / ARN."},
+                         "resource": {"type": "string", "description": "Optional: a resource id or name."},
+                         "service": {"type": "string", "description": "Optional: a service, e.g. ec2, iam, s3."},
+                         "event": {"type": "string", "description": "Optional: an API call, e.g. DeleteBucket."}}),
+                lambda a: self.aws_changes(a.get("hours") or 24, a.get("user"), a.get("resource"), a.get("service"),
+                                           a.get("event"))))
         if self._tailpipe_available():
             specs.append(ToolSpec(
-                "cloudtrail_logs",
-                "CloudTrail logs collected by Tailpipe (local; no AWS calls): full history and data events (S3 object "
-                "reads/writes), beyond the 90 days of management events that LookupEvents keeps. ONE DuckDB SELECT "
-                "on the table aws_cloudtrail_log, with a time range on tp_date (partition date; always add one, e.g. "
-                "tp_date >= current_date - interval 30 day) or tp_timestamp / event_time. Useful columns: event_time, "
-                "event_name, event_source, aws_region, tp_index (account id), source_ip_address, user_agent, "
-                "error_code, read_only, user_identity (struct: user_identity.arn, user_identity.type, "
-                "user_identity.user_name), request_parameters and response_elements (JSON: "
-                "request_parameters ->> 'bucketName'), resources (list of structs). Call with describe=true first "
-                "to list the exact columns of the installed table.",
-                _schema({"sql": {"type": "string", "description": "One DuckDB SELECT on aws_cloudtrail_log."},
-                         "describe": {"type": "boolean", "description": "true: return the table's columns instead."}}),
-                lambda a: self.cloudtrail_logs(a.get("sql") or "", bool(a.get("describe")))))
+                "tailpipe_query",
+                "Data collected by Tailpipe (local; no AWS calls). ONE DuckDB SELECT on aws_cloudtrail_log (CloudTrail: "
+                "full history and data events), aws_vpc_flow_log (VPC flow logs) or aws_cost_and_usage_report (the "
+                "CUR: billed cost per resource and line item), with a time range: tp_date (partition date; e.g. "
+                "tp_date >= current_date - interval 30 day), tp_timestamp, event_time, start_time or "
+                "line_item_usage_start_date. Call with describe=<table> first to list its exact columns. CloudTrail "
+                "hints: user_identity.arn, event_name, event_source, request_parameters ->> 'bucketName', read_only.",
+                _schema({"sql": {"type": "string", "description": "One DuckDB SELECT on one of the three tables."},
+                         "describe": {"type": "string", "description": "A table name: return its columns instead."}}),
+                lambda a: self.tailpipe_query(a.get("sql") or "", a.get("describe"))))
         if self.live:
             q = {"sql": {"type": "string", "description": "One read-only PostgreSQL SELECT on aws_* tables."}}
             specs += [
@@ -249,7 +263,97 @@ class Toolbox:
                          _schema({"job_id": {"type": "string"}}, ["job_id"]),
                          lambda a: self.aws_query_result(a["job_id"])),
             ]
+        specs += self._file_specs()
         return specs + self.extra
+
+    # ----- files: read what was attached, write what was asked for
+
+    def _file_specs(self) -> list[ToolSpec]:
+        out = []
+        if self.inputs:
+            names = ", ".join(f.name for f in self.inputs)
+            out.append(ToolSpec(
+                "read_file",
+                f"Read a file the person attached ({names}). Text comes in pages of characters (use next_offset "
+                "for more); CSV and spreadsheets come as columns + rows (offset = first row; sheet picks a sheet). "
+                "PDF and Word files come as text.",
+                _schema({"name": {"type": "string", "description": "The attached file's name."},
+                         "offset": {"type": "integer", "description": "Character (text) or row (tables) to start at."},
+                         "sheet": {"type": "string", "description": "Spreadsheet sheet name (default: the first)."}},
+                        ["name"]),
+                lambda a: self.read_file(a["name"], int(a.get("offset") or 0), a.get("sheet"))))
+        if self.outdir is not None:
+            out.append(ToolSpec(
+                "write_file",
+                f"Write a file the person asked for into {self.outdir.root} (never overwrites: a numbered name is used "
+                "instead). Only when they ask for a file, export, report, script or document. Types by extension: "
+                "tables as .csv .tsv .xlsx .json .jsonl .md .html .yaml; documents as .docx (from Markdown content, "
+                "plus optional tables) or .md/.html/.txt; code and config as .sql .sh .tf .py .yaml .json .mmd .dot "
+                ".svg. For table data from an earlier tool result, pass its result_id (or a list of them: one "
+                "sheet each in .xlsx) instead of copying rows; otherwise pass columns + rows. Scripts are written, "
+                "never run: say that the person should review them.",
+                _schema({"name": {"type": "string", "description": "File name with extension, e.g. idle-volumes.xlsx"},
+                         "content": {"type": "string", "description": "Text content (Markdown for .docx)."},
+                         "result_id": {"description": "An earlier result's result_id, or a list of them.",
+                                       "anyOf": [{"type": "string"}, {"type": "array", "items": {"type": "string"}}]},
+                         "columns": {"type": "array", "items": {"type": "string"}},
+                         "rows": {"type": "array", "items": {"type": "array"}},
+                         "title": {"type": "string", "description": "Sheet / table title (optional)."}},
+                        ["name"]),
+                lambda a: self.write_file(a)))
+        return out
+
+    def read_file(self, name: str, offset: int = 0, sheet: str | None = None) -> dict[str, Any]:
+        from .files import FileError
+
+        f = next((f for f in self.inputs if f.name == name), None) or next(
+            (f for f in self.inputs if f.name.lower() == str(name).lower() or str(f.path) == name), None)
+        if f is None:
+            raise ToolError(f"no attached file {name!r}; attached: {', '.join(x.name for x in self.inputs)}")
+        try:
+            return f.read(offset=max(offset, 0), sheet=sheet, limit=max(self.cfg.llm.max_result_chars - 2000, 1000),
+                          max_rows=self.cfg.llm.max_rows)
+        except FileError as e:
+            raise ToolError(str(e)) from e
+
+    def write_file(self, a: dict[str, Any]) -> dict[str, Any]:
+        from .files import FileError
+
+        tables = []
+        ids = a.get("result_id")
+        ids = [ids] if isinstance(ids, str) else list(ids or [])
+        for rid in ids:
+            if rid not in self._results:
+                raise ToolError(f"unknown result_id {rid!r}; known: {', '.join(self._results) or 'none yet'}")
+            title, cols, rows = self._results[rid]
+            tables.append(((a.get("title") if len(ids) == 1 else None) or title, cols, rows))
+        if a.get("columns") is not None or a.get("rows") is not None:
+            cols = [str(c) for c in a.get("columns") or []]
+            rows = [r if isinstance(r, list) else [r] for r in a.get("rows") or []]
+            if not cols and rows:
+                cols = [f"column_{i + 1}" for i in range(max(len(r) for r in rows))]
+            tables.append((a.get("title") or "", cols, rows))
+        try:
+            return self.outdir.write(a["name"], content=a.get("content"), tables=tables or None)
+        except FileError as e:
+            raise ToolError(str(e)) from e
+
+    def _remember(self, name: str, args: dict[str, Any], out: Any) -> Any:
+        """Tabular results get a result_id the model can hand to write_file."""
+        if self.outdir is None or not isinstance(out, dict):
+            return out
+        rows = out.get("rows")
+        if not isinstance(rows, list) or not rows:
+            return out
+        cols = out.get("columns")
+        if not cols and isinstance(rows[0], dict):
+            cols = list(rows[0])
+            rows = [[r.get(c) for c in cols] for r in rows]
+        if not cols or not isinstance(rows[0], list):
+            return out
+        rid = f"r{len(self._results) + 1}"
+        self._results[rid] = (name, list(cols), rows)
+        return {"result_id": rid, **out}
 
     def _emit(self, kind: str, name: str, args: dict[str, Any], entry: AuditEntry | None = None,
               content: str | None = None) -> None:
@@ -284,6 +388,7 @@ class Toolbox:
         except Exception as e:  # noqa: BLE001 - surface any tool failure to the model, never crash the session
             return self._log(call_id, AuditEntry(name, args, False, None, int((time.monotonic() - t0) * 1000), repr(e)),
                              f"Error: {type(e).__name__}: {e}", True)
+        out = self._remember(name, args, out)
         rows = out.get("row_count") if isinstance(out, dict) else None
         return self._log(call_id, AuditEntry(name, args, True, rows, int((time.monotonic() - t0) * 1000)),
                          self._serialise(out))
@@ -361,18 +466,36 @@ class Toolbox:
             self._tailpipe_ok = available(self.cfg.graph.tailpipe_path)
         return bool(self._tailpipe_ok)
 
-    def cloudtrail_logs(self, sql: str, describe: bool = False) -> dict[str, Any]:
+    def aws_changes(self, hours: int, user: str | None, resource: str | None, service: str | None,
+                    event: str | None) -> dict[str, Any]:
+        from ..changes import find_changes
+        from ..steampipe import SteampipeError
+
+        tailpipe = self._tailpipe_available()
+        if not tailpipe and not self.live:
+            return {"note": "CloudTrail needs live AWS (ask without --no-live) or CloudTrail logs collected by "
+                            "Tailpipe (`spendlens tailpipe init` then `spendlens tailpipe collect`).", "row_count": 0}
+        try:
+            res = find_changes(self.cfg, int(hours), user=user, resource=resource, service=service, event=event,
+                               source="auto" if tailpipe else "lookup_events",
+                               steampipe=self._client() if self.live else None)
+        except SteampipeError as e:
+            raise ToolError(str(e).splitlines()[0][:300]) from e
+        rows = [{k: str(v)[:300] if v is not None else None for k, v in r.items()}
+                for r in res["rows"][: self.cfg.llm.max_rows]]
+        return {**res, "rows": rows, "row_count": len(rows)}
+
+    def tailpipe_query(self, sql: str, describe: str | None = None) -> dict[str, Any]:
         from ..graph.costs import CostSourceError, tailpipe_runner
-        from .tailpipe_tools import COLUMNS_SQL, run
+        from .tailpipe_tools import columns_sql, run
 
         try:
             runner = tailpipe_runner(self.cfg.graph.tailpipe_path, timeout=int(self.cfg.llm.query_timeout_s))
             if describe:
-                rows = runner(COLUMNS_SQL)
+                rows = runner(columns_sql(describe))
                 if not rows:
-                    return {"note": "Tailpipe has no aws_cloudtrail_log table: collect it with `tailpipe collect "
-                                    "aws_cloudtrail_log` (or use aws_cloudtrail_lookup_event with --live).",
-                            "row_count": 0}
+                    return {"note": f"Tailpipe has no {describe} data yet: `spendlens tailpipe init`, then "
+                                    "`spendlens tailpipe collect`.", "row_count": 0}
                 return {"columns": [[r.get("column_name"), r.get("data_type")] for r in rows], "row_count": len(rows)}
             if not sql.strip():
                 raise ToolError("give sql, or describe=true")

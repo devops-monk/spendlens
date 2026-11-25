@@ -104,7 +104,7 @@ def test_old_cost_explorer_data_is_not_used(tmp_path):
         assert from_cost_explorer(s, today=date(2026, 11, 9)) == ({}, "")
 
 
-def test_tailpipe_runner_and_doctor(tmp_path):
+def test_tailpipe_runner_and_doctor(tmp_path, monkeypatch):
     exe = fake_tailpipe(tmp_path, json.dumps({"columns": [], "rows": CUR_ROWS}))
     run = tailpipe_runner(str(exe))
     assert len(run(cur_sql(30))) == 4
@@ -113,8 +113,13 @@ def test_tailpipe_runner_and_doctor(tmp_path):
     g = graph(load_config(environ={}))
     assert apply(g, {"vol-0rptdata": {"monthly": 1.0, "cost": 1, "window_days": 30, "currency": "USD"}}, "cur", "x") == 1
     (tmp_path / "out.json").write_text(json.dumps({"rows": [{"n": 1234}]}))
+    monkeypatch.setenv("TAILPIPE_INSTALL_DIR", str(tmp_path / "tp"))
     c = check_tailpipe(load_config(environ={}, sets=[f"graph.tailpipe_path={exe}"]))
-    assert (c.status, c.detail) == ("ok", "1,234 CUR line items collected")
+    assert c.status == "warn" and "spendlens tailpipe init" in c.fix  # installed, nothing configured
+    (tmp_path / "tp" / "config").mkdir(parents=True)
+    (tmp_path / "tp" / "config" / "spendlens.tpc").write_text('partition "aws_cost_and_usage_report" "x" {}\n')
+    c = check_tailpipe(load_config(environ={}, sets=[f"graph.tailpipe_path={exe}"]))
+    assert (c.status, c.detail) == ("ok", "Cost and Usage Reports: 1,234 rows")
     bad = fake_tailpipe(tmp_path, "", code=1)
     with pytest.raises(CostSourceError):
         tailpipe_runner(str(bad))(cur_sql(30))

@@ -18,6 +18,9 @@ CATEGORIES: list[tuple[str, str, list[str]]] = [
     ("Cost analysis", "What changed, where, and who owns it, from Cost Explorer. Each period is one bounded request "
      "($0.01 each, billed by AWS).",
      ["cost diff", "cost trend", "cost showback", "cost resources"]),
+    ("Activity and logs", "What changed in the account and who changed it (CloudTrail, read-only), and Tailpipe: "
+     "CloudTrail logs, VPC flow logs and Cost and Usage Reports collected from S3 and queried locally.",
+     ["changes", "tailpipe init", "tailpipe collect", "tailpipe status"]),
     ("Anomalies and forecast", "Spot unusual daily spend and see where the month will land against your budgets.",
      ["anomalies", "forecast"]),
     ("Savings", "AWS's own recommendations, commitment coverage, and one de-duplicated savings total.",
@@ -50,6 +53,8 @@ TASKS: list[tuple[str, str]] = [
     ("See spend per team, environment or cost centre", "cost showback"),
     ("See a multi-month trend", "cost trend"),
     ("Find which resources' cost changed this week", "cost resources"),
+    ("See what changed in the account, and who changed it", "changes"),
+    ("Set up CloudTrail, flow log and CUR collection", "tailpipe init"),
     ("Catch unusual daily spikes", "anomalies"),
     ("Know if we'll go over budget this month", "forecast"),
     ("Get one savings number I can defend", "savings summary"),
@@ -59,7 +64,8 @@ TASKS: list[tuple[str, str]] = [
     ("Give managers a one-page summary with AI insights", "brief"),
     ("Run everything on a schedule in CI", "init"),
     ("Post a summary to Slack or Teams", "notify"),
-    ("Ask a question about my costs", "ask"),
+    ("Ask a question about my costs or anything in the account", "ask"),
+    ("Get an Excel, CSV or Word file from a question", "ask"),
     ("Find which AWS table answers a question", "schema find"),
     ("Check a Steampipe query before running it", "schema check"),
     ("See what changed since the last run", "history diff"),
@@ -75,6 +81,24 @@ RECIPES: dict[str, list[tuple[str, str]]] = {
         ("Write a scheduled GitLab pipeline (.gitlab-ci.yml)", "spendlens init --ci gitlab"),
         ("Write a scheduled GitHub Actions workflow", "spendlens init --ci github"),
         ("Overwrite an existing file", "spendlens init --force"),
+    ],
+    "changes": [
+        ("What changed in the last 24 hours, and who changed it", "spendlens changes"),
+        ("Last week, EC2 only", "spendlens changes --days 7 --service ec2"),
+        ("Everything one person or role did this month", "spendlens changes --user alice --days 30"),
+        ("Every change to one resource, as CSV", "spendlens changes --resource sg-0abc123 --days 90 -f csv -o sg.csv"),
+        ("Who opened security groups", "spendlens changes --days 30 --event AuthorizeSecurityGroupIngress"),
+    ],
+    "tailpipe init": [
+        ("Find your CloudTrail, flow log and CUR buckets and write the Tailpipe config", "spendlens tailpipe init"),
+        ("See the config first", "spendlens tailpipe init --dry-run"),
+    ],
+    "tailpipe collect": [
+        ("Collect everything configured (last 30 days)", "spendlens tailpipe collect"),
+        ("Collect 90 days of CloudTrail logs", "spendlens tailpipe collect cloudtrail --days 90"),
+    ],
+    "tailpipe status": [
+        ("What is configured and collected", "spendlens tailpipe status"),
     ],
     "doctor": [
         ("Check tools, AWS identity, Steampipe, regions and Cost Explorer access", "spendlens doctor"),
@@ -286,6 +310,12 @@ RECIPES: dict[str, list[tuple[str, str]]] = {
         ("On sample data", "spendlens ask --source demo \"Summarise the waste findings\""),
         ("Machine-readable answer and audit trail", "spendlens ask \"Top savings?\" --json"),
         ("Skip the cache: ask and query again", "spendlens ask --live --fresh \"How many instances are running?\""),
+        ("What changed today, and who changed it", "spendlens ask \"What changed in the account today and who did it?\""),
+        ("Get an Excel file (written to ./spendlens-output)", "spendlens ask \"Export unattached EBS volumes with their monthly cost to Excel\""),
+        ("A Word summary for your manager", "spendlens ask \"Write a one-page Word summary of this month's top savings\""),
+        ("Read your own file and compare", "spendlens ask -a budget.xlsx \"Compare this budget with last month's cost per service\""),
+        ("Choose where files go", "spendlens ask --out-dir reports \"Export idle load balancers to CSV\""),
+        ("History only, no live AWS", "spendlens ask --no-live \"Summarise the waste findings\""),
     ],
     "session list": [
         ("Every saved ask session (* = the one -C continues)", "spendlens session list"),

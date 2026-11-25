@@ -1,4 +1,4 @@
-"""The assistant's cloudtrail_logs tool (Tailpipe, DuckDB): guarded, bounded, offered only with Tailpipe."""
+"""The assistant's tailpipe_query tool (Tailpipe, DuckDB): guarded, bounded, offered only with Tailpipe."""
 
 import json
 import stat
@@ -19,7 +19,7 @@ OK = ("select event_name, user_identity.arn from aws_cloudtrail_log where tp_dat
     ("select event_name from aws_cloudtrail_log where event_name = 'DeleteBucket'", "time range"),
     ("select * from read_csv('/etc/passwd')", "table functions"),
     ("select getenv('HOME') from aws_cloudtrail_log where tp_date > '2026-01-01'", "getenv"),
-    ("select * from aws_s3_bucket where tp_date > '2026-01-01'", "only the aws_cloudtrail_log"),
+    ("select * from aws_s3_bucket where tp_date > '2026-01-01'", "can be queried here"),
     ("delete from aws_cloudtrail_log", "only SELECT"),
     ("select 1; select 2", "exactly one"),
 ])
@@ -34,6 +34,10 @@ def test_guard_allows_bounded_reads_and_caps_rows():
     assert check("with x as (select * from aws_cloudtrail_log where tp_date >= '2026-01-01') select count(*) from x", 5)
     assert check("select request_parameters ->> 'bucketName' from aws_cloudtrail_log "
                  "where tp_date between '2026-01-01' and '2026-02-01'", 5)
+    assert check("select interface_id, sum(bytes) from aws_vpc_flow_log where start_time >= current_date - 7 "
+                 "group by 1", 5)
+    assert check("select line_item_resource_id, sum(line_item_unblended_cost) from aws_cost_and_usage_report "
+                 "where line_item_usage_start_date >= current_date - 30 group by 1", 5)
 
 
 def fake_tailpipe(tmp_path, rows):
@@ -47,16 +51,16 @@ def fake_tailpipe(tmp_path, rows):
 def test_tool_is_offered_only_with_tailpipe_and_runs(tmp_path):
     names = {s.name for s in Toolbox(load_config(environ={}, sets=["graph.tailpipe_path=/nonexistent/tailpipe"]),
                                      demo_db_path()).specs()}
-    assert "cloudtrail_logs" not in names
+    assert "tailpipe_query" not in names and "aws_changes" not in names  # no Tailpipe, no live AWS
     exe = fake_tailpipe(tmp_path, [{"event_name": "DeleteBucket", "arn": "arn:aws:iam::1:user/alice"}])
     tb = Toolbox(load_config(environ={}, sets=[f"graph.tailpipe_path={exe}"]), demo_db_path())
-    assert "cloudtrail_logs" in {s.name for s in tb.specs()}
-    r = tb.execute("1", "cloudtrail_logs", {"sql": OK})
+    assert {"tailpipe_query", "aws_changes"} <= {s.name for s in tb.specs()}
+    r = tb.execute("1", "tailpipe_query", {"sql": OK})
     assert not r.is_error and "alice" in r.content and "Tailpipe" in r.content
     assert "limit 501" in (tmp_path / "args").read_text()
-    bad = tb.execute("2", "cloudtrail_logs", {"sql": "select * from read_csv('/etc/passwd')"})
+    bad = tb.execute("2", "tailpipe_query", {"sql": "select * from read_csv('/etc/passwd')"})
     assert bad.is_error and "table functions" in bad.content
     cols = fake_tailpipe(tmp_path, [{"column_name": "event_name", "data_type": "VARCHAR"}])
     tb2 = Toolbox(load_config(environ={}, sets=[f"graph.tailpipe_path={cols}"]), demo_db_path())
-    d = json.loads(tb2.execute("3", "cloudtrail_logs", {"describe": True}).content)
+    d = json.loads(tb2.execute("3", "tailpipe_query", {"describe": "aws_cloudtrail_log"}).content)
     assert d["columns"] == [["event_name", "VARCHAR"]] and "information_schema" in (tmp_path / "args").read_text()

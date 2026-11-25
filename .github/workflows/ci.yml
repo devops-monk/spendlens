@@ -71,6 +71,7 @@ jobs:
       - name: Smoke test (offline, demo data, no credentials)
         run: |
           docker run --rm --network none spendlens:ci tags --source demo --summary | tail -1
+          docker run --rm --network none --entrypoint sh spendlens:ci -c 'tailpipe --version && tailpipe plugin list | grep -q aws && python -c "import openpyxl, pypdf, docx"'
           docker run --rm --network none -e SPENDLENS_STEAMPIPE_SERVICE=on spendlens:ci doctor --offline
           docker run --rm --network none --entrypoint cat spendlens:ci /usr/share/doc/spendlens/NOTICE > /dev/null
           test "$(docker image inspect spendlens:ci --format '{{index .Config.Labels "org.opencontainers.image.licenses"}}')" = "Apache-2.0"

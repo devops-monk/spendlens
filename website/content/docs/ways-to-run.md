@@ -42,7 +42,7 @@ Installer options are environment variables set before `sh`:
 | Variable | Effect |
 |---|---|
 | `SPENDLENS_DRY_RUN=1` | Print every step; change nothing |
-| `SPENDLENS_REF=v0.4.5` | Install a tag or branch (default `main`) |
+| `SPENDLENS_REF=v0.4.6` | Install a tag or branch (default `main`) |
 | `SPENDLENS_EXTRAS=""` | Skip the AI assistant's SDKs |
 | `SPENDLENS_SKIP_ENGINES=1` | Don't install Steampipe, Powerpipe or the AWS plugin |
 | `SPENDLENS_BIN_DIR=…` | Where binaries go (default `~/.local/bin`) |

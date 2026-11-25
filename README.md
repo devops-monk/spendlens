@@ -36,8 +36,15 @@
 <p align="center"><sub>One self-contained HTML report, shown with the bundled demo data.</sub></p>
 
 > [!NOTE]
-> v0.4.5. spendlens is tested end to end through Steampipe against an AWS emulator. Verification against a live
+> v0.4.6. spendlens is tested end to end through Steampipe against an AWS emulator. Verification against a live
 > account with a read-only role is next (see [PLAN.md](PLAN.md)).
+
+## New in 0.4.6
+
+- **Ask about anything in the account.** `spendlens ask` now uses live AWS by default (read-only, through the Steampipe AWS plugin's table schema); `--no-live` keeps it to saved runs.
+- **What changed, and who changed it.** `spendlens changes` lists CloudTrail write events with who made them, filtered by user, resource, service or API call. The assistant has the same as its `aws_changes` tool: "What changed today, and who did it?"
+- **Files in and out.** Attach files with `ask -a budget.xlsx` (or write their path in the question): csv, Excel, JSON, YAML, PDF, Word, logs, Terraform. Ask for a file and the assistant writes it to `./spendlens-output`: Excel, CSV, Word, Markdown, HTML, JSON, scripts and Terraform for review.
+- **Tailpipe included and set up for you.** The installer and Docker image now include Tailpipe and its AWS plugin. `spendlens tailpipe init` finds your CloudTrail, flow log and CUR buckets (read-only) and writes the config; `spendlens tailpipe collect` collects them. The assistant's `tailpipe_query` tool covers CloudTrail logs, flow logs and the CUR.
 
 ## New in 0.4.5
 
@@ -126,7 +133,7 @@
 
 ## Install
 
-**macOS or Linux**: one command, no sudo. Installs pinned Steampipe and Powerpipe, the AWS plugin, and spendlens in
+**macOS or Linux**: one command, no sudo. Installs pinned Steampipe, Powerpipe and Tailpipe, their AWS plugins, and spendlens in
 its own isolated environment.
 
 ```bash
@@ -319,7 +326,7 @@ Supported models:
 - **Claude** on Amazon Bedrock with your own AWS role, or on the Anthropic API (official Anthropic SDK).
 - **OpenAI, Azure OpenAI** or any **OpenAI-compatible** server (official OpenAI SDK).
 
-The assistant answers from saved history first, which is offline and free. It queries live AWS only with `--live`, and then it can answer from any of the AWS plugin's 589 tables:
+The assistant answers from saved history first, which is offline and free. When history can't answer, it queries live AWS (read-only; `--no-live` turns this off) and can answer from any of the AWS plugin's 589 tables:
 - **Right first time:** it looks up the real tables, columns and required filters in a catalog built from the Steampipe AWS plugin's own source, and every query is checked before it reaches AWS. A wrong column comes back with "did you mean".
 - **Patient:** slow queries run as background jobs that the model waits for, instead of timing out.
 - **Cached:** live results are reused while fresh (15 min for resources, 5 for metrics, 6 h for Cost Explorer), and the same question on the same data costs no tokens. `--fresh` skips the cache.
@@ -488,4 +495,4 @@ CI runs on every push: lint, tests on Python 3.11 and 3.13, a website check, and
 ## License
 
 spendlens is licensed under the [Apache License 2.0](LICENSE). Some controls are adapted from Turbot's Apache-2.0
-Powerpipe mods. The Docker image includes Steampipe and Powerpipe (AGPL-3.0, unmodified); see [NOTICE](NOTICE).
+Powerpipe mods. The Docker image includes Steampipe, Powerpipe and Tailpipe (AGPL-3.0, unmodified); see [NOTICE](NOTICE).

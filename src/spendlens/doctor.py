@@ -154,27 +154,36 @@ def check_regions(cfg: Config) -> Check:
 
 
 def check_tailpipe(cfg: Config) -> Check:
-    """Optional: exact per-resource cost for `spendlens graph` from the CUR (local; no AWS calls)."""
-    if cfg.graph.cost_source == "estimate":
-        return Check("tailpipe (CUR)", "ok", "not used (graph.cost_source = estimate)")
+    """Tailpipe: CloudTrail logs, VPC flow logs and the CUR collected locally (no AWS calls here)."""
     exe = shutil.which(cfg.graph.tailpipe_path)
     if not exe:
-        return Check("tailpipe (CUR)", "warn" if cfg.graph.cost_source == "cur" else "ok",
-                     "not installed: graph costs come from Cost Explorer resource data or the price book",
-                     "Optional, for billed per-resource costs: https://tailpipe.io + its AWS plugin, then collect "
-                     "aws_cost_and_usage_report")
-    code, out = _run([exe, "query", "select count(*) as n from aws_cost_and_usage_report", "--output", "json"], 120)
-    if code != 0:
-        return Check("tailpipe (CUR)", "warn", (out.splitlines() or ["query failed"])[-1][:160],
-                     "Collect the CUR: tailpipe collect aws_cost_and_usage_report")
+        return Check("tailpipe", "warn" if cfg.graph.cost_source == "cur" else "ok",
+                     "not installed: `changes` uses CloudTrail LookupEvents (90 days); graph costs come from Cost "
+                     "Explorer or the price book",
+                     "Re-run the spendlens installer (it installs Tailpipe), then: spendlens tailpipe init")
+    from . import tailpipe as tp
+
+    have = tp.configured()
+    if not any(have.values()):
+        return Check("tailpipe", "warn", "installed, no sources configured",
+                     "spendlens tailpipe init (finds your CloudTrail, flow log and CUR buckets), then "
+                     "spendlens tailpipe collect")
     from .graph.costs import CostSourceError, parse_json
 
-    try:
-        n = int((parse_json(out) or [{}])[0].get("n") or 0)
-    except (CostSourceError, ValueError, TypeError):
-        n = 0
-    return Check("tailpipe (CUR)", "ok" if n else "warn", f"{n:,} CUR line items collected",
-                 "" if n else "Collect the CUR: tailpipe collect aws_cost_and_usage_report")
+    counts = []
+    for kind, table in tp.KINDS.items():
+        if not have.get(kind):
+            continue
+        code, out = _run([exe, "query", f"select count(*) as n from {table}", "--output", "json"], 120)
+        try:
+            n = int((parse_json(out) or [{}])[0].get("n") or 0) if code == 0 else 0
+        except (CostSourceError, ValueError, TypeError):
+            n = 0
+        counts.append((kind, n))
+    empty = [k for k, n in counts if not n]
+    detail = ", ".join(f"{tp.LABELS[k]}: {n:,} rows" for k, n in counts)
+    return Check("tailpipe", "warn" if empty else "ok", detail,
+                 f"spendlens tailpipe collect {' '.join(empty)}" if empty else "")
 
 
 def run_checks(

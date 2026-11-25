@@ -34,9 +34,10 @@ sh install.sh
 | Option | Effect |
 |---|---|
 | `SPENDLENS_DRY_RUN=1` | Print every step without changing anything |
-| `SPENDLENS_REF=v0.4.5` | Install a specific tag or branch (default `main`) |
+| `SPENDLENS_REF=v0.4.6` | Install a specific tag or branch (default `main`) |
 | `SPENDLENS_EXTRAS=""` | Skip the AI assistant's SDKs |
-| `SPENDLENS_SKIP_ENGINES=1` | Don't install Steampipe, Powerpipe or the plugin (you manage them) |
+| `SPENDLENS_SKIP_ENGINES=1` | Don't install Steampipe, Powerpipe, Tailpipe or their plugins (you manage them) |
+| `SPENDLENS_SKIP_TAILPIPE=1` | Don't install Tailpipe (CloudTrail logs, flow logs and the CUR then aren't collected locally) |
 | `SPENDLENS_BIN_DIR=…` | Where binaries go (default `~/.local/bin`) |
 | `SPENDLENS_PACKAGE=…` | Install spendlens from a wheel path or URL, e.g. an internal mirror |
 

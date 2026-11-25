@@ -125,7 +125,8 @@ def ask(
     question: Annotated[str | None, typer.Argument(help="Your question (omit with -i for an interactive session).")] = None,
     interactive: Annotated[bool, typer.Option("--interactive", "-i", help="Keep asking follow-up questions.")] = False,
     source: Annotated[Source, typer.Option("--source", help="History to answer from: last (yours) or demo.")] = Source.last,
-    live: Annotated[bool, typer.Option("--live", help="Also allow read-only live AWS queries via Steampipe.")] = False,
+    live: Annotated[bool | None, typer.Option("--live/--no-live", help="Allow read-only live AWS queries via Steampipe "
+                                                                     "(default llm.live: on).")] = None,
     show_tools: Annotated[bool, typer.Option("--show-tools", help="Show every tool call and SQL used.")] = False,
     max_steps: Annotated[int | None, typer.Option("--max-steps", help="Tool-call limit per question (llm.max_steps).")] = None,
     json_out: Annotated[bool, typer.Option("--json", help="Machine-readable answer + audit trail.")] = False,
@@ -136,6 +137,13 @@ def ask(
     resume: Annotated[bool, typer.Option("--continue", "-C", help="Continue the last session used.")] = False,
     out: Annotated[Path | None, typer.Option("--out", "-o", help="Also save the answer as a page: .html (styled, "
                                                                  "with the tool calls) or .md.")] = None,
+    files: Annotated[list[Path] | None, typer.Option("--file", "-a", help="Attach a file for the assistant to read "
+                                                         "(csv, xlsx, json, yaml, pdf, docx, logs, Terraform, ...). "
+                                                         "Repeatable. Paths written in the question are attached too.")
+                     ] = None,
+    out_dir: Annotated[Path | None, typer.Option("--out-dir", help="Where the assistant writes files you ask for "
+                                                                   "(default llm.output_dir: ./spendlens-output).")
+                       ] = None,
     fresh: Annotated[bool, typer.Option("--fresh", help="Ignore cached answers and live results; ask and query "
                                                         "again (results are still cached for next time).")] = False,
     config: ConfigOpt = None,
@@ -155,6 +163,9 @@ def ask(
       spendlens ask -C "List them by cluster"                            # follow-up in the same session
       spendlens ask -S ecs "Which of those have no autoscaling?"          # a named session
       spendlens ask "Which ECS services should be right-sized?" -o ecs.html   # save the answer as a page
+      spendlens ask "Export unattached EBS volumes with their cost to an Excel file"   # writes spendlens-output/
+      spendlens ask -a budget.xlsx "Compare this budget with last month's actual cost per service"
+      spendlens ask "Which of the instances in ./inventory.csv no longer exist?"
     """
     if source is Source.live:
         raise typer.BadParameter("Use --live to allow live AWS queries; --source picks the history (last or demo).",
@@ -162,6 +173,7 @@ def ask(
     if not question and not interactive:
         raise typer.BadParameter("Ask a question, or use -i for an interactive session.", param_hint="QUESTION")
     cfg = load(config, profile, sets)
+    live = cfg.llm.live if live is None else live
     db = demo_db_path() if source is Source.demo else history_path(cfg)
     from ..ai.cache import AICache
 
@@ -174,7 +186,15 @@ def ask(
             sess = Sessions(sessions_dir(history_path(cfg))).open(session, new=new, resume=resume)
         except SessionError as e:
             raise typer.BadParameter(str(e), param_hint="--session") from e
-    toolbox = Toolbox(cfg, db, live=live, extra=_plugin_tools(), fresh=fresh, cache=cache)
+    from ..ai.files import FileError, InputFile, OutputDir
+
+    toolbox = Toolbox(cfg, db, live=live, extra=_plugin_tools(), fresh=fresh, cache=cache,
+                      outdir=OutputDir((out_dir or Path(cfg.llm.output_dir)).expanduser()))
+    for f in files or []:
+        try:
+            _attach(toolbox, InputFile.load(f))
+        except FileError as e:
+            raise typer.BadParameter(str(e), param_hint="--file") from e
     try:
         provider = build_provider(cfg)
     except AIError as e:
@@ -208,7 +228,8 @@ def ask(
                     break
                 questions.append(q)
             q = questions.pop(0)
-            key = _answer_key(cfg, provider.label, source, live, db, q) if first else None
+            q = _with_files(toolbox, q)
+            key = _answer_key(cfg, provider.label, source, live, db, q) if first and not toolbox.inputs else None
             first = False
             if key and not fresh and (hit := cache.get("answer", key)):
                 _print_cached(hit, q, json_out)
@@ -236,7 +257,11 @@ def ask(
                 }, default=str, indent=2))
             else:
                 _print(ans, show_tools, streamed)
-            if key and not (ans.refused or ans.hit_step_limit) and ans.text.strip():
+            wrote = [s for s in ans.steps if s.tool == "write_file" and s.ok]
+            if wrote and not json_out:
+                for p in toolbox.outdir.written[-len(wrote):]:
+                    err.print(f"[green]wrote[/] {p}")
+            if key and not wrote and not (ans.refused or ans.hit_step_limit) and ans.text.strip():
                 live_left = toolbox.live_ttls[ttls_before:]
                 ttl = min([cfg.llm.cache.answer_ttl_s, *live_left]) if live_left else cfg.llm.cache.answer_ttl_s
                 cache.put("answer", key, {"answer": ans.text, "model": ans.model, "notes": ans.notes,
@@ -254,6 +279,42 @@ def ask(
         if sess is not None and sess.turns:
             err.print(f"[dim]session {sess.name} · {len(sess.turns)} question(s) · follow up with: "
                       f"spendlens ask -C \"...\" (or -S {sess.name})[/]")
+
+
+def _attach(toolbox: Toolbox, f: Any) -> None:
+    names = {x.name for x in toolbox.inputs}
+    if any(x.path.resolve() == f.path.resolve() for x in toolbox.inputs):
+        return
+    base, i = f.name, 2
+    while f.name in names:
+        f.name = f"{Path(base).stem}-{i}{Path(base).suffix}"
+        i += 1
+    toolbox.inputs.append(f)
+    err.print(f"[dim]attached {f.path} ({f.summary().get('bytes', 0):,} bytes)[/]")
+
+
+def _with_files(toolbox: Toolbox, q: str) -> str:
+    """Attach files named in the question, and tell the model what is attached (with a short preview)."""
+    from ..ai.files import FileError, InputFile, paths_in
+
+    for p in paths_in(q):
+        try:
+            _attach(toolbox, InputFile.load(p))
+        except FileError as e:
+            err.print(f"[yellow]not attached:[/] {e}")
+    new = [f for f in toolbox.inputs if not getattr(f, "announced", False)]
+    if not new:
+        return q
+    lines = []
+    for f in new:
+        f.announced = True
+        s = f.summary()
+        head = f.read(max_rows=5, limit=1500)
+        preview = (json.dumps({"columns": head.get("columns"), "first_rows": head.get("rows")}, default=str)
+                   if "rows" in head else head.get("text", ""))
+        lines.append(f"- {json.dumps(s, default=str)}\n  preview: {preview[:1500]}")
+    return (q + "\n\n[Attached files: read them with read_file(name); the preview is only the start.]\n"
+            + "\n".join(lines))
 
 
 def _save(out: Path, q: str, answer: str, model: str, live: bool, steps: list, db: Path, cfg: Any) -> None:

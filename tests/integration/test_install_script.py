@@ -47,6 +47,7 @@ def test_dry_run_with_existing_engines_and_pipx(tmp_path: Path) -> None:
     out = p.stdout
     assert "already installed" in out
     assert "plugin install aws@1.35.0" in out
+    assert "Installing Tailpipe v0.7.6" in out and "plugin install aws@0.14.2" in out  # tailpipe not on PATH
     assert "pipx install --force" in out and "spendlens[ai] @ https://github.com/devops-monk/spendlens/archive/main.tar.gz" in out
     calls = (tmp_path / "home" / "calls.log").read_text().splitlines()
     assert calls and all(c.endswith(" --version") for c in calls), calls  # dry run: version checks only
@@ -58,6 +59,7 @@ def test_dry_run_without_engines_downloads_pinned_releases(tmp_path: Path) -> No
     assert p.returncode == 0, p.stderr
     assert "steampipe/releases/download/v2.5.0/" in p.stdout
     assert "powerpipe/releases/download/v1.6.0/" in p.stdout
+    assert "tailpipe/releases/download/v0.7.6/tailpipe." in p.stdout
     assert "spendlens @ https://github.com/devops-monk/spendlens/archive/v0.1.0.tar.gz" in p.stdout
     assert "-m venv" in p.stdout  # no pipx/uv on PATH -> private venv
 

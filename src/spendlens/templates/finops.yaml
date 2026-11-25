@@ -103,7 +103,9 @@ llm:
   max_steps: 20
   fallbacks: true                # Claude: retry safety-declined requests on a fallback model
   max_rows: 500
-  query_wait_s: 30               # spendlens ask --live: wait per call, then the AI waits again for slow queries
+  live: true                     # ask may query live AWS (read-only); spendlens ask --no-live for saved runs only
+  output_dir: spendlens-output   # where ask writes the files you ask for (ask --out-dir)
+  query_wait_s: 30               # live queries: wait per call, then the AI waits again for slow queries
   query_timeout_s: 300           # a live query running longer is cancelled
   cache:                         # reuse recent live results and answers (saves AWS calls and tokens)
     enabled: true
@@ -139,6 +141,13 @@ graph:                         # spendlens graph: how resources connect, cleanup
   cost_source: auto            # auto: the CUR via Tailpipe, else Cost Explorer resource data, else the price book
   cur_days: 30                 # CUR window, in full days before today
   owner_from_cloudtrail: false # opt-in: who created each resource (CloudTrail, last 90 days) as an Owner suggestion
+
+tailpipe:                      # spendlens tailpipe init/collect: CloudTrail logs, VPC flow logs and the CUR, queried locally
+  discover: true               # find the S3 locations from the account (read-only), besides the lists below
+  cloudtrail: []               # e.g. [{bucket: my-org-trail, prefix: AWSLogs/}]
+  flow_logs: []
+  cur: []                      # the CUR 2.0 export bucket, e.g. [{bucket: my-billing, prefix: cur2}]
+  collect_days: 30             # how far back `spendlens tailpipe collect` goes
 
 aws:
   profile: null                # null = the credentials Steampipe's service started with (your assumed role); or a profile name

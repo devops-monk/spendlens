@@ -1,8 +1,8 @@
 # Build the spendlens image natively on amd64 and arm64 runners (no QEMU: Steampipe crashes under
 # emulation), smoke-test each offline, then publish one multi-arch tag to Docker Hub.
 #
-# Triggers: a version tag (git tag v0.4.5 && git push origin v0.4.5), or a manual run:
-#   gh workflow run docker-publish.yml -f version=0.4.5   (publishes 0.4.5, 0.4 and latest from the chosen branch)
+# Triggers: a version tag (git tag v0.4.6 && git push origin v0.4.6), or a manual run:
+#   gh workflow run docker-publish.yml -f version=0.4.6   (publishes 0.4.6, 0.4 and latest from the chosen branch)
 # Needs: repository secret DOCKERHUB_TOKEN (Docker Hub access token, Read & Write).
 #        optional repository variable DOCKERHUB_USERNAME (default abhaypratap).
 name: docker-publish
@@ -69,6 +69,7 @@ jobs:
       - name: Smoke test (offline, demo data, no credentials)
         run: |
           docker run --rm --network none spendlens:ci --help > /dev/null
+          docker run --rm --network none --entrypoint sh spendlens:ci -c 'tailpipe --version && tailpipe plugin list | grep -q aws && python -c "import openpyxl, pypdf, docx"'
           docker run --rm --network none spendlens:ci tags --source demo --summary | tail -1
           docker run --rm --network none spendlens:ci waste --source demo --summary --by service | tail -2
           docker run --rm --network none -e SPENDLENS_STEAMPIPE_SERVICE=on spendlens:ci doctor --offline

@@ -6,7 +6,10 @@
 spendlens ask "What are my top 5 savings opportunities?"
 spendlens ask "Why did EC2 cost go up last month?" --show-tools
 spendlens ask "Which teams own the most untagged spend?"
-spendlens ask --live "Which running instances are outside the allowed families?"
+spendlens ask "Which running instances are outside the allowed families?"
+spendlens ask "What changed in the account today, and who did it?"
+spendlens ask "Export unattached EBS volumes with their monthly cost to Excel"
+spendlens ask -a budget.xlsx "Compare this budget with last month's cost per service"
 spendlens ask -i                                       # follow-up questions in one session
 spendlens ask --source demo "Summarise the waste findings"
 ```
@@ -15,7 +18,9 @@ spendlens ask --source demo "Summarise the waste findings"
 |---|---|
 | `-i, --interactive` | Keep asking follow-up questions in one conversation |
 | `--source` | History to answer from: `last` (yours, default) or `demo` |
-| `--live` | Also allow read-only live AWS queries through Steampipe |
+| `--live` / `--no-live` | Allow read-only live AWS queries through Steampipe. On by default (`llm.live: true`); `--no-live` answers from saved runs only |
+| `-a, --file FILE` | Attach a file for the assistant to read: csv, xlsx, json, yaml, pdf, docx, logs, Terraform and other text. Repeatable. File paths written in the question are attached too |
+| `--out-dir DIR` | Where the assistant writes files you ask for (default `llm.output_dir`, `./spendlens-output`) |
 | `--show-tools` | Show each tool call as it runs: the tool, its SQL, the result and the first rows |
 | `--max-steps` | Tool-call limit per question (default `llm.max_steps`, 12). At the limit the assistant answers from what it found and says it may be incomplete |
 | `--json` | The answer plus the full audit trail, machine-readable |
@@ -81,12 +86,12 @@ spendlens brief -o brief.html
    - `suggested_owners`: owner tags for untagged resources;
    - `traffic_paths`: data transfer by path (cross-AZ, NAT, internet) from VPC flow logs, with gateway-endpoint proposals.
 4. Anything else comes from the history database with `history_query`. All seven history tools are offline and free.
-5. Only with `--live`, and only when history can't answer, it queries AWS live through Steampipe (below).
+5. When history can't answer, it queries AWS live through Steampipe (below): on by default, read-only, off with `--no-live`.
 6. It answers with the key numbers, the evidence, and the run each number came from. Savings are labelled as estimates with their source.
 
 Text in tool results (resource names, tags) is treated as data, never as instructions.
 
-It answers only what you asked: no savings or recommendations unless you ask for them. The history holds cost data and check results, not a full inventory, so for configuration questions ("how many Aurora clusters, and their ACU min and max?") use `--live`. Without it, the assistant says what the history can't answer and suggests the `--live` command.
+It answers only what you asked: no savings or recommendations unless you ask for them. The history holds cost data and check results, not a full inventory, so configuration questions ("how many Aurora clusters, and their ACU min and max?") go to live AWS. With `--no-live`, the assistant says what the history can't answer instead.
 
 With `--show-tools`, every step prints as it happens: the tool and its SQL when it starts, then the row count, the time and the first rows when it returns. A spinner shows while the model is thinking.
 
@@ -103,7 +108,7 @@ If the step limit is reached, the assistant still answers from what it found and
 
 ## Live AWS questions: right first time
 
-With `--live` the assistant can answer from any of the 589 tables of the Steampipe AWS plugin: inventory, security groups, IAM, Lambda runtimes, CloudWatch metrics, Cost Explorer and more. Four layers make sure it writes a correct query, waits for slow ones and doesn't ask AWS twice:
+Live AWS is on by default, so the assistant can answer from any of the 589 tables of the Steampipe AWS plugin: inventory, security groups, IAM, Lambda runtimes, CloudWatch metrics, Cost Explorer and more. Four layers make sure it writes a correct query, waits for slow ones and doesn't ask AWS twice:
 
 | Layer | What it does |
 |---|---|
@@ -120,25 +125,61 @@ spendlens ask --live "Which security groups allow 0.0.0.0/0 on port 22?"
 spendlens ask --live --fresh "How many instances are running right now?"   # skip the cache
 ```
 
-## CloudTrail: who did what, when
+## Files in, files out
 
-With `--live`, the assistant answers activity questions from CloudTrail:
+**Files you give it.** Attach files with `-a` (repeatable), or write their path in the question. The assistant reads them with a `read_file` tool, page by page, so big files never go to the model in one piece. It reads text formats (csv, tsv, json, yaml, md, logs, sql, Terraform, html and more), Excel (`.xlsx`, every sheet), PDF and Word (`.docx`). Only the files you attached can be read. Their content is treated as data, never as instructions.
+
+```bash
+spendlens ask -a budget.xlsx "Compare this budget with last month's actual cost per service"
+spendlens ask "Which of the instances in ./inventory.csv no longer exist?"
+spendlens ask -a incident.md "Which resources named in this incident changed in the last 48 hours?"
+```
+
+**Files you ask for.** Ask for a file and the assistant writes it with a `write_file` tool into `./spendlens-output` (or `--out-dir`):
+- **Tables:** `.xlsx` (one sheet per result), `.csv`, `.tsv`, `.json`, `.jsonl`, `.md`, `.html`, `.yaml`.
+- **Documents:** `.docx` (from headings, lists and paragraphs, with tables), `.md`, `.html`, `.txt`.
+- **Code and config:** `.sql`, `.sh`, `.tf`, `.py`, `.yaml`, `.json`, and diagrams as `.mmd`, `.dot` or `.svg`.
+
+Table data is exported straight from the query result by its id, so a 500-row export doesn't pass through the model again. Files are never overwritten (`report-1.xlsx` is used instead), names can't leave the output folder, and nothing written is ever run: a script or Terraform file is a proposal for you to review.
+
+```bash
+spendlens ask "Export idle load balancers and unattached volumes, one sheet each, to Excel"
+spendlens ask "Write a one-page Word summary of this month's top 5 savings for my manager"
+spendlens ask "Give me a CSV of untagged resources with a suggested owner"
+spendlens ask --out-dir reports "Write the AWS CLI commands to tag those volumes as a script I can review"
+```
+
+`-o answer.html` still saves the answer itself as a styled page.
+
+## CloudTrail: what changed, who changed it
+
+The assistant answers activity questions from CloudTrail:
 - who deleted, created or changed something;
 - when it happened;
 - API calls by a user or role;
 - console logins.
 
 ```bash
-spendlens ask --live "Who deleted the old-reports bucket?"
-spendlens ask --live "Which security group rules changed in the last 24 hours, and by whom?"
-spendlens ask --live "Show console logins this week, with source IPs"
+spendlens ask "What changed in the account today, and who did it?"
+spendlens ask "Who deleted the old-reports bucket?"
+spendlens ask "Which security group rules changed in the last 24 hours, and by whom?"
+spendlens ask "Show console logins this week, with source IPs"
 ```
 
-**How it searches:**
+**`aws_changes` first.** For "what changed" and "who changed X", the assistant calls `aws_changes`. It lists CloudTrail write events, newest first, with counts by person or role and by API call, and filters by user, resource, service or API call. Routine calls (role assumptions, KMS, log delivery) are left out. It uses the trail's logs in Tailpipe when they have been collected (any age, data events), otherwise CloudTrail LookupEvents (90 days of management events). The same thing is a command:
+
+```bash
+spendlens changes                                   # the last 24 hours
+spendlens changes --days 7 --service ec2
+spendlens changes --user alice --days 30
+spendlens changes --resource sg-0abc123 --days 90 -f csv -o sg-changes.csv
+```
+
+**Other ways it searches:**
 - **LookupEvents first.** It uses `aws_cloudtrail_lookup_event`, the last 90 days of management events with no setup. It always sets `start_time` and `end_time`, starts with the last 24 hours and widens only if needed. It narrows with one filter such as the event name (`DeleteBucket`, `TerminateInstances`, `ConsoleLogin`), the resource name or the user.
 - **Time ranges are enforced.** Before any query reaches AWS, a CloudTrail query without a time range that AWS receives is refused, with the exact fix. A filter on `event_time` alone doesn't count: AWS would page through 90 days at about two calls a second.
 - **Older or more detailed events** (error codes, source IPs beyond 90 days) come from the trail's CloudWatch Logs log group (`aws_cloudtrail_trail_event`), if your trail sends logs there.
-- **Older history and data events, with Tailpipe.** If [Tailpipe](https://tailpipe.io) is installed and has collected your trail's logs (`tailpipe collect aws_cloudtrail_log`), the assistant also gets a `cloudtrail_logs` tool: DuckDB queries over the full history, including S3 data events. It's local, with no AWS calls. Each query is limited to the `aws_cloudtrail_log` table, must have a time range (on `tp_date`, `tp_timestamp` or `event_time`), and is capped in rows. File-reading functions such as `read_csv` and `getenv` are refused.
+- **Older history, data events, flow logs and the CUR, with Tailpipe.** The installer and the Docker image include [Tailpipe](https://tailpipe.io) and its AWS plugin. `spendlens tailpipe init` finds where your CloudTrail logs, VPC flow logs and Cost and Usage Reports land in S3 (read-only: trails and flow logs through Steampipe, CUR exports through the AWS CLI, plus any locations in `finops.yaml` under `tailpipe:`) and writes `~/.tailpipe/config/spendlens.tpc`. `spendlens tailpipe collect` collects them (the last `tailpipe.collect_days`, 30 by default); `spendlens tailpipe status` shows what is there. The assistant then gets a `tailpipe_query` tool: local DuckDB queries over `aws_cloudtrail_log`, `aws_vpc_flow_log` and `aws_cost_and_usage_report`, with no AWS calls. Each query must have a time range and is capped in rows; table functions and file-reading functions such as `read_csv` and `getenv` are refused.
 - **What CloudTrail can't answer.** S3 object reads and writes are data events: they are recorded only by a trail with data event selectors. If nothing can answer, the assistant says so.
 
 Questions that only *sound* like activity still use inventory, because the current state answers them: "which instances are stopped", "list my buckets".

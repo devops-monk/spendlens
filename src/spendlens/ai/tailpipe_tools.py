@@ -1,13 +1,16 @@
-"""The assistant's `cloudtrail_logs` tool: CloudTrail logs already collected by Tailpipe (DuckDB SQL, local).
+"""The assistant's `tailpipe_query` tool: data already collected by Tailpipe (DuckDB SQL, local): CloudTrail logs,
+VPC flow logs and Cost and Usage Reports.
 
 Beyond what LookupEvents gives (`aws_cloudtrail_lookup_event`, 90 days of management events): full history and data
 events (S3 object reads and writes), from the trail's own log files that Tailpipe collected. Offered to the model
 only when the tailpipe CLI is installed. Nothing here calls AWS.
 
 Guard, on top of the general one (single read-only SELECT):
-  * only the table aws_cloudtrail_log (and the query's own CTEs): no table functions, no read_csv / read_parquet /
+  * only the tables aws_cloudtrail_log, aws_vpc_flow_log, aws_cost_and_usage_report (and the query's own CTEs):
+    no table functions, no read_csv / read_parquet /
     glob / getenv or other file and environment access DuckDB offers;
-  * a time range on tp_date, tp_timestamp or event_time, so Tailpipe reads only the partitions it needs;
+  * a time range (tp_date, tp_timestamp, event_time, start_time or the CUR's usage date), so Tailpipe reads only
+    the partitions it needs;
   * a row cap (llm.max_rows).
 """
 
@@ -22,15 +25,25 @@ from sqlglot import exp
 from .sql_guard import UnsafeSQL, check_select
 
 TABLE = "aws_cloudtrail_log"
-TIME_COLUMNS = {"tp_date", "tp_timestamp", "event_time"}
+TABLES = ("aws_cloudtrail_log", "aws_vpc_flow_log", "aws_cost_and_usage_report")
+TIME_COLUMNS = {"tp_date", "tp_timestamp", "event_time", "start_time", "line_item_usage_start_date",
+                "bill_billing_period_start_date"}
 DUCKDB_FORBIDDEN = {
     "read_csv", "read_csv_auto", "read_parquet", "parquet_scan", "read_json", "read_json_auto", "read_ndjson",
     "read_ndjson_auto", "read_json_objects", "read_text", "read_blob", "glob", "getenv", "sniff_csv", "iceberg_scan",
     "delta_scan", "query", "query_table", "install", "load", "attach", "copy", "export_database", "import_database",
     "duckdb_secrets", "duckdb_settings", "current_setting", "sqlite_scan", "postgres_scan", "mysql_scan", "httpfs",
 }
-COLUMNS_SQL = (f"select column_name, data_type from information_schema.columns where table_name = '{TABLE}' "
-               "order by ordinal_position")
+
+
+def columns_sql(table: str) -> str:
+    if table not in TABLES:
+        raise UnsafeSQL(f"table must be one of {', '.join(TABLES)}")
+    return (f"select column_name, data_type from information_schema.columns where table_name = '{table}' "
+            "order by ordinal_position")
+
+
+COLUMNS_SQL = columns_sql(TABLE)
 
 
 def available(path: str) -> bool:
@@ -47,10 +60,10 @@ def check(sql: str, max_rows: int) -> str:
     ctes = {c.alias_or_name.lower() for c in tree.find_all(exp.CTE)}
     for t in tree.find_all(exp.Table):
         if not isinstance(t.this, exp.Identifier):
-            raise UnsafeSQL("table functions are not allowed: query the aws_cloudtrail_log table")
+            raise UnsafeSQL("table functions are not allowed: query the Tailpipe tables directly")
         name = t.name.lower()
-        if name not in ctes and name != TABLE:
-            raise UnsafeSQL(f"only the {TABLE} table can be queried here (got {t.name})")
+        if name not in ctes and name not in TABLES:
+            raise UnsafeSQL(f"only {', '.join(TABLES)} can be queried here (got {t.name})")
     for f in tree.find_all(exp.Func):
         name = (f.name if isinstance(f, exp.Anonymous) else f.sql_name()).lower()
         if name in DUCKDB_FORBIDDEN:
@@ -72,4 +85,4 @@ def run(sql: str, *, runner: Any, max_rows: int) -> dict[str, Any]:
     rows = rows[:max_rows]
     cols = list(rows[0]) if rows else []
     return {"columns": cols, "rows": [[r.get(c) for c in cols] for r in rows], "row_count": len(rows),
-            "truncated": truncated, "source": "Tailpipe (CloudTrail logs, local)"}
+            "truncated": truncated, "source": "Tailpipe (local)"}

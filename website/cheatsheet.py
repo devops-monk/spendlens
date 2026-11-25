@@ -96,6 +96,19 @@ SECTIONS: list[tuple[str, str, str, list[tuple[str, str, str]]]] = [
         ("Everything saved about one resource", "spendlens find vol-0abc123", "offline"),
         ("Open the review in the browser, from saved runs", "spendlens open", "offline"),
     ]),
+    ("activity", "What changed", "CloudTrail write events: who changed what, and when. Read-only.", [
+        ("What changed in the last 24 hours, and who changed it", "spendlens changes", "aws"),
+        ("Last week, EC2 only", "spendlens changes --days 7 --service ec2", "aws"),
+        ("Everything one person did this month", "spendlens changes --user alice --days 30", "aws"),
+        ("Ask it in plain English", "spendlens ask \"Who changed the payments security group this week?\"", "aws"),
+        ("Set up Tailpipe for CloudTrail, flow logs and the CUR", "spendlens tailpipe init", "aws"),
+        ("Collect them from S3", "spendlens tailpipe collect", "aws"),
+    ]),
+    ("files", "Files in, files out", "The assistant reads files you give it and writes the files you ask for.", [
+        ("An Excel export (written to ./spendlens-output)", "spendlens ask \"Export idle resources with their cost to Excel\"", "aws"),
+        ("A Word summary", "spendlens ask \"Write a one-page Word summary of this month's top savings\"", "aws"),
+        ("Compare your own spreadsheet", "spendlens ask -a budget.xlsx \"Compare this budget with last month's cost\"", "aws"),
+    ]),
     ("hunt", "Find one kind of waste", "Run a single check when you already know what you're looking for.", [
         ("Elastic IPs not attached to anything (billed hourly)", "spendlens waste -C vpc_eip_unattached", "aws"),
         ("NAT gateways with no traffic", "spendlens waste -C vpc_nat_gateway_unused", "aws"),

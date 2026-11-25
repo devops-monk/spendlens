@@ -60,6 +60,8 @@ def _isolate(request, tmp_path, monkeypatch):
     monkeypatch.setenv("STEAMPIPE_DATABASE_PASSWORD", "testing")
     # a Tailpipe installed on this machine must not be used either: only tests that bring a fake one see one
     monkeypatch.setenv("SPENDLENS__GRAPH__TAILPIPE_PATH", "/nonexistent/tailpipe")
+    # `ask` uses live AWS by default; tests opt in with --live (against a fake Steampipe)
+    monkeypatch.setenv("SPENDLENS__LLM__LIVE", "false")
     monkeypatch.setattr("spendlens.ai.tailpipe_tools.available",
                         lambda path: os.path.isabs(path) and os.access(path, os.X_OK))
     monkeypatch.delenv("STEAMPIPE_INSTALL_DIR", raising=False)

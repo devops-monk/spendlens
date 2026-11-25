@@ -5,7 +5,7 @@
 #   docker run --rm spendlens tags --source demo --summary
 #   docker run --rm -e AWS_PROFILE=finops -v ~/.aws:/home/finops/.aws:ro -v "$PWD:/work" spendlens report --out reports
 #
-# Multi-arch: docker buildx build --platform linux/amd64,linux/arm64 -t <registry>/spendlens:0.4.5 --push .
+# Multi-arch: docker buildx build --platform linux/amd64,linux/arm64 -t <registry>/spendlens:0.4.6 --push .
 
 ARG PYTHON_VERSION=3.13
 
@@ -22,6 +22,8 @@ FROM python:${PYTHON_VERSION}-slim
 ARG STEAMPIPE_VERSION=2.5.0
 ARG POWERPIPE_VERSION=1.6.0
 ARG AWS_PLUGIN_VERSION=1.35.0
+ARG TAILPIPE_VERSION=0.7.6
+ARG TAILPIPE_AWS_PLUGIN_VERSION=0.14.2
 ARG TARGETARCH
 
 LABEL org.opencontainers.image.title="spendlens" \
@@ -35,15 +37,17 @@ RUN apt-get update \
  && apt-get install -y --no-install-recommends ca-certificates curl tini \
  && rm -rf /var/lib/apt/lists/*
 
-# Pinned Steampipe + Powerpipe release binaries (amd64 / arm64 from TARGETARCH).
+# Pinned Steampipe, Powerpipe and Tailpipe release binaries (amd64 / arm64 from TARGETARCH).
 RUN set -eux; \
     arch="${TARGETARCH:-$(dpkg --print-architecture)}"; \
-    mkdir -p /tmp/sp /tmp/pp; \
+    mkdir -p /tmp/sp /tmp/pp /tmp/tp; \
     curl -fsSL "https://github.com/turbot/steampipe/releases/download/v${STEAMPIPE_VERSION}/steampipe_linux_${arch}.tar.gz" | tar -xz -C /tmp/sp; \
     curl -fsSL "https://github.com/turbot/powerpipe/releases/download/v${POWERPIPE_VERSION}/powerpipe.linux.${arch}.tar.gz" | tar -xz -C /tmp/pp; \
+    curl -fsSL "https://github.com/turbot/tailpipe/releases/download/v${TAILPIPE_VERSION}/tailpipe.linux.${arch}.tar.gz" | tar -xz -C /tmp/tp; \
     install -m 0755 "$(find /tmp/sp -type f -name steampipe | head -1)" /usr/local/bin/steampipe; \
     install -m 0755 "$(find /tmp/pp -type f -name powerpipe | head -1)" /usr/local/bin/powerpipe; \
-    rm -rf /tmp/sp /tmp/pp
+    install -m 0755 "$(find /tmp/tp -type f -name tailpipe | head -1)" /usr/local/bin/tailpipe; \
+    rm -rf /tmp/sp /tmp/pp /tmp/tp
 
 COPY --from=wheels /wheels /tmp/wheels
 RUN pip install --no-cache-dir --no-index --find-links /tmp/wheels "spendlens[ai]" && rm -rf /tmp/wheels
@@ -58,6 +62,8 @@ ENV HOME=/home/finops \
     POWERPIPE_UPDATE_CHECK=false \
     STEAMPIPE_TELEMETRY=none \
     POWERPIPE_TELEMETRY=none \
+    TAILPIPE_UPDATE_CHECK=false \
+    TAILPIPE_TELEMETRY=none \
     SPENDLENS__HISTORY__PATH=/data/spendlens.db \
     PYTHONUNBUFFERED=1
 
@@ -66,7 +72,8 @@ ENV HOME=/home/finops \
 RUN steampipe plugin install "aws@${AWS_PLUGIN_VERSION}" \
  && steampipe service start --database-listen local \
  && steampipe service stop \
- && rm -rf "$HOME/.steampipe/logs/"*
+ && rm -rf "$HOME/.steampipe/logs/"* \
+ && tailpipe plugin install "aws@${TAILPIPE_AWS_PLUGIN_VERSION}"
 
 COPY --chown=finops:finops --chmod=0755 docker/entrypoint.sh /usr/local/bin/spendlens-entrypoint
 # licence texts and third-party notices (Steampipe/Powerpipe are AGPL-3.0, shipped unmodified)

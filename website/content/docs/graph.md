@@ -266,11 +266,12 @@ Set up the CUR once:
 
 ```bash
 # 1. In the AWS Billing console, create a CUR 2.0 export to S3 with resource IDs included.
-# 2. Install Tailpipe and its AWS plugin, point a partition at the export bucket, and collect:
-tailpipe plugin install aws
-tailpipe collect aws_cost_and_usage_report
+# 2. Tailpipe and its AWS plugin come with spendlens. Find the export (and your CloudTrail and flow log buckets)
+#    and collect them:
+spendlens tailpipe init       # read-only; or set tailpipe.cur in finops.yaml
+spendlens tailpipe collect
 # 3. Check that spendlens can see it, then collect the graph:
-spendlens doctor              # "tailpipe (CUR): N CUR line items collected"
+spendlens doctor              # "tailpipe: Cost and Usage Reports: N rows"
 spendlens graph collect       # "N resources priced from the CUR (Tailpipe)"
 ```
 

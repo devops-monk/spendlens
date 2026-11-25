@@ -243,6 +243,8 @@ class LLMConfig(_Strict):
     temperature: float | None = Field(None, ge=0, le=2)  # OpenAI-family only (current Claude models reject it)
     max_tokens: int = Field(16000, ge=256, le=128000)
     max_steps: int = Field(12, ge=1, le=50)  # tool calls per question
+    output_dir: str = "spendlens-output"  # where ask's write_file tool writes (ask --out-dir)
+    live: bool = True  # ask may query live AWS (read-only) by default; --no-live keeps it to saved runs
     fallbacks: bool = True  # Claude refusal fallbacks (server-side on the Anthropic API, SDK middleware on Bedrock)
     fallback_model: str | None = None  # Bedrock middleware target (default anthropic.claude-opus-4-8)
     max_rows: int = Field(500, ge=1)
@@ -299,6 +301,25 @@ class GraphConfig(_Strict):
     cloudtrail_days: int = Field(90, ge=1, le=90)
     cloudtrail_owner_key: str = Field("Owner", min_length=1, max_length=128)  # the tag the creator is suggested for
     tailpipe_path: str = Field("tailpipe", pattern=r"^[^;&|`$<>]+$")  # the tailpipe CLI
+
+
+class S3Location(_Strict):
+    bucket: str = Field(pattern=r"^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$")
+    prefix: str = Field("", pattern=r"^[A-Za-z0-9!_.*'()/=+-]*$")
+
+
+class TailpipeConfig(_Strict):
+    """Tailpipe: CloudTrail logs, Cost and Usage Reports and VPC flow logs, collected from S3 and queried locally.
+
+    `spendlens tailpipe init` writes ~/.tailpipe/config/spendlens.tpc from these lists plus, with discover, what the
+    account reports (CloudTrail trails and flow logs via Steampipe, CUR exports via the AWS CLI), all read-only."""
+
+    discover: bool = True
+    profile: str | None = Field(None, pattern=r"^[A-Za-z0-9_.+=,@/-]+$")  # default: aws.profile
+    cloudtrail: list[S3Location] = Field(default_factory=list)
+    flow_logs: list[S3Location] = Field(default_factory=list)
+    cur: list[S3Location] = Field(default_factory=list)
+    collect_days: int = Field(30, ge=1, le=400)  # how far back `spendlens tailpipe collect` goes
 
 
 class HistoryConfig(_Strict):
@@ -374,6 +395,7 @@ class Config(_Strict):
     dashboard: DashboardConfig = Field(default_factory=DashboardConfig)
     history: HistoryConfig = Field(default_factory=HistoryConfig)
     graph: GraphConfig = Field(default_factory=GraphConfig)
+    tailpipe: TailpipeConfig = Field(default_factory=TailpipeConfig)
     aws: AWSConfig = Field(default_factory=AWSConfig)
     powerpipe_vars: dict[str, Any] = Field(default_factory=dict)  # raw passthrough, merged last
     plugins: dict[str, dict[str, Any]] = Field(default_factory=dict)  # per-plugin settings
