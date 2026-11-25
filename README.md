@@ -36,8 +36,12 @@
 <p align="center"><sub>One self-contained HTML report, shown with the bundled demo data.</sub></p>
 
 > [!NOTE]
-> v0.4.6. spendlens is tested end to end through Steampipe against an AWS emulator. Verification against a live
+> v0.4.7. spendlens is tested end to end through Steampipe against an AWS emulator. Verification against a live
 > account with a read-only role is next (see [PLAN.md](PLAN.md)).
+
+## New in 0.4.7
+
+- **`tailpipe init` says what to fix.** When discovery can't read a source, the note now names the fix: an expired AWS SSO session ("run `aws sso login`"), or an AWS CLI too old to list CUR 2.0 exports (2.15 or later needed). Before, the message was cut off or just said "help".
 
 ## New in 0.4.6
 
