@@ -214,12 +214,18 @@ class Toolbox:
                 "What changed in the AWS account and who changed it: CloudTrail write events, newest first, with counts "
                 "by who and by API call. Uses the trail's logs in Tailpipe when collected (any age, data events), else "
                 "CloudTrail LookupEvents (last 90 days, management events). Routine calls (role assumptions, KMS, log "
-                "delivery) are left out. Use it first for 'what changed', 'who changed X', 'who deleted ...'.",
+                "delivery) are left out. Use it first for 'what changed', 'who changed X', 'who deleted ...'. "
+                "Without Tailpipe, a search by service alone is slow (LookupEvents reads every event of that service, "
+                "50 a page): when the question implies an action, pass event instead, e.g. ECS deployments = "
+                "UpdateService (then CreateService), Lambda deploys = UpdateFunctionCode, RDS changes = "
+                "ModifyDBInstance. Results stop after about a minute: partial = true and covered_hours say how far "
+                "back it got.",
                 _schema({"hours": {"type": "integer", "description": "How far back (default 24; 168 = a week)."},
                          "user": {"type": "string", "description": "Optional: part of a user or role name / ARN."},
                          "resource": {"type": "string", "description": "Optional: a resource id or name."},
                          "service": {"type": "string", "description": "Optional: a service, e.g. ec2, iam, s3."},
-                         "event": {"type": "string", "description": "Optional: an API call, e.g. DeleteBucket."}}),
+                         "event": {"type": "string", "description": "Optional: an API call, e.g. DeleteBucket, "
+                                                                    "UpdateService. Fast: prefer it to service."}}),
                 lambda a: self.aws_changes(a.get("hours") or 24, a.get("user"), a.get("resource"), a.get("service"),
                                            a.get("event"))))
         if self._tailpipe_available():

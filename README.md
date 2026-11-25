@@ -36,8 +36,12 @@
 <p align="center"><sub>One self-contained HTML report, shown with the bundled demo data.</sub></p>
 
 > [!NOTE]
-> v0.4.7. spendlens is tested end to end through Steampipe against an AWS emulator. Verification against a live
+> v0.4.8. spendlens is tested end to end through Steampipe against an AWS emulator. Verification against a live
 > account with a read-only role is next (see [PLAN.md](PLAN.md)).
+
+## New in 0.4.8
+
+- **"What changed" no longer hangs without Tailpipe.** CloudTrail LookupEvents searches send AWS one filter (two made the plugin drop the request), no longer sort (which made Steampipe read every page before answering), search a whole service newest first in widening windows, and stop after a minute (`spendlens changes --max-wait`) with what they found and how far back they got. The assistant asks for the action itself when the question implies one: "which ECS service was deployed last" looks up `UpdateService`, not every ECS event.
 
 ## New in 0.4.7
 

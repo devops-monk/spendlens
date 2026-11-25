@@ -13,6 +13,7 @@ Only write events (read_only = false) are listed, minus routine calls that chang
 
 from __future__ import annotations
 
+import time
 from collections import Counter
 from typing import Any
 
@@ -21,6 +22,7 @@ NOISE = ("AssumeRole", "AssumeRoleWithSAML", "AssumeRoleWithWebIdentity", "GetSe
          "PutLogEvents", "StartQuery", "SetTaskStatus", "ReportTaskProgress", "PollForTask", "SendCommand",
          "UpdateInstanceInformation", "RefreshCredentials", "CreateToken", "Federate")
 MAX_ROWS = 500
+MAX_WAIT_S = 60.0
 
 
 def _quote(v: str) -> str:
@@ -57,11 +59,20 @@ def tailpipe_sql(hours: int, *, user: str | None = None, resource: str | None = 
 
 
 def lookup_sql(hours: int, *, user: str | None = None, resource: str | None = None, service: str | None = None,
-               event: str | None = None) -> tuple[str, dict[str, Any]]:
-    """For Steampipe: start_time / end_time and the '=' filters are sent to the LookupEvents API."""
-    where = [f"start_time = now() - interval '{int(hours)} hours'", "end_time = now()", "read_only = 'false'"]
+               event: str | None = None, since_hours: int = 0) -> tuple[str, dict[str, Any]]:
+    """For Steampipe: the window [now - hours, now - since_hours] and ONE '=' filter go to the LookupEvents API.
+
+    LookupEvents accepts a single lookup attribute (the plugin silently drops a request with two), so the most
+    selective filter is sent as '=' and the others are written so Steampipe filters them itself (ilike, functions,
+    <>): read-only events are only sent as the attribute when nothing else is. There is no ORDER BY: LookupEvents
+    already returns newest first, and sorting would make Steampipe read every page before returning a row; with a
+    plain LIMIT it stops as soon as it has enough.
+    """
+    hours, since_hours = int(hours), max(0, int(since_hours))
+    end = f"now() - interval '{since_hours} hours'" if since_hours else "now()"
+    where = [f"start_time = now() - interval '{hours} hours'", f"end_time = {end}"]
     params: dict[str, Any] = {}
-    # LookupEvents takes one lookup attribute: send the most selective one, filter the rest in SQL
+    svc = _service(service)
     if resource:
         where.append("resource_name = %(resource)s")
         params["resource"] = resource
@@ -71,16 +82,44 @@ def lookup_sql(hours: int, *, user: str | None = None, resource: str | None = No
     elif user:
         where.append("username = %(user)s")
         params["user"] = user
-    elif service:
+    elif svc:
         where.append("event_source = %(service)s")
-        params["service"] = _service(service)
+        params["service"] = svc
+    else:
+        where.append("read_only = 'false'")
+    if params:  # something else went to the API: Steampipe drops read events itself
+        where.append("coalesce(read_only, 'false') <> 'true'")
+    if event and "event" not in params:
+        where.append("lower(event_name) = lower(%(event)s)")
+        params["event"] = event
+    if svc and "service" not in params:
+        where.append("lower(event_source) = %(service)s")
+        params["service"] = svc
+    if user and "user" not in params:
+        where.append("(coalesce(cloud_trail_event -> 'userIdentity' ->> 'arn', '') ilike %(user_like)s "
+                     "or coalesce(username, '') ilike %(user_like)s)")
+        params["user_like"] = f"%{user}%"
     noise = ", ".join(_quote(n) for n in NOISE)
     sql = ("select event_time, coalesce(cloud_trail_event -> 'userIdentity' ->> 'arn', username) as who, event_name, "
            "event_source, region, cloud_trail_event ->> 'sourceIPAddress' as source_ip, "
            "cloud_trail_event ->> 'errorCode' as error_code, resource_name as details "
            f"from aws_cloudtrail_lookup_event where {' and '.join(where)} and event_name not in ({noise}) "
-           f"order by event_time desc limit {MAX_ROWS}")
+           f"limit {MAX_ROWS}")
     return sql, params
+
+
+def windows(hours: int, broad: bool) -> list[tuple[int, int]]:
+    """(since_hours, hours) pairs, newest first. A broad search (service only, or nothing) starts small and widens,
+    so recent changes come back fast and a time budget can stop it with what it has; a selective one is one call."""
+    if not broad:
+        return [(0, hours)]
+    edges = [e for e in (1, 6, 24, 72, 168) if e < hours]
+    edges += list(range(336, hours, 168)) + [hours]
+    out, prev = [], 0
+    for e in edges:
+        out.append((prev, e))
+        prev = e
+    return out
 
 
 def _match(r: dict[str, Any], user: str | None, service: str | None, event: str | None) -> bool:
@@ -103,8 +142,11 @@ def summarise(rows: list[dict[str, Any]], source: str, hours: int) -> dict[str, 
 
 def find_changes(cfg: Any, hours: int = 24, *, user: str | None = None, resource: str | None = None,
                  service: str | None = None, event: str | None = None, source: str = "auto",
-                 tailpipe_run: Any = None, steampipe: Any = None) -> dict[str, Any]:
-    """{source, count, by_who, by_event, rows, notes}. source: auto | tailpipe | lookup_events."""
+                 tailpipe_run: Any = None, steampipe: Any = None, max_wait_s: float = MAX_WAIT_S,
+                 clock: Any = time.monotonic) -> dict[str, Any]:
+    """{source, count, by_who, by_event, rows, notes}. source: auto | tailpipe | lookup_events.
+
+    LookupEvents gets at most max_wait_s: what it found by then is returned, with covered_hours and a note."""
     hours = max(1, min(int(hours), 24 * 400))
     notes: list[str] = []
     if source in ("auto", "tailpipe"):
@@ -124,15 +166,41 @@ def find_changes(cfg: Any, hours: int = 24, *, user: str | None = None, resource
     if hours > 90 * 24:
         notes.append("LookupEvents keeps 90 days: the window was cut to 90 days.")
         hours = 90 * 24
-    from .steampipe import SteampipeClient
+    from .steampipe import SteampipeClient, SteampipeError
 
-    sql, params = lookup_sql(hours, user=user, resource=resource, service=service, event=event)
-    c = steampipe or SteampipeClient(cfg.steampipe, timeout_s=300)
+    broad = not (resource or event or user)
+    c = steampipe or SteampipeClient(cfg.steampipe, timeout_s=max(10, int(max_wait_s)))
+    rows: list[dict[str, Any]] = []
+    covered = 0
+    deadline = clock() + max_wait_s
     try:
-        rows = [r for r in c.query(sql, params or None) if _match(r, user, service, event)]
+        for since, upto in windows(hours, broad):
+            left = deadline - clock()
+            if left <= 1:
+                break
+            sql, params = lookup_sql(upto, user=user, resource=resource, service=service, event=event,
+                                     since_hours=since)
+            try:
+                got = c.query(sql, params or None, timeout_s=max(1, int(left)))
+            except SteampipeError as e:
+                if "statement timeout" not in str(e).lower() and "canceling statement" not in str(e).lower():
+                    raise
+                break
+            rows += [r for r in got if _match(r, user, service, event)]
+            covered = upto
+            if len(rows) >= MAX_ROWS:
+                rows = rows[:MAX_ROWS]
+                break
     finally:
         if steampipe is None:
             c.close()
+    if covered < hours:
+        notes.append(f"LookupEvents is slow (50 events a page, rate-limited): stopped after {int(max_wait_s)}s with "
+                     f"the last {covered} of {hours} hours covered. Narrow it with an event (e.g. UpdateService, "
+                     "TerminateInstances), a resource or a user, or collect CloudTrail logs with Tailpipe "
+                     "(`spendlens tailpipe init`, `spendlens tailpipe collect`).")
     notes.append("From LookupEvents: management events only, in the connection's regions (global services such as "
                  "IAM are recorded in us-east-1).")
-    return {**summarise(rows, "lookup_events", hours), "notes": notes}
+    rows.sort(key=lambda r: str(r.get("event_time") or ""), reverse=True)
+    return {**summarise(rows, "lookup_events", hours), "covered_hours": covered, "partial": covered < hours,
+            "notes": notes}

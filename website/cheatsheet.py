@@ -98,6 +98,7 @@ SECTIONS: list[tuple[str, str, str, list[tuple[str, str, str]]]] = [
     ]),
     ("activity", "What changed", "CloudTrail write events: who changed what, and when. Read-only.", [
         ("What changed in the last 24 hours, and who changed it", "spendlens changes", "aws"),
+        ("ECS deployments this week", "spendlens changes --days 7 --event UpdateService", "aws"),
         ("Last week, EC2 only", "spendlens changes --days 7 --service ec2", "aws"),
         ("Everything one person did this month", "spendlens changes --user alice --days 30", "aws"),
         ("Ask it in plain English", "spendlens ask \"Who changed the payments security group this week?\"", "aws"),

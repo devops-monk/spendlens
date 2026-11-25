@@ -26,6 +26,8 @@ def changes(
     source: Annotated[str, typer.Option("--source", help="auto: Tailpipe's CloudTrail logs if collected, else "
                                                          "LookupEvents; tailpipe; lookup_events.")] = "auto",
     top: Annotated[int, typer.Option("--top", help="Events to list.")] = 50,
+    max_wait: Annotated[int, typer.Option("--max-wait", help="Seconds to give LookupEvents before showing what it "
+                                                             "found (Tailpipe is not limited).")] = 60,
     fmt: FormatOpt = Format.table,
     out: OutOpt = None,
     config: ConfigOpt = None,
@@ -40,6 +42,7 @@ def changes(
     Examples:
       spendlens changes
       spendlens changes --days 7 --service ec2
+      spendlens changes --days 7 --event UpdateService       # ECS deployments (fast: one API filter)
       spendlens changes --user alice --days 30
       spendlens changes --resource sg-0abc123 -f csv -o sg-changes.csv
     """
@@ -54,7 +57,8 @@ def changes(
 
     try:
         with activity("Reading CloudTrail [dim](read-only)[/]"):
-            res = find_changes(cfg, window, user=user, resource=resource, service=service, event=event, source=source)
+            res = find_changes(cfg, window, user=user, resource=resource, service=service, event=event, source=source,
+                               max_wait_s=max(5, max_wait))
     except SteampipeError as e:
         from ..doctor import credential_fix
 

@@ -170,10 +170,13 @@ spendlens ask "Show console logins this week, with source IPs"
 
 ```bash
 spendlens changes                                   # the last 24 hours
+spendlens changes --days 7 --event UpdateService      # ECS deployments
 spendlens changes --days 7 --service ec2
 spendlens changes --user alice --days 30
 spendlens changes --resource sg-0abc123 --days 90 -f csv -o sg-changes.csv
 ```
+
+**Without Tailpipe, an action is faster than a service.** LookupEvents returns 50 events a page and is rate-limited, and it takes one filter. An event name (`UpdateService` for ECS deployments, `UpdateFunctionCode` for Lambda deploys, `ModifyDBInstance` for RDS changes), a resource or a user matches few events and comes back in seconds. A whole service, or the whole account, can mean thousands of events: spendlens then searches newest first in widening windows (the last hour, 6 hours, a day, 3 days, a week and so on) and stops after about a minute (`--max-wait`, 60 seconds by default) with what it found and how far back it got. The assistant picks the event name for you when the question implies one, and says when an answer covers only part of the window. With CloudTrail logs collected by Tailpipe, there is no such limit.
 
 **Other ways it searches:**
 - **LookupEvents first.** It uses `aws_cloudtrail_lookup_event`, the last 90 days of management events with no setup. It always sets `start_time` and `end_time`, starts with the last 24 hours and widens only if needed. It narrows with one filter such as the event name (`DeleteBucket`, `TerminateInstances`, `ConsoleLogin`), the resource name or the user.

@@ -36,7 +36,10 @@ de-duplicated against waste alarms: never add the two together. For data transfe
 cross-AZ traffic, use traffic_paths.
 - "What changed / who changed X / who deleted or created ... / what did <user> do": call aws_changes first (with \
 hours, and user, resource, service or event when the question names one). It returns CloudTrail write events with \
-counts by who and by API call. Name the people or roles, the API calls and the times.
+counts by who and by API call. Name the people or roles, the API calls and the times. When the question implies \
+an action, pass event rather than service alone (much faster without Tailpipe): ECS deployments are UpdateService \
+(and CreateService), Lambda deploys UpdateFunctionCode, RDS changes ModifyDBInstance, security group changes \
+AuthorizeSecurityGroupIngress. If the result says partial, say how far back it covered.
 - If a tailpipe_query tool is listed, Tailpipe has collected data: aws_cloudtrail_log (CloudTrail beyond 90 days, \
 data events such as S3 object reads/writes), aws_vpc_flow_log (traffic) and aws_cost_and_usage_report (billed cost \
 per resource and line item). describe=<table> lists its columns; always bound the time (tp_date).
@@ -104,7 +107,8 @@ they name a resource: a deleted resource is gone from inventory, and inventory s
 start_time = <from> AND end_time = <to> with '=' (they are sent to the API; event_time is not), and narrow it with \
 one '=' filter: event_name (e.g. 'DeleteBucket', 'TerminateInstances', 'AuthorizeSecurityGroupIngress', \
 'ConsoleLogin'), resource_name, username or event_source. Start with the last 24 hours, widen only if needed (up to \
-90 days), and order by event_time desc.
+90 days). Never ORDER BY: rows already come newest first, and a sort makes Steampipe read every page (minutes); use \
+a LIMIT instead.
   2. Who did it: username, and cloud_trail_event ->> 'sourceIPAddress' and cloud_trail_event -> 'userIdentity' \
 ->> 'arn'.
   3. Older than 90 days, error codes, or data events (S3 object reads and writes): aws_cloudtrail_trail_event, if \

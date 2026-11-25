@@ -214,17 +214,25 @@ class SteampipeClient:
                     cur.execute("set default_transaction_read_only = on")
         return self._conn
 
-    def query(self, sql: str, params: Any = None, *, limit: int | None = None) -> list[dict[str, Any]]:
+    def query(self, sql: str, params: Any = None, *, limit: int | None = None,
+              timeout_s: int | None = None) -> list[dict[str, Any]]:
+        """timeout_s: a statement timeout for this query only (the connection's own is restored after)."""
         import psycopg
 
         conn = self.connect()
         try:
             with conn.cursor() as cur:
-                cur.execute(sql, params)
-                if cur.description is None:
-                    return []
-                rows = cur.fetchmany(limit) if limit else cur.fetchall()
-                return [dict(r) for r in rows]
+                if timeout_s:
+                    cur.execute(f"set statement_timeout = {int(timeout_s) * 1000}")
+                try:
+                    cur.execute(sql, params)
+                    if cur.description is None:
+                        return []
+                    rows = cur.fetchmany(limit) if limit else cur.fetchall()
+                    return [dict(r) for r in rows]
+                finally:
+                    if timeout_s:
+                        cur.execute(f"set statement_timeout = {int(self.timeout_s) * 1000}")
         except psycopg.Error as e:
             raise SteampipeError(str(e).strip()) from e
 

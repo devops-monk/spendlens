@@ -84,6 +84,7 @@ RECIPES: dict[str, list[tuple[str, str]]] = {
     ],
     "changes": [
         ("What changed in the last 24 hours, and who changed it", "spendlens changes"),
+        ("ECS deployments this week (fast: one API call name)", "spendlens changes --days 7 --event UpdateService"),
         ("Last week, EC2 only", "spendlens changes --days 7 --service ec2"),
         ("Everything one person or role did this month", "spendlens changes --user alice --days 30"),
         ("Every change to one resource, as CSV", "spendlens changes --resource sg-0abc123 --days 90 -f csv -o sg.csv"),
