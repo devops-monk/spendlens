@@ -12,6 +12,10 @@ from .sources import SOURCES, Ref, Source, resolve
 _DENIED = ("accessdenied", "not authorized", "unauthorizedoperation", "access denied")
 
 
+class LoginExpired(RuntimeError):
+    """Every source would fail the same way: stop and say so once."""
+
+
 def explain(source: Source, error: str) -> str:
     e = error.lower()
     if any(k in e for k in _DENIED):
@@ -39,6 +43,11 @@ def collect(cfg: Config, *, client: Any = None, sources: tuple[Source, ...] = SO
             try:
                 rows = c.query(s.sql)
             except SteampipeError as e:
+                from ..doctor import credential_fix
+
+                fix = credential_fix(str(e), cfg.aws.profile, "")
+                if fix:  # an expired or missing login: no point trying the other 23 sources
+                    raise LoginExpired(fix) from e
                 skipped[s.name] = explain(s, str(e))
                 continue
             n0 = len(nodes)

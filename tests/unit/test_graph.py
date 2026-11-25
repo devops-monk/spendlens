@@ -166,3 +166,13 @@ def test_history_round_trip_and_migration_from_v2(tmp_path, demo):
         assert s.latest_run("waste") is not None
         s.save_graph(s.save_run("graph"), *g.to_rows())
     assert sqlite3.connect(old).execute("pragma user_version").fetchone()[0] == 3
+
+
+def test_expired_login_stops_collection_once():
+    from spendlens.graph.collect import LoginExpired
+
+    cfg = load_config(environ={}, sets=["aws.profile=non-prd-fs"])
+    client = FakeClient(rows(), fail={"aws_ec2_instance": "get credentials: the SSO session has expired or is invalid"})
+    with pytest.raises(LoginExpired, match="aws sso login --profile non-prd-fs"):
+        collect(cfg, client=client)
+    assert len(client.sql) == 1  # did not try the other sources

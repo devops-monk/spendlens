@@ -176,13 +176,21 @@ def _latest_waste(store: Any) -> list[Finding]:
 
 def collect_live(cfg: Config) -> Loaded:
     """Collect the graph now and save it as a `graph` run."""
-    from ..graph.collect import collect
+    from ..graph.collect import LoginExpired, collect
     from ..graph.costs import price
     from ..history import HistoryStore
+    from ..steampipe import SteampipeError
     from ..ui import activity
 
-    with activity("Reading resources and their links [dim](Steampipe, read-only)[/]") as act:
-        g, meta = collect(cfg, progress=lambda s: act.update(f"Reading {s} [dim](Steampipe, read-only)[/]"))
+    try:
+        with activity("Reading resources and their links [dim](Steampipe, read-only)[/]") as act:
+            g, meta = collect(cfg, progress=lambda s: act.update(f"Reading {s} [dim](Steampipe, read-only)[/]"))
+    except LoginExpired as e:
+        err.print(f"[red]{e}[/]")
+        raise typer.Exit(1) from e
+    except SteampipeError as e:  # e.g. the Steampipe service is not running
+        err.print(f"[red]Steampipe:[/] {str(e).splitlines()[0]}")
+        raise typer.Exit(1) from e
     for why in meta["skipped"].values():
         err.print(f"[yellow]Skipped[/] {why}")
     if cfg.graph.owner_from_cloudtrail:

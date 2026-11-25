@@ -53,6 +53,21 @@ def check_aws_plugin() -> Check:
     return Check("aws plugin", "fail", "turbot/aws not installed", "steampipe plugin install aws")
 
 
+_EXPIRED = ("sso session has expired", "token for", "error loading sso token", "sso/cache", "expiredtoken",
+            "the security token included in the request is expired", "token has expired")
+
+
+def credential_fix(error: str, profile: str | None, default: str) -> str:
+    """The fix for an error: an expired login (SSO or temporary keys) is not a missing permission."""
+    e = error.lower()
+    if any(k in e for k in _EXPIRED):
+        return (f"Your AWS login has expired: aws sso login{f' --profile {profile}' if profile else ''} "
+                "(or refresh your temporary credentials), then run doctor again")
+    if "no credentials" in e or "unable to locate credentials" in e:
+        return "No AWS credentials: assume a role, `aws sso login`, or set aws.profile in finops.yaml"
+    return default
+
+
 def check_aws_identity(profile: str | None) -> Check:
     from .common import sts_command
 
@@ -61,10 +76,9 @@ def check_aws_identity(profile: str | None) -> Check:
         return Check("aws identity", "warn", "aws CLI not found; cannot verify identity", "Install AWS CLI v2")
     code, out = _run(cmd)
     if code != 0:
-        return Check(
-            "aws identity", "fail", out.splitlines()[-1] if out else "no credentials",
-            "Assume a role / `aws sso login` / export AWS_PROFILE",
-        )
+        detail = out.splitlines()[-1] if out else "no credentials"
+        return Check("aws identity", "fail", detail,
+                     credential_fix(out, profile, "Assume a role / `aws sso login` / export AWS_PROFILE"))
     ident = json.loads(out)
     return Check("aws identity", "ok", f"{ident.get('Arn')} (account {ident.get('Account')})")
 
@@ -83,7 +97,8 @@ def check_service_and_cost(cfg: Config) -> list[Check]:
         c.query("select account_id from aws_account limit 1")
         checks.append(Check("aws tables", "ok", "aws_account readable"))
     except SteampipeError as e:
-        checks.append(Check("aws tables", "fail", str(e).splitlines()[0], "Check ~/.steampipe/config/aws.spc"))
+        checks.append(Check("aws tables", "fail", str(e).splitlines()[0],
+                            credential_fix(str(e), cfg.aws.profile, "Check ~/.steampipe/config/aws.spc")))
     try:
         rows = c.query(
             "select sum(unblended_cost_amount)::numeric(14,2) as cost from aws_cost_by_service_monthly "
@@ -93,7 +108,7 @@ def check_service_and_cost(cfg: Config) -> list[Check]:
     except SteampipeError as e:
         checks.append(Check(
             "cost explorer", "fail", str(e).splitlines()[0],
-            "Role needs ce:GetCostAndUsage (and ce:GetCostForecast)",
+            credential_fix(str(e), cfg.aws.profile, "Role needs ce:GetCostAndUsage (and ce:GetCostForecast)"),
         ))
     finally:
         c.close()
