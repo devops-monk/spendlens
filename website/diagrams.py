@@ -75,7 +75,7 @@ def c4_context() -> tuple[str, str]:
     # spendlens (centre)
     b.append(_box(330, 120, 220, 130, "spendlens", "FinOps CLI · read-only", "Software system", accent=True))
     # external systems (right)
-    b.append(_box(720, 20, 240, 66, "AWS account(s)", "resource APIs · CloudWatch", "External system", ext=True))
+    b.append(_box(720, 20, 240, 66, "AWS account(s)", "resources · CloudWatch · CloudTrail · S3 logs", "External system", ext=True))
     b.append(_box(720, 106, 240, 66, "AWS billing APIs", "Cost Explorer · Budgets · Opt. Hub", "External system", ext=True))
     b.append(_box(720, 192, 240, 66, "LLM provider", "Bedrock · Anthropic · OpenAI · Azure", "External system", ext=True))
     b.append(_box(720, 278, 240, 66, "Slack / Teams", "incoming webhooks", "External system", ext=True))
@@ -100,7 +100,7 @@ def c4_container() -> tuple[str, str]:
     u = "ctr"
     b = []
     # spendlens boundary
-    b.append(f'<rect x="200" y="20" width="560" height="480" rx="18" fill="none" stroke="{ACCENT}" '
+    b.append(f'<rect x="200" y="20" width="560" height="560" rx="18" fill="none" stroke="{ACCENT}" '
              f'stroke-opacity="0.9" stroke-width="1.5" stroke-dasharray="7 5"/>')
     b.append(_t(216, 42, "spendlens (one Python package on the machine or CI runner)", 12, anchor="start", weight=600,
                 fill=ACCENT))
@@ -112,12 +112,14 @@ def c4_container() -> tuple[str, str]:
     b.append(_box(230, 200, 200, 72, "Engines", "cost · anomaly · forecast · savings", "Container"))
     b.append(_box(530, 200, 210, 72, "Steampipe (Postgres)", "aws plugin · read-only session", "Container"))
     b.append(_box(230, 340, 200, 72, "History store", "SQLite: runs · findings · cost", "Container"))
-    b.append(_box(530, 340, 210, 72, "AI agent", "catalog · checker · jobs · cache", "Container"))
-    b.append(_box(230, 430, 200, 58, "Renderers", "table · CSV · JSON · HTML · brief", "Container"))
+    b.append(_box(530, 340, 210, 72, "AI agent", "catalog · checker · jobs · files", "Container"))
+    b.append(_box(230, 440, 200, 56, "Renderers", "table · CSV · JSON · HTML · brief", "Container"))
+    b.append(_box(530, 440, 210, 56, "Tailpipe (DuckDB)", "CloudTrail · flow logs · CUR", "Container"))
     # externals
     b.append(_box(830, 200, 160, 72, "AWS APIs", "role from terminal / OIDC", "External", ext=True))
     b.append(_box(830, 340, 160, 72, "LLM provider", "official SDKs", "External", ext=True))
-    b.append(_box(830, 440, 160, 58, "Slack / Teams", "webhook (env var)", "External", ext=True))
+    b.append(_box(830, 440, 160, 56, "S3 buckets", "log and CUR files", "External", ext=True))
+    b.append(_box(830, 530, 160, 56, "Slack / Teams", "webhook (env var)", "External", ext=True))
     # arrows
     b.append(_arrow(u, 170, 240, 230, 110, "invokes", 186, 170, anchor="start"))
     b.append(_arrow(u, 430, 96, 530, 96, "runs benchmark", 480, 88))
@@ -127,15 +129,18 @@ def c4_container() -> tuple[str, str]:
     b.append(_arrow(u, 740, 236, 830, 236, "API reads", 795, 228))
     b.append(_arrow(u, 300, 272, 300, 340, "save run", 310, 310, anchor="start"))
     b.append(_arrow(u, 530, 376, 430, 376, "history_query", 480, 368))
-    b.append(_arrow(u, 600, 340, 600, 272, "--live only", 610, 310, anchor="start"))
+    b.append(_arrow(u, 600, 340, 600, 272, "live (default)", 610, 310, anchor="start"))
+    b.append(_arrow(u, 635, 412, 635, 440, "", None, None))
+    b.append(_arrow(u, 740, 468, 830, 468, "collect", 785, 460))
     b.append(_arrow(u, 740, 376, 830, 376, "messages", 795, 368))
-    b.append(_arrow(u, 330, 412, 330, 430, "", None, None))
-    b.append(_arrow(u, 430, 470, 830, 470, "notify (summary)", 615, 462))
-    svg = _svg(u, 1010, 520, "Containers inside spendlens: CLI, Powerpipe, engines, Steampipe, history store, AI agent "
-               "and renderers, and the external systems they read from", "".join(b))
+    b.append(_arrow(u, 330, 412, 330, 440, "", None, None))
+    b.append(_arrow(u, 430, 490, 830, 560, "notify (summary)", 440, 532, anchor="start"))
+    svg = _svg(u, 1010, 600, "Containers inside spendlens: CLI, Powerpipe, engines, Steampipe, history store, AI agent, "
+               "Tailpipe and renderers, and the external systems they read from", "".join(b))
     return svg, ("C4 level 2 (containers). Controls run through Powerpipe; cost questions go straight to Steampipe as "
                  "bounded SQL; every run lands in the SQLite history, which the dashboard, notify and the AI assistant "
-                 "read without touching AWS again.")
+                 "read without touching AWS again. Tailpipe collects CloudTrail logs, flow logs and the CUR from S3 and "
+                 "answers locally.")
 
 
 # ------------------------------------------------------------------ sequence diagrams
@@ -240,7 +245,7 @@ def seq_ask_live() -> tuple[str, str]:
     parts = [("user", "You"), ("sl", "spendlens ask"), ("llm", "LLM provider"), ("cat", "Catalog · checker"),
              ("cache", "Cache"), ("sp", "Steampipe + plugin"), ("aws", "AWS APIs")]
     steps = [
-        ("msg", "user", "sl", "ask --live “Which EBS volumes are unattached?”", False),
+        ("msg", "user", "sl", "ask “Which EBS volumes are unattached?”", False),
         ("msg", "sl", "llm", "question + workflow + 5 AWS tools", False),
         ("note", "sl", "cat", "1 · learn the schema: no guessed tables or columns"),
         ("msg", "llm", "sl", "aws_find_tables(question)", True),
@@ -375,15 +380,25 @@ def ai_tools() -> tuple[str, str]:
     # live tools
     b.append(f'<rect x="220" y="352" width="440" height="240" rx="16" fill="none" stroke="{ACCENT}" stroke-opacity="0.8" '
              f'stroke-width="1.5" stroke-dasharray="7 5"/>')
-    b.append(_t(240, 376, "Added by --live · read-only AWS", 12, anchor="start", weight=700, fill=ACCENT))
+    b.append(_t(240, 376, "Live AWS · read-only (on by default; --no-live)", 12, anchor="start", weight=700, fill=ACCENT))
     for i, (n, wht) in enumerate([("aws_find_tables", "search 589 tables"),
                                   ("aws_describe_table", "columns · filters · examples"),
                                   ("aws_check_query", "check SQL, no AWS call"),
                                   ("aws_query", "check · cache · run as a job"),
                                   ("aws_query_result", "wait for a slow query")]):
         b.append(_pill(240, 390 + i * 38, n, wht))
+    # activity, Tailpipe and files
+    b.append(f'<rect x="220" y="612" width="440" height="200" rx="16" fill="none" stroke="{ACCENT}" stroke-opacity="0.8" '
+             f'stroke-width="1.5" stroke-dasharray="2 5"/>')
+    b.append(_t(240, 636, "Activity, logs and files · when available", 12, anchor="start", weight=700, fill=ACCENT))
+    for i, (n, wht) in enumerate([("aws_changes", "what changed · who changed it"),
+                                  ("tailpipe_query", "CloudTrail · flow logs · CUR"),
+                                  ("read_file", "files you attach"),
+                                  ("write_file", "xlsx · csv · docx · md · scripts")]):
+        b.append(_pill(240, 650 + i * 38, n, wht))
     b.append(_arrow(u, 160, 245, 218, 160, "tool calls", 186, 190, anchor="middle"))
     b.append(_arrow(u, 160, 275, 218, 470, "", None, None))
+    b.append(_arrow(u, 150, 265, 218, 710, "", None, None))
     # sources
     b.append(_box(740, 60, 190, 70, "History DB", "runs · findings · cost", "SQLite, read-only"))
     b.append(_box(740, 180, 190, 70, "Resource graph", "nodes · links · cost", "In the history", accent=True))
@@ -399,11 +414,18 @@ def ai_tools() -> tuple[str, str]:
     b.append(_arrow(u, 988, 397, 932, 397))
     b.append(_arrow(u, 835, 500, 835, 434, "installed columns, daily", 845, 470, anchor="start"))
     b.append(_arrow(u, 932, 537, 988, 537))
-    svg = _svg(u, 1180, 612, "The assistant's tools: seven history and graph tools always, five AWS tools with --live, and the "
-                             "data sources behind them", "".join(b))
+    b.append(_box(740, 632, 190, 70, "Tailpipe", "CloudTrail · flow logs · CUR", "Local DuckDB", accent=True))
+    b.append(_box(990, 632, 170, 70, "S3 buckets", "log + CUR files", "tailpipe collect", ext=True))
+    b.append(_box(740, 732, 190, 70, "Your files", "attached · spendlens-output", "Local disk"))
+    b.append(_arrow(u, 662, 680, 738, 667))
+    b.append(_arrow(u, 662, 762, 738, 767))
+    b.append(_arrow(u, 988, 667, 932, 667))
+    svg = _svg(u, 1180, 832, "The assistant's tools: seven history and graph tools, five live AWS tools, and the CloudTrail, "
+                             "Tailpipe and file tools, with the data sources behind them", "".join(b))
     return svg, ("The model knows only what its tools tell it. The history tools carry the database schema; the AWS "
                  "tools search a catalog built from the Steampipe AWS plugin's own source and checked against the columns "
-                 "your installed plugin reports.")
+                 "your installed plugin reports; aws_changes and tailpipe_query read CloudTrail, flow logs and the CUR; "
+                 "read_file and write_file handle the files you give and ask for.")
 
 
 def seq_session() -> tuple[str, str]:

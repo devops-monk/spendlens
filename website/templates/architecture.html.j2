@@ -234,9 +234,12 @@
       <div class="sc-copy">
         <p>The model doesn't come with your account in its head. Every question is sent with instructions and a list
           of <b>tools</b>; the model replies "call this tool", spendlens runs it and returns the result, and the model
-          decides the next step. Without <code>--live</code> it has seven tools over your saved runs, the resource graph and its traffic analysis. With
-          <code>--live</code> it gets five more that cover the whole Steampipe AWS plugin.</p>
-        <ul class="chips"><li>12 tools</li><li>All read-only</li><li>Schema from the plugin's source</li></ul>
+          decides the next step. Seven tools cover your saved runs, the resource graph and its traffic analysis. Five
+          more cover the whole Steampipe AWS plugin, live and read-only (on by default; <code>--no-live</code> turns
+          them off). <code>aws_changes</code> answers "what changed, who changed it" from CloudTrail,
+          <code>tailpipe_query</code> reads CloudTrail logs, flow logs and the CUR that Tailpipe collected, and
+          <code>read_file</code> / <code>write_file</code> read the files you attach and write the ones you ask for.</p>
+        <ul class="chips"><li>16 tools</li><li>Read-only in AWS</li><li>Schema from the plugin's source</li><li>Files in and out</li></ul>
       </div>
     </div>
     <div class="sc-media">{{ diagram("ai_tools") }}</div>
@@ -271,7 +274,7 @@
         <span class="tile-ico" aria-hidden="true">{{ icons["list"]|safe }}</span>
         <p class="t-eyebrow">3 · Your installed plugin</p>
         <h3>The real column list.</h3>
-        <p>With <code>--live</code>, spendlens reads <code>information_schema.columns</code> from your local Steampipe
+        <p>For live questions, spendlens reads <code>information_schema.columns</code> from your local Steampipe
           once a day. That describes the installed plugin, not AWS, so it's free. If your plugin version differs, its
           columns win and the catalog adds descriptions and filter rules.</p>
       </article>
@@ -299,19 +302,28 @@
           each with one saving, counted once against the waste alarms they include.</td></tr>
         <tr><td><code>suggested_owners</code></td><td>always</td><td>Owner tags for untagged resources, from what they are
           attached to, with a confidence and the reason.</td></tr>
-        <tr><td><code>cloudtrail_logs</code></td><td>with Tailpipe</td><td>CloudTrail logs Tailpipe collected:
-          full history and S3 data events, one bounded DuckDB query on <code>aws_cloudtrail_log</code>.</td></tr>
+        <tr><td><code>aws_changes</code></td><td>live or Tailpipe</td><td>CloudTrail write events, newest first, with
+          counts by who and by API call; filtered by user, resource, service or API call. From Tailpipe's CloudTrail
+          logs when collected, else LookupEvents (90 days).</td></tr>
+        <tr><td><code>tailpipe_query</code></td><td>with Tailpipe</td><td>One bounded DuckDB query on
+          <code>aws_cloudtrail_log</code>, <code>aws_vpc_flow_log</code> or <code>aws_cost_and_usage_report</code>:
+          full CloudTrail history and data events, traffic, billed cost per resource. Local, no AWS calls.</td></tr>
+        <tr><td><code>read_file</code></td><td>files attached</td><td>A page of an attached file: text, or columns and rows
+          for CSV and Excel; PDF and Word as text. Only files you attached.</td></tr>
+        <tr><td><code>write_file</code></td><td><code>ask</code></td><td>The path of the file it wrote into
+          <code>./spendlens-output</code>: xlsx, csv, docx, md, html, json, yaml, scripts, Terraform. Tables come
+          straight from a result id; never overwrites, never runs anything.</td></tr>
         <tr><td><code>history_query</code></td><td>always</td><td>Rows from one read-only SQLite <code>SELECT</code> over
           runs, findings and cost rows.</td></tr>
-        <tr><td><code>aws_find_tables</code></td><td><code>--live</code></td><td>The best ~8 of 589 tables for the
+        <tr><td><code>aws_find_tables</code></td><td>live (default)</td><td>The best ~8 of 589 tables for the
           question, by name, service, description and column, with synonyms (volume → EBS, ACU → RDS cluster).</td></tr>
-        <tr><td><code>aws_describe_table</code></td><td><code>--live</code></td><td>One table's columns and their
+        <tr><td><code>aws_describe_table</code></td><td>live (default)</td><td>One table's columns and their
           meaning, required filters with valid values, fast filters, examples, cost notes.</td></tr>
-        <tr><td><code>aws_check_query</code></td><td><code>--live</code></td><td>Problems in a <code>SELECT</code> and how
+        <tr><td><code>aws_check_query</code></td><td>live (default)</td><td>Problems in a <code>SELECT</code> and how
           to fix them, without calling AWS.</td></tr>
-        <tr><td><code>aws_query</code></td><td><code>--live</code></td><td>Rows with an "as of" time: checked, then from
+        <tr><td><code>aws_query</code></td><td>live (default)</td><td>Rows with an "as of" time: checked, then from
           the cache if fresh, else run as a read-only job.</td></tr>
-        <tr><td><code>aws_query_result</code></td><td><code>--live</code></td><td>The rows of a slow query that was still
+        <tr><td><code>aws_query_result</code></td><td>live (default)</td><td>The rows of a slow query that was still
           running, after waiting again.</td></tr>
       </tbody>
     </table></div>
@@ -329,7 +341,8 @@
         <h2>Any AWS question,<br>read-only.</h2>
       </div>
       <div class="sc-copy">
-        <p>With <code>--live</code> the assistant can answer from any of the AWS plugin's 589 tables, not only cost:
+        <p>The assistant can answer from any of the AWS plugin's 589 tables, not only cost (live AWS is on by default;
+          <code>--no-live</code> keeps it to saved runs):
           inventory, security groups, IAM, Lambda runtimes and more. It looks up the real tables and columns first,
           every query is checked before it reaches AWS, slow queries run as jobs it waits for, and recent results
           are reused from the cache.</p>
@@ -390,11 +403,11 @@ spendlens schema show aws_ebs_volume --json</code></pre>
         <span class="tile-ico" aria-hidden="true">{{ icons["clock"]|safe }}</span>
         <p class="t-eyebrow">3 · Runner</p>
         <h3>Waits, within limits you set.</h3>
-        <p>Live queries run only through <code>ask --live</code>, as background jobs on read-only connections.
+        <p>Live queries run only through <code>ask</code> (on by default, off with <code>--no-live</code>), as background jobs on read-only connections.
           <code>llm.query_wait_s</code> sets how long each call waits before the model waits again;
           <code>llm.query_timeout_s</code> cancels the query.</p>
-        <pre class="t-code"><code>spendlens ask --live --show-tools "Idle NAT gateways?"
-spendlens ask --live --set llm.query_timeout_s=600 "…"</code></pre>
+        <pre class="t-code"><code>spendlens ask --show-tools "Idle NAT gateways?"
+spendlens ask --set llm.query_timeout_s=600 "…"</code></pre>
       </article>
       <article class="tile">
         <span class="tile-ico" aria-hidden="true">{{ icons["coins"]|safe }}</span>
@@ -471,14 +484,19 @@ spendlens session clear --yes</code></pre></div>
   <div class="wrap">
     <p class="t-eyebrow center">spendlens ask flags</p>
     <h2 class="h2">Every way to ask.</h2>
-    <p class="sub">Combine them freely, e.g. <code>ask --live -S ecs --show-tools "…" -o ecs.html</code>.</p>
+    <p class="sub">Combine them freely, e.g. <code>ask -S ecs -a budget.xlsx --show-tools "…" -o ecs.html</code>.</p>
     <div class="arch-table-wrap"><table class="arch-table">
       <thead><tr><th>Flag</th><th>What it does</th><th>Example</th></tr></thead>
       <tbody>
-        <tr><td><i>(none)</i></td><td>Answer from your latest saved runs only. No AWS calls.</td>
-          <td><code>spendlens ask "Top 5 savings?"</code></td></tr>
-        <tr><td><code>--live</code></td><td>Also allow read-only live AWS queries through Steampipe: inventory and
-          configuration, not only what was saved.</td><td><code>ask --live "Unattached EBS volumes?"</code></td></tr>
+        <tr><td><i>(none)</i></td><td>Saved runs first; live AWS through Steampipe (read-only) when they can't answer.</td>
+          <td><code>spendlens ask "Unattached EBS volumes?"</code></td></tr>
+        <tr><td><code>--no-live</code></td><td>Saved runs only: no AWS calls (default from <code>llm.live</code>;
+          <code>--live</code> turns it back on).</td><td><code>ask --no-live "Top 5 savings?"</code></td></tr>
+        <tr><td><code>-a, --file</code></td><td>Attach a file to read: csv, xlsx, json, yaml, pdf, docx, logs,
+          Terraform. Repeatable; paths written in the question are attached too.</td>
+          <td><code>ask -a budget.xlsx "Over budget?"</code></td></tr>
+        <tr><td><code>--out-dir</code></td><td>Where files you ask for are written (default
+          <code>./spendlens-output</code>).</td><td><code>ask --out-dir reports "Export to Excel"</code></td></tr>
         <tr><td><code>--source demo</code></td><td>Answer from the bundled sample history.</td>
           <td><code>ask --source demo "What changed?"</code></td></tr>
         <tr><td><code>--new</code></td><td>Start a new session (with <code>-S NAME</code>: start that one over).</td>
@@ -498,7 +516,7 @@ spendlens session clear --yes</code></pre></div>
           12). At the limit the model still answers from what it found, marked as possibly incomplete.</td>
           <td><code>ask --max-steps 20 "…"</code></td></tr>
         <tr><td><code>--fresh</code></td><td>Skip cached answers and live results this time (new results are still
-          cached).</td><td><code>ask --live --fresh "…"</code></td></tr>
+          cached).</td><td><code>ask --fresh "…"</code></td></tr>
         <tr><td><code>-c</code>, <code>-p</code>, <code>--set</code></td><td>Same as every command: policy file, AWS
           profile, and one-off settings such as the model.</td><td><code>--set llm.model=claude-sonnet-5-5</code></td></tr>
       </tbody>
@@ -517,7 +535,7 @@ spendlens session clear --yes</code></pre></div>
         <p>spendlens sends your question, the FinOps analyst instructions and the tool list to your AI provider:
           Bedrock, Anthropic, OpenAI, Azure OpenAI or any OpenAI-compatible server (Ollama, vLLM, GLM).</p></div>
       <div class="step"><h3>It learns the schema</h3>
-        <p>It starts with your saved runs. With <code>--live</code> it searches the AWS table catalog
+        <p>It starts with your saved runs and any files you attached. For live questions it searches the AWS table catalog
           (<code>aws_find_tables</code>) and reads the chosen table's columns, required filters and examples
           (<code>aws_describe_table</code>), so it never guesses a column.</p></div>
       <div class="step"><h3>Its query is checked</h3>
@@ -544,7 +562,9 @@ spendlens session clear --yes</code></pre></div>
     <p class="t-eyebrow center">Safety</p>
     <h2 class="h2">Three read-only layers.<br>Zero writes.</h2>
     <p class="sub">Every query the AI assistant writes must pass the parser, then runs on a connection that cannot
-      write: the read-only history, or with <code>--live</code>, a read-only Steampipe session.</p>
+      write: the read-only history, a read-only Steampipe session, or Tailpipe limited to its three tables. The only
+      thing it writes is a file you asked for, inside <code>./spendlens-output</code>, never over an existing file
+      and never run.</p>
     <div class="layers">
       <article class="layer"><b>1</b><h3>SQL guard</h3>
         <p>The query is parsed with sqlglot. Only one read-only <code>SELECT</code> passes: no writes, DDL,
