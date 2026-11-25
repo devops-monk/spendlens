@@ -47,4 +47,7 @@ def test_reads_an_attached_file_and_a_path_in_the_question(tmp_path: Path) -> No
 def test_missing_attachment_is_a_usage_error(tmp_path: Path) -> None:
     with StubLLM([("final", "x")]) as stub:
         r = ask(stub, "hi", "-a", str(tmp_path / "nope.csv"))
-    assert r.exit_code == 2 and "not a file" in r.output
+    import re
+
+    flat = re.sub(r"\x1b\[[0-9;]*m|[\s│]", "", r.output)  # the error box wraps long temp paths
+    assert r.exit_code == 2 and "notafile" in flat
