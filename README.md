@@ -36,8 +36,13 @@
 <p align="center"><sub>One self-contained HTML report, shown with the bundled demo data.</sub></p>
 
 > [!NOTE]
-> v0.4.4. spendlens is tested end to end through Steampipe against an AWS emulator. Verification against a live
+> v0.4.5. spendlens is tested end to end through Steampipe against an AWS emulator. Verification against a live
 > account with a read-only role is next (see [PLAN.md](PLAN.md)).
+
+## New in 0.4.5
+
+- **An expired login says so.** `spendlens doctor` now reports an expired AWS SSO login (or expired temporary credentials) as "aws sso login --profile …", not as a missing permission. `spendlens graph collect` stops at the first such error and prints the fix once, instead of failing for every resource type.
+- **A deck to present spendlens.** [docs/ppt](docs/ppt/) has a 13-slide PowerPoint deck with speaker notes that proposes a read-only pilot.
 
 ## New in 0.4.4
 
