@@ -33,7 +33,7 @@ spendlens only reads. It never creates, modifies or deletes AWS resources. Recom
 |---|---|
 | `tags`, `rightsize`, `waste` | `ReadOnlyAccess` (resource inventory + CloudWatch metrics) |
 | `ask` CloudTrail questions, `changes` | `cloudtrail:LookupEvents`; `logs:FilterLogEvents` for a trail that logs to CloudWatch Logs |
-| `tailpipe init` | `cloudtrail:DescribeTrails`, `ec2:DescribeFlowLogs`, `bcm-data-exports:ListExports`, `bcm-data-exports:GetExport`, `cur:DescribeReportDefinitions` (each is optional: a missing one is skipped with a note) |
+| `tailpipe init` | `cloudtrail:DescribeTrails`, `ec2:DescribeFlowLogs`, `bcm-data-exports:ListExports`, `bcm-data-exports:GetExport`, `cur:DescribeReportDefinitions` (each is optional: a missing one is skipped with a note). Finding CUR 2.0 exports needs AWS CLI 2.15 or later. |
 | `tailpipe collect` | `s3:ListBucket` and `s3:GetObject` on the CloudTrail, flow log and CUR buckets (and `kms:Decrypt` if they are KMS-encrypted) |
 | `graph` | `ReadOnlyAccess`, or the Describe/List actions for EC2, EBS, ELB, Auto Scaling, RDS, ECS and Lambda listed in [Resource graph](../graph/#permissions). A missing one skips that type. With `graph.owner_from_cloudtrail`: `cloudtrail:LookupEvents` |
 | `cost diff/trend/showback`, `anomalies` | `ce:GetCostAndUsage` |

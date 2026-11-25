@@ -64,6 +64,18 @@ def from_config(cfg: Config, found: Found) -> None:
             found.add(kind, loc.bucket, loc.prefix, "finops.yaml")
 
 
+def _why(text: str) -> str:
+    """One readable line for a failed AWS call: name the fix for the common cases."""
+    t = str(text)
+    low = t.lower()
+    if "sso" in low and ("expired" in low or "refresh cached credentials" in low):
+        return "the AWS SSO session has expired: run `aws sso login` for this profile, then try again"
+    if "usage: aws" in low or low.strip().endswith("aws help") or low.strip() == "help":
+        return "this AWS CLI has no `bcm-data-exports` command: upgrade the AWS CLI (2.15 or later)"
+    lines = [ln for ln in t.strip().splitlines() if ln.strip()]
+    return (lines[-1] if lines else "failed")[:300]
+
+
 def from_steampipe(cfg: Config, found: Found, client: Any = None) -> None:
     from .steampipe import SteampipeClient, SteampipeError
 
@@ -74,7 +86,7 @@ def from_steampipe(cfg: Config, found: Found, client: Any = None) -> None:
                              "where s3_bucket_name is not null"):
                 found.add("cloudtrail", r["s3_bucket_name"], r.get("s3_key_prefix") or "", f"trail {r.get('name')}")
         except SteampipeError as e:
-            found.notes.append(f"CloudTrail trails not read: {str(e).splitlines()[0][:160]}")
+            found.notes.append(f"CloudTrail trails not read: {_why(e)}")
         try:
             for r in c.query("select bucket_name, log_destination from aws_vpc_flow_log "
                              "where log_destination_type = 's3'"):
@@ -84,7 +96,7 @@ def from_steampipe(cfg: Config, found: Found, client: Any = None) -> None:
                 prefix = path.split("/", 1)[1] if "/" in path else ""
                 found.add("flow_logs", bucket, prefix, "flow log")
         except SteampipeError as e:
-            found.notes.append(f"Flow logs not read: {str(e).splitlines()[0][:160]}")
+            found.notes.append(f"Flow logs not read: {_why(e)}")
     finally:
         if client is None:
             c.close()
@@ -101,7 +113,7 @@ def _aws(cfg: Config, *args: str) -> Any:
         cmd += ["--endpoint-url", endpoint]
     p = subprocess.run(cmd, capture_output=True, text=True, timeout=60, check=False)
     if p.returncode != 0:
-        raise RuntimeError((p.stderr or p.stdout).strip().splitlines()[-1][:200] if (p.stderr or p.stdout) else "failed")
+        raise RuntimeError(_why(p.stderr or p.stdout or "failed"))
     return json.loads(p.stdout or "{}")
 
 

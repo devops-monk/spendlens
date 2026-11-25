@@ -103,3 +103,14 @@ def test_cli_init_dry_run_and_collect(tmp_path: Path, monkeypatch: pytest.Monkey
     assert r.exit_code == 1 and "Nothing configured" in r.output
     r = runner.invoke(app, ["tailpipe", "collect", "bogus", "--set", f"graph.tailpipe_path={fake}"])
     assert r.exit_code == 2
+
+
+def test_discovery_errors_name_the_fix():
+    from spendlens.tailpipe import _why
+
+    sso = ("operation error STS: GetCallerIdentity, get identity: get credentials: failed to refresh cached "
+           "credentials, the SSO session has expired or is invalid")
+    assert "aws sso login" in _why(sso)
+    old_cli = "\nusage: aws [options] <command> <subcommand>\nTo see help text, you can run:\n\n  aws help\n"
+    assert "upgrade the AWS CLI" in _why(old_cli)
+    assert _why("line one\nAccessDenied: not allowed\n") == "AccessDenied: not allowed"
