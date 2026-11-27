@@ -436,18 +436,11 @@ def log_group_of(cfg: Any, steampipe: Any) -> tuple[str, str | None] | None:
     return None
 
 
-def tailpipe_configured() -> bool:
-    """CloudTrail sources set up for Tailpipe (spendlens tailpipe init)."""
-    from .tailpipe import configured
+def tailpipe_configured(cfg: Any) -> bool:
+    """Tailpipe may be used for CloudTrail: enabled, installed, CloudTrail sources configured (sources.py)."""
+    from .sources import tailpipe_ready
 
-    return bool(configured().get("cloudtrail"))
-
-
-def _coverage(run: Any) -> tuple[str, str] | None:
-    """(first, last) day of the CloudTrail logs Tailpipe has collected, or None."""
-    rows = run("select cast(min(tp_date) as varchar) as lo, cast(max(tp_date) as varchar) as hi from aws_cloudtrail_log")
-    r = rows[0] if rows else {}
-    return (str(r["lo"])[:10], str(r["hi"])[:10]) if r.get("lo") and r.get("hi") else None
+    return tailpipe_ready(cfg, "cloudtrail")
 
 
 def search(cfg: Any, f: Filters, *, source: str = "auto", limit: int = MAX_ROWS, max_wait_s: float = MAX_WAIT_S,
@@ -462,19 +455,12 @@ def search(cfg: Any, f: Filters, *, source: str = "auto", limit: int = MAX_ROWS,
     use_tailpipe = source == "tailpipe"
     if source == "auto":
         source = "aws"
-        if cfg.tailpipe.enabled and (tailpipe_run is not None or tailpipe_configured()):
-            from .graph.costs import CostSourceError, tailpipe_runner
+        if cfg.tailpipe.enabled and (tailpipe_run is not None or tailpipe_configured(cfg)):
+            from .sources import tailpipe_coverage
 
-            try:
-                run = tailpipe_run or tailpipe_runner(cfg.graph.tailpipe_path, timeout=300)
-                cov = _coverage(run)
-            except CostSourceError as e:
-                cov = None
-                notes.append(f"{_clean_error(e)}.")
+            cov = tailpipe_coverage(cfg, "cloudtrail", tailpipe_run)
             if cov is None:
-                if not notes:
-                    notes.append("Tailpipe has no CloudTrail logs collected yet (spendlens tailpipe collect "
-                                 "cloudtrail).")
+                notes.append("Tailpipe has no CloudTrail logs collected yet (spendlens tailpipe collect cloudtrail).")
             elif cov[0] <= f.start.date().isoformat() and cov[1] >= f.end.date().isoformat():
                 use_tailpipe = True
             elif not allow_aws or f.start < _now() - timedelta(days=LOOKUP_DAYS):

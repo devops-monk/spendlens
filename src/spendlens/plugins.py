@@ -71,6 +71,7 @@ BUILTIN_FEATURES: tuple[str, ...] = (
     "spendlens.features.tailpipe_cmd",
     "spendlens.features.changes_cmd",
     "spendlens.features.cloudtrail_cmd",
+    "spendlens.features.sources_cmd",
 )
 
 
@@ -127,9 +128,26 @@ class Registry:
 
     def apply(self, app: typer.Typer) -> None:
         for fn, name in self.commands:
-            app.command(name)(fn)
+            app.command(name, rich_help_panel=panel_of(name or fn.__name__))(fn)
         for sub, name in self.typers:
-            app.add_typer(sub, name=name)
+            app.add_typer(sub, name=name, rich_help_panel=panel_of(name))
+
+
+# `spendlens --help` groups commands by the job they do; a plugin's own commands go under "More"
+PANELS: dict[str, list[str]] = {
+    "Save money": ["waste", "rightsize", "savings", "graph"],
+    "Understand spend": ["cost", "anomalies", "forecast"],
+    "Govern and audit": ["tags", "cloudtrail", "changes", "find"],
+    "Ask": ["ask", "session"],
+    "Reports and notifications": ["report", "review", "brief", "dashboard", "open", "notify", "history"],
+    "Data sources": ["sources", "query", "schema", "tailpipe", "cache"],
+    "Setup": ["init", "doctor", "config", "params", "plugins"],
+}
+_PANEL_OF = {cmd: panel for panel, cmds in PANELS.items() for cmd in cmds}
+
+
+def panel_of(name: str) -> str:
+    return _PANEL_OF.get(name.replace("_", "-"), "More")
 
 
 def _register(obj: Any, reg: Registry) -> None:

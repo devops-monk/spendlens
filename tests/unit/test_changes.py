@@ -181,11 +181,11 @@ def tailpipe(lo: str, hi: str, rows: list[dict[str, Any]] | None = None) -> Any:
 def test_tailpipe_only_when_configured_and_covering_the_window(monkeypatch: pytest.MonkeyPatch) -> None:
     cfg = load_config(environ={})
     # no CloudTrail sources configured for Tailpipe: straight to Steampipe, Tailpipe never asked
-    monkeypatch.setattr(ct, "tailpipe_configured", lambda: False)
+    monkeypatch.setattr(ct, "tailpipe_configured", lambda cfg: False)
     res = ct.search(cfg, F(), steampipe=Steampipe())
     assert res.source == "lookup" and len(res.rows) == 3 and not any("Tailpipe" in n for n in res.notes)
 
-    monkeypatch.setattr(ct, "tailpipe_configured", lambda: True)
+    monkeypatch.setattr(ct, "tailpipe_configured", lambda cfg: True)
     run = tailpipe("2026-11-01", "2026-11-27")
     res = ct.search(cfg, F(), tailpipe_run=run, steampipe=Steampipe())
     assert res.source == "tailpipe" and len(res.rows) == 1 and "aws_cloudtrail_log" in res.queries[0]["sql"]

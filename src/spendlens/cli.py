@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Any
 
 import typer
 from rich.table import Table
+from typer.core import TyperGroup
 
 from . import __version__
 from .common import (
@@ -24,15 +25,28 @@ from .common import (
     load,
 )
 from .config import flatten, param_keys, template_text
-from .plugins import load_plugins, registry
+from .plugins import load_plugins, panel_of, registry
 from .render import Format
 from .steampipe import SteampipeClient, SteampipeError
 
+
+class _JobOrder(TyperGroup):
+    """--help lists the command groups in job order (Save money ... Setup), commands in their group's order."""
+
+    def list_commands(self, ctx: Any) -> list[str]:
+        from .plugins import PANELS
+
+        order = {c: (i, j) for i, cmds in enumerate(PANELS.values()) for j, c in enumerate(cmds)}
+        return sorted(super().list_commands(ctx), key=lambda c: order.get(c, (len(PANELS), 0)))
+
+
 app = typer.Typer(
     name="spendlens",
-    help="FinOps lens for AWS: tag compliance, rightsizing, cost diff, savings and AI Q&A (Steampipe-powered).",
+    help="Read-only FinOps and AWS intelligence: save money, understand spend, audit who did what, and ask "
+         "anything about your account in plain English (Steampipe-powered).",
     no_args_is_help=True,
     rich_markup_mode="rich",
+    cls=_JobOrder,
 )
 
 
@@ -64,7 +78,7 @@ def ci_template_text(kind: str) -> str:
     return resources.files("spendlens.templates").joinpath("ci", CI_TEMPLATES[kind][0]).read_text()
 
 
-@app.command()
+@app.command(rich_help_panel=panel_of("init"))
 def init(
     path: Annotated[Path | None, typer.Argument(help="Where to write (default: finops.yaml, or the CI file).")] = None,
     ci: Annotated[str | None, typer.Option("--ci", help="Write a scheduled CI pipeline instead: gitlab | github.")] = None,
@@ -87,7 +101,7 @@ def init(
     console.print(f"[green]Created[/] {target}. Edit tagging/sizing/budgets/llm, then run [bold]spendlens doctor[/].")
 
 
-@app.command()
+@app.command(rich_help_panel=panel_of("doctor"))
 def doctor(
     config: ConfigOpt = None,
     profile: ProfileOpt = None,
@@ -113,7 +127,7 @@ def doctor(
         raise typer.Exit(1)
 
 
-@app.command()
+@app.command(rich_help_panel=panel_of("query"))
 def query(
     sql: Annotated[str, typer.Argument(help="SQL to run against Steampipe (read-only), or @file.sql.")],
     config: ConfigOpt = None,
@@ -135,7 +149,7 @@ def query(
     emit(rows, fmt, out, "query")
 
 
-@app.command()
+@app.command(rich_help_panel=panel_of("params"))
 def params(
     config: ConfigOpt = None,
     sets: SetOpt = None,
@@ -157,7 +171,7 @@ def params(
     emit(rows, fmt, out, f"spendlens parameters ({cfg.source or 'built-in defaults'})")
 
 
-@app.command("config")
+@app.command("config", rich_help_panel=panel_of("config"))
 def show_config(config: ConfigOpt = None, sets: SetOpt = None, pp_vars: VarOpt = None) -> None:
     """Show the effective configuration and the Powerpipe variables it produces."""
     cfg = load(config, None, sets, pp_vars)
@@ -165,7 +179,7 @@ def show_config(config: ConfigOpt = None, sets: SetOpt = None, pp_vars: VarOpt =
     console.print_json(json.dumps({"config": cfg.model_dump(mode="json"), "powerpipe_vars": cfg.to_powerpipe_vars()}))
 
 
-@app.command("plugins")
+@app.command("plugins", rich_help_panel=panel_of("plugins"))
 def list_plugins() -> None:
     """List loaded features/plugins and what they contribute."""
     t = Table(title="spendlens plugins", header_style=f"bold {BRAND}")

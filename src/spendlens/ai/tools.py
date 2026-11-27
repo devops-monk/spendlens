@@ -597,14 +597,11 @@ class Toolbox:
     _tailpipe_ok: Any = None
 
     def _tailpipe_available(self) -> bool:
-        if not self.cfg.tailpipe.enabled:  # tailpipe.enabled: false / ask --no-tailpipe
-            return False
         if self._tailpipe_ok is None:
-            from ..tailpipe import configured
-            from .tailpipe_tools import available
+            from ..sources import tailpipe_ready
 
-            # installed AND sources configured (spendlens tailpipe init); otherwise the Steampipe tables, as usual
-            self._tailpipe_ok = available(self.cfg.graph.tailpipe_path) and any(configured().values())
+            # enabled, installed AND sources configured; otherwise the Steampipe tables, as usual (sources.py)
+            self._tailpipe_ok = tailpipe_ready(self.cfg)
         return bool(self._tailpipe_ok)
 
     def cloudtrail_events(self, a: dict[str, Any]) -> dict[str, Any]:
