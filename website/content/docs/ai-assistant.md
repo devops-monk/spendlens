@@ -146,40 +146,19 @@ spendlens ask --out-dir reports "Write the AWS CLI commands to tag those volumes
 
 ## CloudTrail: what changed, who changed it
 
-The assistant answers activity questions from CloudTrail:
-- who deleted, created or changed something;
-- when it happened;
-- API calls by a user or role;
-- console logins.
+Ask about activity in plain English: "What changed in production today, and who did it?", "Show failed console logins this week", "Who opened port 22?". The assistant answers them with its `cloudtrail_events` tool. It takes every filter and preset of `spendlens cloudtrail`, shows the SQL it ran, and can write the events to a file. Say "using Steampipe" or pass `--no-tailpipe` to skip Tailpipe's collected logs.
 
-```bash
-spendlens ask "What changed in the account today, and who did it?"
-spendlens ask "Who deleted the old-reports bucket?"
-spendlens ask "Which security group rules changed in the last 24 hours, and by whom?"
-spendlens ask "Show console logins this week, with source IPs"
-```
+The [CloudTrail activity](../cloudtrail/) page has everything else: where events come from, every filter, the presets, speed and limits, and the commands.
 
-**`cloudtrail_events` first.** For CloudTrail questions the assistant calls `cloudtrail_events`. It takes every filter: a time range or exact dates, user, event names (with wildcards), service, resource, resource type, access key, source IP or CIDR, error codes, reads or writes, region, and presets such as console logins, deletes or access denied. It returns the events newest first, with counts by who, API call, service, source IP, error and day, plus the SQL it ran (shown with `--show-tools`). It reads the trail's logs in Tailpipe when collected, then the trail's CloudWatch Logs group, then LookupEvents. Ask for a file and it writes every event it found. The [CloudTrail page](../cloudtrail/) has every filter, the presets and the commands:
+## Exports of any size
 
-```bash
-spendlens cloudtrail events --days 7 --event UpdateService      # ECS deployments
-spendlens cloudtrail events --from 2026-11-01 --to 2026-11-20 --service iam -o iam.xlsx
-spendlens cloudtrail summary --preset access-denied --hours 24
-spendlens changes --days 7 --service ec2                        # the short form, write events
-```
+For a full list ("all instances to Excel", "every event this month as CSV"), the assistant uses `export_query`. It runs one read-only query and writes **every row** to a file in `./spendlens-output`, up to `llm.export_max_rows` (100,000). Only the file name, the row count and the first five rows come back to the model, so a large export costs no extra tokens. It works on live AWS (Steampipe), the history and Tailpipe.
 
-**Without Tailpipe, an action is faster than a service.** LookupEvents returns 50 events a page and is rate-limited, and it takes one filter. An event name (`UpdateService` for ECS deployments, `UpdateFunctionCode` for Lambda deploys, `ModifyDBInstance` for RDS changes), a resource or a user matches few events and comes back in seconds. A whole service, or the whole account, can mean thousands of events: spendlens then searches newest first in widening windows (the last hour, 6 hours, a day, 3 days, a week and so on) and stops after about a minute (`--max-wait`, 60 seconds by default) with what it found and how far back it got. The assistant picks the event name for you when the question implies one, and says when an answer covers only part of the window. With CloudTrail logs collected by Tailpipe, there is no such limit.
+A result too big for the model (`llm.max_result_chars`, 20,000 characters) is trimmed by whole rows, never cut mid-row. The assistant is told how many rows it saw, so it aggregates in SQL or exports instead of totalling a partial list.
 
-**Other ways it searches:**
-- **Its own SQL, when the tool cannot express a question.** On `aws_cloudtrail_lookup_event` (the last 90 days of management events, no setup) it always sets `start_time` and `end_time`, starts with the last 24 hours and widens only if needed. It narrows with one filter such as the event name (`DeleteBucket`, `TerminateInstances`, `ConsoleLogin`), the resource name or the user.
-- **Time ranges are enforced.** Before any query reaches AWS, a CloudTrail query without a time range that AWS receives is refused, with the exact fix. A filter on `event_time` alone doesn't count: AWS would page through 90 days at about two calls a second.
-- **Older or more detailed events** (error codes, source IPs beyond 90 days) come from the trail's CloudWatch Logs log group (`aws_cloudtrail_trail_event`), if your trail sends logs there.
-- **Older history, data events, flow logs and the CUR, with Tailpipe.** The installer and the Docker image include [Tailpipe](https://tailpipe.io) and its AWS plugin. `spendlens tailpipe init` finds where your CloudTrail logs, VPC flow logs and Cost and Usage Reports land in S3 (read-only: trails and flow logs through Steampipe, CUR exports through the AWS CLI, which needs version 2.15 or later for CUR 2.0 exports, plus any locations in `finops.yaml` under `tailpipe:`) and writes `~/.tailpipe/config/spendlens.tpc`. `spendlens tailpipe collect` collects them (the last `tailpipe.collect_days`, 30 by default); `spendlens tailpipe status` shows what is there. The [Tailpipe page](../tailpipe/) has the design, the commands in order and troubleshooting. The assistant then gets a `tailpipe_query` tool: local DuckDB queries over `aws_cloudtrail_log`, `aws_vpc_flow_log` and `aws_cost_and_usage_report`, with no AWS calls. Each query must have a time range and is capped in rows; table functions and file-reading functions such as `read_csv` and `getenv` are refused.
-- **What CloudTrail can't answer.** S3 object reads and writes are data events: they are recorded only by a trail with data event selectors. If nothing can answer, the assistant says so.
+## What goes to your AI provider
 
-Questions that only *sound* like activity still use inventory, because the current state answers them: "which instances are stopped", "list my buckets".
-
-Permissions: `cloudtrail:LookupEvents`, plus `logs:FilterLogEvents` for the CloudWatch Logs table. Both are in `ReadOnlyAccess`.
+Questions and the tool results the assistant reads go to the provider you chose. With Bedrock they stay in your AWS account. With other providers they leave it, and `spendlens ask` prints a one-line data note. `llm.redact: [account_ids, emails, ips]` sends placeholders instead and shows you the real values. See [Data and security](../data-security/).
 
 ## Schema commands: the assistant's tools, for you
 

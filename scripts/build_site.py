@@ -37,16 +37,19 @@ REPO_URL = "https://github.com/devops-monk/spendlens"
 
 NAV = [
     ("Get started", [("", "Introduction"), ("getting-started", "Getting started"), ("configuration", "Configuration"),
-                     ("permissions", "IAM permissions"), ("docker", "Docker"), ("ways-to-run", "Ways to run")]),
-    ("Features", [("tags", "Tag compliance"), ("rightsize-waste", "Rightsizing & waste"),
-                  ("graph", "Resource graph & cleanup"), ("cost", "Cost analysis"),
-                  ("anomalies-forecast", "Anomalies & forecast"), ("savings", "Savings"),
-                  ("dashboard", "Dashboard & formats"), ("history", "History & sources"),
-                  ("cloudtrail", "CloudTrail activity"), ("tailpipe", "Tailpipe: logs & CUR")]),
-    ("AI", [("ai-assistant", "AI assistant"), ("sessions", "Sessions")]),
-    ("Automation", [("report-notify", "Reports & notifications"), ("ci", "CI/CD")]),
+                     ("ways-to-run", "Ways to run"), ("docker", "Docker")]),
+    ("Save money", [("rightsize-waste", "Rightsizing & waste"), ("graph", "Resource graph & cleanup"),
+                    ("savings", "Savings")]),
+    ("Understand spend", [("cost", "Cost analysis"), ("anomalies-forecast", "Anomalies & forecast"),
+                          ("dashboard", "Dashboard & formats")]),
+    ("Govern & audit", [("tags", "Tag compliance"), ("cloudtrail", "CloudTrail activity")]),
+    ("Ask", [("ai-assistant", "AI assistant"), ("sessions", "Sessions")]),
+    ("Run it", [("report-notify", "Reports & notifications"), ("ci", "CI/CD"), ("history", "History & replays")]),
+    ("Data sources", [("data-sources", "Data sources"), ("tailpipe", "Tailpipe: logs & CUR"),
+                      ("multi-account", "Multi-account & regions"), ("permissions", "IAM permissions")]),
+    ("Trust & help", [("data-security", "Data & security"), ("troubleshooting", "Troubleshooting")]),
     ("Reference", [("cli", "Commands & options"), ("controls", "Controls catalog"), ("control-mapping", "Control mapping"),
-                   ("extending", "Extending"), ("development", "Development & testing")]),
+                   ("extending", "Extending"), ("development", "Development & testing"), ("changelog", "Changelog")]),
 ]
 REPO_DOCS = {"docker": "docker.md", "permissions": "permissions.md", "ci": "ci.md", "controls": "controls.md",
              "control-mapping": "control-mapping.md"}
@@ -123,6 +126,11 @@ DOC_INFO = {
     "dashboard": ("layout", "The self-contained HTML dashboard and every output format."),
     "history": ("clock", "Saved runs, replays and what changed between them."),
     "cloudtrail": ("clock", "Who did what, when: every filter, presets, summaries, exports, and the AI."),
+    "data-sources": ("flow", "Where each kind of data comes from, and how spendlens picks the best source."),
+    "multi-account": ("map", "More regions, several accounts through a Steampipe aggregator, and CI."),
+    "data-security": ("key", "What is read, what goes to the AI provider, what is stored, and how to hide it."),
+    "troubleshooting": ("pulse", "The common errors and their fixes, in one place."),
+    "changelog": ("clock", "What changed in each release."),
     "tailpipe": ("list", "CloudTrail logs, VPC flow logs and the CUR, collected from S3 and queried locally."),
     "ai-assistant": ("spark", "Plain-English answers from your data, with read-only safety."),
     "sessions": ("clock", "Every conversation saved: list them, reopen one by id, and continue with its context."),
@@ -536,6 +544,7 @@ def build() -> list[Path]:
     for f in (SITE / "content" / "docs").glob("*.md"):
         sources["" if f.stem == "index" else f.stem] = f.read_text()
     sources["cli"] = cli_reference_md()
+    sources["changelog"] = (ROOT / "CHANGELOG.md").read_text()  # one source: the repo's CHANGELOG.md
 
     flat = [(slug, title) for _, items in NAV for slug, title in items]
     missing = [s for s, _ in flat if s not in sources]
@@ -553,6 +562,8 @@ def build() -> list[Path]:
             edit = f"{REPO_URL}/edit/main/docs/{REPO_DOCS[slug]}"
         elif slug == "cli":
             edit = None
+        elif slug == "changelog":
+            edit = f"{REPO_URL}/edit/main/CHANGELOG.md"
         else:
             edit = f"{REPO_URL}/edit/main/website/content/docs/{slug or 'index'}.md"
         page = {"slug": slug, "title": title, "html": html, "toc": toc, "h1": h1 or title, "lead": lead,

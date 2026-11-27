@@ -388,13 +388,14 @@ def ai_tools() -> tuple[str, str]:
                                   ("aws_query_result", "wait for a slow query")]):
         b.append(_pill(240, 390 + i * 38, n, wht))
     # activity, Tailpipe and files
-    b.append(f'<rect x="220" y="612" width="440" height="200" rx="16" fill="none" stroke="{ACCENT}" stroke-opacity="0.8" '
+    b.append(f'<rect x="220" y="612" width="440" height="238" rx="16" fill="none" stroke="{ACCENT}" stroke-opacity="0.8" '
              f'stroke-width="1.5" stroke-dasharray="2 5"/>')
     b.append(_t(240, 636, "Activity, logs and files · when available", 12, anchor="start", weight=700, fill=ACCENT))
     for i, (n, wht) in enumerate([("cloudtrail_events", "who did what · any filter"),
                                   ("tailpipe_query", "CloudTrail · flow logs · CUR"),
                                   ("read_file", "files you attach"),
-                                  ("write_file", "xlsx · csv · docx · md · scripts")]):
+                                  ("write_file", "xlsx · csv · docx · md · scripts"),
+                                  ("export_query", "every row of a query, to a file")]):
         b.append(_pill(240, 650 + i * 38, n, wht))
     b.append(_arrow(u, 160, 245, 218, 160, "tool calls", 186, 190, anchor="middle"))
     b.append(_arrow(u, 160, 275, 218, 470, "", None, None))
@@ -420,12 +421,12 @@ def ai_tools() -> tuple[str, str]:
     b.append(_arrow(u, 662, 680, 738, 667))
     b.append(_arrow(u, 662, 762, 738, 767))
     b.append(_arrow(u, 988, 667, 932, 667))
-    svg = _svg(u, 1180, 832, "The assistant's tools: seven history and graph tools, five live AWS tools, and the CloudTrail, "
-                             "Tailpipe and file tools, with the data sources behind them", "".join(b))
+    svg = _svg(u, 1180, 870, "The assistant's tools: seven history and graph tools, five live AWS tools, and the CloudTrail, "
+                             "Tailpipe, file and export tools, with the data sources behind them", "".join(b))
     return svg, ("The model knows only what its tools tell it. The history tools carry the database schema; the AWS "
                  "tools search a catalog built from the Steampipe AWS plugin's own source and checked against the columns "
                  "your installed plugin reports; cloudtrail_events and tailpipe_query read CloudTrail, flow logs and the CUR; "
-                 "read_file and write_file handle the files you give and ask for.")
+                 "read_file, write_file and export_query handle the files you give and ask for.")
 
 
 def seq_session() -> tuple[str, str]:

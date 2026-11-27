@@ -238,8 +238,9 @@
           more cover the whole Steampipe AWS plugin, live and read-only (on by default; <code>--no-live</code> turns
           them off). <code>cloudtrail_events</code> answers "who did what, when" from CloudTrail, with every filter,
           <code>tailpipe_query</code> reads CloudTrail logs, flow logs and the CUR that Tailpipe collected, and
-          <code>read_file</code> / <code>write_file</code> read the files you attach and write the ones you ask for.</p>
-        <ul class="chips"><li>16 tools</li><li>Read-only in AWS</li><li>Schema from the plugin's source</li><li>Files in and out</li></ul>
+          <code>read_file</code> / <code>write_file</code> read the files you attach and write the ones you ask for, and
+          <code>export_query</code> writes every row of a query to a file without sending the rows to the model.</p>
+        <ul class="chips"><li>17 tools</li><li>Read-only in AWS</li><li>Schema from the plugin's source</li><li>Files in and out</li></ul>
       </div>
     </div>
     <div class="sc-media">{{ diagram("ai_tools") }}</div>
@@ -315,6 +316,9 @@
         <tr><td><code>write_file</code></td><td><code>ask</code></td><td>The path of the file it wrote into
           <code>./spendlens-output</code>: xlsx, csv, docx, md, html, json, yaml, scripts, Terraform. Tables come
           straight from a result id; never overwrites, never runs anything.</td></tr>
+        <tr><td><code>export_query</code></td><td><code>ask</code></td><td>Runs one read-only query (live AWS,
+          history or Tailpipe) and writes every row, up to <code>llm.export_max_rows</code>, to a file; the model
+          gets only the path, the row count and five rows.</td></tr>
         <tr><td><code>history_query</code></td><td>always</td><td>Rows from one read-only SQLite <code>SELECT</code> over
           runs, findings and cost rows.</td></tr>
         <tr><td><code>aws_find_tables</code></td><td>live (default)</td><td>The best ~8 of 589 tables for the

@@ -2,6 +2,8 @@
 
 **spendlens** finds untagged resources, oversized instances, idle waste and unexpected cost spikes in your AWS accounts, puts a dollar figure on each one, and answers your questions in plain English. **It is read-only by design**: it never creates, changes, tags or deletes anything.
 
+> 🛡️ **100% read-only.** spendlens never creates, changes, tags or deletes anything in your AWS account: only Describe, List, Get and Lookup calls, a read-only role, and read-only SQL. Safe to point at production.
+
 This image is ready to run. It includes spendlens with its AI assistant, plus pinned versions of [Steampipe](https://steampipe.io) 2.5.0, [Powerpipe](https://powerpipe.io) 1.6.0, the Steampipe AWS plugin 1.35.0, [Tailpipe](https://tailpipe.io) 0.7.6 and the Tailpipe AWS plugin 0.14.2. Steampipe's database is set up when the image is built, so a container starts without downloading anything.
 
 📖 **Docs:** https://spendlens.devops-monk.com · **Architecture:** https://spendlens.devops-monk.com/architecture/ · **Source:** https://github.com/devops-monk/spendlens
@@ -192,7 +194,7 @@ Add `--fresh` to `ask` or `brief` to skip the cache once.
 
 | | |
 |---|---|
-| **Tags** | `latest`, `0.4.8`, `0.4` (plus `sha-<commit>` per build) |
+| **Tags** | `latest`, `0.4.9`, `0.4` (plus `sha-<commit>` per build) |
 | **Platforms** | `linux/amd64` and `linux/arm64` (Graviton, Apple silicon), each built natively and smoke-tested |
 | **License** | spendlens: Apache-2.0. The image also contains Steampipe, Powerpipe and Tailpipe (AGPL-3.0, unmodified) and their AWS plugins (Apache-2.0); see `/usr/share/doc/spendlens/NOTICE` |
 | **User** | `finops` (uid 10001). Steampipe refuses to run as root |
@@ -215,7 +217,7 @@ If you bind-mount `/work` or `/data` on Linux, they must be writable by uid 1000
 ```yaml
 # GitLab
 spendlens:
-  image: { name: abhaypratap/spendlens:0.4.8, entrypoint: [""] }
+  image: { name: abhaypratap/spendlens:0.4.9, entrypoint: [""] }
   script:
     - spendlens-entrypoint report --out reports
     # report has just run every check: post from those saved runs, no second round of AWS calls

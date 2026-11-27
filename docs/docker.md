@@ -13,18 +13,18 @@ The image contains spendlens with the AI extras, plus pinned versions of Steampi
 ## Pull the published image
 
 ```bash
-docker pull abhaypratap/spendlens:0.4.8      # or :latest
+docker pull abhaypratap/spendlens:0.4.9      # or :latest
 docker run --rm --network none abhaypratap/spendlens tags --source demo --summary
 ```
 
-Image page and screenshots: [hub.docker.com/r/abhaypratap/spendlens](https://hub.docker.com/r/abhaypratap/spendlens). Tags: `latest`, `0.4.8`, `0.4`, for `linux/amd64` and `linux/arm64`. Releases are built natively for each platform and published by `.github/workflows/docker-publish.yml` when a `v*` tag is pushed (or `gh workflow run docker-publish.yml -f version=X.Y.Z`).
+Image page and screenshots: [hub.docker.com/r/abhaypratap/spendlens](https://hub.docker.com/r/abhaypratap/spendlens). Tags: `latest`, `0.4.9`, `0.4`, for `linux/amd64` and `linux/arm64`. Releases are built natively for each platform and published by `.github/workflows/docker-publish.yml` when a `v*` tag is pushed (or `gh workflow run docker-publish.yml -f version=X.Y.Z`).
 
 ## Build it yourself
 
 ```bash
 docker build -t spendlens .              # or: make docker-build  (tags spendlens:dev)
 # multi-arch, pushed to your registry
-docker buildx build --platform linux/amd64,linux/arm64 -t <registry>/spendlens:0.4.8 --push .
+docker buildx build --platform linux/amd64,linux/arm64 -t <registry>/spendlens:0.4.9 --push .
 ```
 
 The image is about 1 GB, most of it Steampipe's embedded Postgres and the AWS plugin. BuildKit is required (the default in current Docker; on older versions set `DOCKER_BUILDKIT=1`).
@@ -100,7 +100,7 @@ The entrypoint starts the local Steampipe service (listening inside the containe
 ## In CI
 
 Use the image as the job image to skip installing tools on every run:
-- **GitLab:** `image: <registry>/spendlens:0.4.8`, with `entrypoint: [""]`, then `spendlens-entrypoint report --out reports` in `script`.
-- **GitHub Actions:** `container: <registry>/spendlens:0.4.8`.
+- **GitLab:** `image: <registry>/spendlens:0.4.9`, with `entrypoint: [""]`, then `spendlens-entrypoint report --out reports` in `script`.
+- **GitHub Actions:** `container: <registry>/spendlens:0.4.9`.
 
 OIDC role assumption works as described in [CI/CD](ci.md). Pass `AWS_ROLE_ARN` and `AWS_WEB_IDENTITY_TOKEN_FILE` into the container.

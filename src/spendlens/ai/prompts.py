@@ -102,7 +102,7 @@ def system_prompt(cfg: Config, live: bool) -> str:
                    f"{', '.join(a.regions) or 'eu-west-1'}"
                    + (f", accounts {', '.join(a.accounts)}" if a.accounts else "")
                    + (f", AWS profile {a.profile}" if a.profile else "") + ". Questions about other regions or "
-                   "accounts cannot be answered live: say so and name the setting (aws.regions, aws.accounts)."
+                   "accounts cannot be answered live: say so and name the setting (aws.regions, or steampipe.connection for an aggregator over several accounts)."
                    f"\n- Tailpipe (collected CloudTrail logs, flow logs, CUR): "
                    f"{'on when sources are configured' if cfg.tailpipe.enabled else 'turned off: Steampipe only'}.")
     return BASE + policy + (LIVE if live else "")

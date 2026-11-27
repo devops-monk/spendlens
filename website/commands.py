@@ -6,7 +6,7 @@ from __future__ import annotations
 # (category, intro, [command paths]) in page order. Every CLI command must appear exactly once (checked at build).
 CATEGORIES: list[tuple[str, str, list[str]]] = [
     ("Set up and configure", "Create your policy file, check the setup, and see exactly which settings are in effect.",
-     ["init", "doctor", "params", "config", "plugins", "query"]),
+     ["init", "doctor", "sources", "params", "config", "plugins", "query"]),
     ("Checks: tags, rightsizing and waste",
      "Run your company standards against every resource. Each result is a finding (alarm, ok, info, skip, error) "
      "with a reason, the resource, account, region and, where it applies, a monthly saving estimate.",
@@ -41,6 +41,7 @@ CATEGORIES: list[tuple[str, str, list[str]]] = [
 TASKS: list[tuple[str, str]] = [
     ("Try spendlens without an AWS account", "report"),
     ("Check my setup and AWS access", "doctor"),
+    ("See where each kind of data comes from (Tailpipe, CloudWatch Logs, Steampipe ...)", "sources"),
     ("Find resources missing mandatory tags", "tags"),
     ("Find oversized or non-standard resources", "rightsize"),
     ("Find idle and orphaned resources I'm paying for", "waste"),
@@ -84,6 +85,10 @@ RECIPES: dict[str, list[tuple[str, str]]] = {
         ("Write a scheduled GitLab pipeline (.gitlab-ci.yml)", "spendlens init --ci gitlab"),
         ("Write a scheduled GitHub Actions workflow", "spendlens init --ci github"),
         ("Overwrite an existing file", "spendlens init --force"),
+    ],
+    "sources": [
+        ("Where CloudTrail events, resource costs and flow logs come from right now", "spendlens sources"),
+        ("…including the trail's CloudWatch Logs group (read-only)", "spendlens sources --aws"),
     ],
     "cloudtrail events": [
         ("ECS deployments this week", "spendlens cloudtrail events --days 7 --event UpdateService"),

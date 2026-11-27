@@ -564,3 +564,25 @@ main:has(.localnav) .cs-section[id] { scroll-margin-top: 104px; }
 .tile-shot { margin-top: 18px; border-radius: 12px; overflow: hidden; border: 1px solid var(--line); }
 .center-chips { justify-content: center; margin: 32px 0 28px; }
 @media (max-width: 640px) { .review-bento { grid-template-columns: 1fr; } .one-cmd { padding: 14px 16px; } }
+
+/* read-only: the hero band and its section */
+.ro-band { display: inline-flex; align-items: center; gap: 16px; margin: 30px auto 4px; padding: 16px 26px;
+  border-radius: 20px; background: var(--accent-soft); border: 1.5px solid var(--accent); color: var(--ink);
+  text-align: left; max-width: 760px; }
+.ro-band:hover { text-decoration: none; filter: brightness(1.03); }
+.ro-icon { flex: none; width: 46px; height: 46px; fill: none; stroke: var(--accent); stroke-width: 1.8;
+  stroke-linecap: round; stroke-linejoin: round; }
+.ro-text { font-size: clamp(16px, 2vw, 20px); line-height: 1.35; color: var(--ink-2); }
+.ro-text b { display: block; font-size: clamp(24px, 3.4vw, 36px); letter-spacing: -.02em; color: var(--ink); }
+.ro-sec { text-align: center; }
+.ro-h2 { font-size: clamp(40px, 7vw, 76px); }
+.ro-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; margin: 40px 0 34px;
+  text-align: left; }
+.ro-card { background: var(--bg-alt); border: 1px solid var(--line); border-radius: 22px; padding: 26px 24px; }
+.ro-num { display: block; font-size: clamp(40px, 5vw, 56px); line-height: 1; letter-spacing: -.03em;
+  background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.ro-card h3 { margin: 10px 0 8px; font-size: 19px; }
+.ro-card p { margin: 0; color: var(--ink-2); font-size: 15px; line-height: 1.45; }
+@media (max-width: 900px) { .ro-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .ro-grid { grid-template-columns: 1fr; } .ro-band { padding: 14px 16px; gap: 12px; }
+  .ro-icon { width: 36px; height: 36px; } }

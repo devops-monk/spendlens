@@ -6,11 +6,16 @@
 {%- endmacro %}
 {% block main %}
 <section class="hero hero-xl">
-  <a class="pill" href="#new"><b>New</b> v{{ version }} · executive brief, AI that checks its own queries ›</a>
+  <a class="pill" href="#new"><b>New</b> v{{ version }} · CloudTrail search, sessions, exports of any size ›</a>
   <p class="eyebrow">FinOps for AWS, from your terminal</p>
   <h1>See every dollar.<br><span class="grad">Act on every insight.</span></h1>
   <p class="lede">spendlens finds untagged resources, oversized instances, idle waste and unexpected cost spikes, puts a
-    price on each one, and answers your questions in plain English. Read-only, by design.</p>
+    price on each one, and answers your questions in plain English.</p>
+  <a class="ro-band" href="#read-only" aria-label="100% read-only: spendlens never changes anything in your AWS account">
+    <svg class="ro-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l7.5 3v6c0 4.7-3.1 8.6-7.5 10-4.4-1.4-7.5-5.3-7.5-10v-6z"/><path d="M8.5 12.2l2.4 2.4 4.7-5"/></svg>
+    <span class="ro-text"><b>100% read-only.</b> <span>It never creates, changes, tags or deletes anything in your
+      AWS account. Safe to point at production.</span></span>
+  </a>
   <div class="ctas">
     <a class="btn primary" href="#install">Install</a>
     <a class="btn ghost" href="#screenshots">Take the tour ›</a>
@@ -27,6 +32,27 @@
     </div>
     <figcaption>One self-contained HTML report. Works offline, in CI artifacts, and in print. Shown with demo data.</figcaption>
   </figure>
+</section>
+
+<section class="section ro-sec" id="read-only">
+  <div class="wrap">
+    <p class="eyebrow center">The biggest advantage</p>
+    <h2 class="h2 ro-h2">Read-only. <span class="grad">Always.</span></h2>
+    <p class="sub">Most cost tools ask for write access to "fix" things for you. spendlens never does. It reads your
+      account, explains it and proposes savings. A person decides, and makes every change.</p>
+    <div class="ro-grid">
+      <article class="ro-card"><b class="ro-num">0</b><h3>writes to AWS</h3>
+        <p>Only Describe, List, Get and Lookup calls. Nothing is created, changed, tagged or deleted, ever.</p></article>
+      <article class="ro-card"><b class="ro-num">1</b><h3>read-only role</h3>
+        <p><code>ReadOnlyAccess</code> is enough. In CI it assumes the role through OIDC, so no AWS keys are stored.</p></article>
+      <article class="ro-card"><b class="ro-num">3</b><h3>layers on every AI query</h3>
+        <p>A SQL parser that allows one SELECT, checks against the AWS schema, and a connection that cannot write.</p></article>
+      <article class="ro-card"><b class="ro-num">100%</b><h3>human-approved changes</h3>
+        <p>Savings are proposals. Scripts it writes are for review, never run. You approve, defer or reject.</p></article>
+    </div>
+    <div class="ctas"><a class="btn primary" href="{{ root }}docs/data-security/">Data and security</a>
+      <a class="btn ghost" href="{{ root }}docs/permissions/">IAM permissions ›</a></div>
+  </div>
 </section>
 
 <section class="section alt review-sec" id="review">
@@ -373,12 +399,11 @@ spendlens init --ci gitlab</code></pre></div>
 
 <section class="section">
   <div class="wrap narrow" style="text-align:center">
-    <h2 class="h2">Read-only. By design.</h2>
-    <p class="sub" style="margin-bottom:28px">spendlens never creates, changes, tags or deletes anything. Savings are
-      proposals for a human to review. In CI it assumes a read-only role through OIDC, so no AWS keys are stored. Its AI
-      assistant can only run SQL that passes a parser and then executes on connections that cannot write.</p>
+    <h2 class="h2">See how it works.</h2>
+    <p class="sub" style="margin-bottom:28px">The architecture, from the AWS APIs it reads to the AI tools that answer
+      your questions, with every read-only safety layer marked.</p>
     <div class="ctas"><a class="btn primary" href="{{ root }}architecture/">See the architecture</a>
-      <a class="btn ghost" href="{{ root }}docs/permissions/">IAM permissions ›</a></div>
+      <a class="btn ghost" href="{{ root }}docs/data-security/">Data and security ›</a></div>
   </div>
 </section>
 
