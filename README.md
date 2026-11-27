@@ -39,8 +39,12 @@ only Describe, List, Get and Lookup calls, a read-only role, and read-only SQL. 
 <p align="center"><sub>One self-contained HTML report, shown with the bundled demo data.</sub></p>
 
 > [!NOTE]
-> v0.4.9. spendlens is tested end to end through Steampipe against an AWS emulator. Verification against a live
+> v0.4.10. spendlens is tested end to end through Steampipe against an AWS emulator. Verification against a live
 > account with a read-only role is next (see [PLAN.md](PLAN.md)).
+
+## New in 0.4.10
+
+- **Next time, without the AI:** after each answer, `spendlens ask` lists the commands that get the same data with no AI tokens (`spendlens query`, `spendlens cloudtrail events` with the same filters, the graph commands). `--no-hints` turns it off.
 
 ## New in 0.4.9
 

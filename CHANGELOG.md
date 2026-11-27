@@ -2,7 +2,7 @@
 
 What changed in each spendlens release, newest first. Upgrade with the [installer](https://spendlens.devops-monk.com/docs/getting-started/) or `docker pull abhaypratap/spendlens:latest`.
 
-## Unreleased
+## 0.4.10
 
 - **Next time, without the AI.** After each answer, `spendlens ask` lists the commands that get the same data without the AI: `spendlens query`, `spendlens cloudtrail events` with the same filters, the graph commands and more. They're built from the tool calls that answered, so they run exactly the same query, with no tokens. `--no-hints` or `llm.command_hints: false` turns it off; `--json` has them as `cli_commands`.
 - **Copy buttons** on the home page's commands; the site's CSS and JS are versioned by content, so browsers never keep a stale copy.
