@@ -503,7 +503,13 @@ def build() -> list[Path]:
 
     env = Environment(loader=FileSystemLoader(SITE / "templates"), autoescape=True, undefined=StrictUndefined,
                       trim_blocks=True, lstrip_blocks=True)
-    common = {"version": __version__, "site_url": SITE_URL, "repo_url": REPO_URL}
+    import hashlib
+
+    def asset(name: str) -> str:  # a short content hash: every change to the file gets a new URL (no stale cache)
+        return hashlib.sha256((SITE / "static" / name).read_bytes()).hexdigest()[:10]
+
+    common = {"version": __version__, "site_url": SITE_URL, "repo_url": REPO_URL,
+              "css_v": asset("site.css"), "js_v": asset("site.js")}
     written: list[Path] = []
 
     def write(rel: str, template: str, **ctx) -> None:

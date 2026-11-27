@@ -19,7 +19,7 @@
 <link rel="apple-touch-icon" href="{{ root }}static/brand/apple-touch-icon.png">
 <link rel="manifest" href="{{ root }}manifest.json">
 <meta name="theme-color" content="#0a84ff">
-<link rel="stylesheet" href="{{ root }}static/site.css?v={{ version }}">
+<link rel="stylesheet" href="{{ root }}static/site.css?v={{ css_v }}">
 <script>document.documentElement.classList.add("js");try{var t=localStorage.getItem("spendlens-site-theme");if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
 </head>
 <body>
@@ -49,6 +49,6 @@
     <span><a href="{{ root }}#install">Install</a> · <a href="{{ root }}docs/">Docs</a> · <a href="{{ root }}architecture/">Architecture</a> · <a href="https://hub.docker.com/r/abhaypratap/spendlens">Docker Hub</a> · <a href="{{ repo_url }}">GitHub</a></span>
   </div>
 </footer>
-<script src="{{ root }}static/site.js?v={{ version }}" defer></script>
+<script src="{{ root }}static/site.js?v={{ js_v }}" defer></script>
 </body>
 </html>
