@@ -264,13 +264,16 @@ class Toolbox:
         if self._tailpipe_available():
             specs.append(ToolSpec(
                 "tailpipe_query",
-                "Data collected by Tailpipe (local; no AWS calls). ONE DuckDB SELECT on aws_cloudtrail_log (CloudTrail: "
-                "full history and data events), aws_vpc_flow_log (VPC flow logs) or aws_cost_and_usage_report (the "
-                "CUR: billed cost per resource and line item), with a time range: tp_date (partition date; e.g. "
-                "tp_date >= current_date - interval 30 day), tp_timestamp, event_time, start_time or "
-                "line_item_usage_start_date. Call with describe=<table> first to list its exact columns. CloudTrail "
-                "hints: user_identity.arn, event_name, event_source, request_parameters ->> 'bucketName', read_only.",
-                _schema({"sql": {"type": "string", "description": "One DuckDB SELECT on one of the three tables."},
+                "Data collected by Tailpipe (local; no AWS calls). ONE DuckDB SELECT, with a time range (tp_date, the "
+                "partition date, e.g. tp_date >= current_date - interval 30 day; or tp_timestamp / timestamp / "
+                "event_time). Tables with data configured here: " + self._tailpipe_tables() + ". Call with "
+                "describe=<table> first to list its exact columns. Uses: aws_cloudtrail_log (full CloudTrail history, "
+                "data events), aws_vpc_flow_log (traffic), aws_cost_and_usage_report / aws_cost_and_usage_focus (billed "
+                "cost per resource), aws_cost_optimization_recommendation (AWS savings recommendations over time), "
+                "aws_s3_server_access_log (who reads which bucket; unused buckets), aws_alb_access_log / "
+                "aws_nlb_access_log / aws_clb_access_log (requests per load balancer; idle ones), "
+                "aws_guardduty_finding / aws_securityhub_finding (security findings history), aws_waf_traffic_log.",
+                _schema({"sql": {"type": "string", "description": "One DuckDB SELECT on Tailpipe's AWS tables."},
                          "describe": {"type": "string", "description": "A table name: return its columns instead."}}),
                 lambda a: self.tailpipe_query(a.get("sql") or "", a.get("describe"))))
         if self.live:
@@ -640,6 +643,13 @@ class Toolbox:
         out["row_count"] = len(out["rows"])
         out["_export_rows"] = res.rows  # every row, for write_file(result_id); never sent to the model
         return out
+
+    def _tailpipe_tables(self) -> str:
+        from ..tailpipe import KINDS, configured
+
+        have = configured()
+        names = [KINDS[k] for k, n in have.items() if n]
+        return ", ".join(names) or "none yet"
 
     def tailpipe_query(self, sql: str, describe: str | None = None) -> dict[str, Any]:
         from ..graph.costs import CostSourceError, tailpipe_runner

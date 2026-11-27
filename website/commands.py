@@ -10,7 +10,8 @@ CATEGORIES: list[tuple[str, str, list[str]]] = [
     ("Checks: tags, rightsizing and waste",
      "Run your company standards against every resource. Each result is a finding (alarm, ok, info, skip, error) "
      "with a reason, the resource, account, region and, where it applies, a monthly saving estimate.",
-     ["tags", "tags types", "rightsize", "rightsize controls", "waste", "waste controls"]),
+     ["tags", "tags types", "rightsize", "rightsize controls", "waste", "waste controls", "unused buckets",
+      "unused load-balancers"]),
     ("Resource graph", "How resources connect and what they cost together: cleanup groups of resources that can be "
      "removed together, suggested owner tags for untagged resources, and what deleting one would affect. show, impact, owners and stats read the saved graph.",
      ["graph orphans", "graph owners", "graph traffic", "graph age", "graph show", "graph impact",
@@ -25,7 +26,7 @@ CATEGORIES: list[tuple[str, str, list[str]]] = [
     ("Anomalies and forecast", "Spot unusual daily spend and see where the month will land against your budgets.",
      ["anomalies", "forecast"]),
     ("Savings", "AWS's own recommendations, commitment coverage, and one de-duplicated savings total.",
-     ["savings hub", "savings commitments", "savings summary"]),
+     ["savings hub", "savings commitments", "savings summary", "savings history"]),
     ("Reports, dashboard and notifications", "Run everything at once, build the branded dashboard, post summaries.",
      ["report", "review", "dashboard", "brief", "notify"]),
     ("AI assistant", "Ask questions in plain English; answers come from your saved runs (and, with --live, read-only "
@@ -85,6 +86,19 @@ RECIPES: dict[str, list[tuple[str, str]]] = {
         ("Write a scheduled GitLab pipeline (.gitlab-ci.yml)", "spendlens init --ci gitlab"),
         ("Write a scheduled GitHub Actions workflow", "spendlens init --ci github"),
         ("Overwrite an existing file", "spendlens init --force"),
+    ],
+    "unused buckets": [
+        ("S3 buckets nobody read or wrote in 30 days (S3 server access logs)", "spendlens unused buckets"),
+        ("Only the unused ones, over 90 days, as CSV",
+         "spendlens unused buckets --days 90 --status unused -f csv -o unused-buckets.csv"),
+    ],
+    "unused load-balancers": [
+        ("Load balancers with no requests in 30 days (their access logs)", "spendlens unused load-balancers"),
+        ("Only the unused ones, over 14 days", "spendlens unused load-balancers --days 14 --status unused"),
+    ],
+    "savings history": [
+        ("AWS savings recommendations over time, and the ones left open longest", "spendlens savings history"),
+        ("All open ones, as CSV", "spendlens savings history --days 180 -f csv -o open-recommendations.csv"),
     ],
     "sources": [
         ("Where CloudTrail events, resource costs and flow logs come from right now", "spendlens sources"),

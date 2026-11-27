@@ -24,8 +24,8 @@ class Client:
         if "aws_vpc_flow_log" in sql:
             if self.fail_flow:
                 raise SteampipeError("AccessDenied: ec2:DescribeFlowLogs")
-            return [{"bucket_name": None, "log_destination": "arn:aws:s3:::flows/vpc/"},
-                    {"bucket_name": "Bad Bucket!", "log_destination": ""}]
+            return [{"bucket_name": None, "log_destination": "arn:aws:s3:::flows/vpc/", "log_destination_type": "s3"},
+                    {"bucket_name": "Bad Bucket!", "log_destination": "", "log_destination_type": "s3"}]
         return []
 
 
@@ -75,7 +75,7 @@ def test_write_status_and_collect(tmp_path: Path, monkeypatch: pytest.MonkeyPatc
     found = tp.discover(c, discover=False)
     path = tp.write(c, found)
     assert path == tmp_path / "tp" / "config" / "spendlens.tpc"
-    assert tp.configured() == {"cloudtrail": 1, "flow_logs": 0, "cur": 0}
+    assert tp.configured() == {k: int(k == "cloudtrail") for k in tp.KINDS}
     assert tp.collect_cmd("/bin/tp", "cloudtrail", 30, today=date(2026, 11, 25)) == [
         "/bin/tp", "collect", "aws_cloudtrail_log", "--from", "2026-10-26", "--progress=false"]
 
@@ -114,3 +114,68 @@ def test_discovery_errors_name_the_fix():
     old_cli = "\nusage: aws [options] <command> <subcommand>\nTo see help text, you can run:\n\n  aws help\n"
     assert "upgrade the AWS CLI" in _why(old_cli)
     assert _why("line one\nAccessDenied: not allowed\n") == "AccessDenied: not allowed"
+
+
+class AllSources:
+    """Every discovery query answered, as Steampipe would."""
+
+    def query(self, sql: str, params: Any = None) -> list[dict[str, Any]]:
+        if "aws_cloudtrail_trail" in sql:
+            return [{"name": "org", "s3_bucket_name": None,
+                     "log_group_arn": "arn:aws:logs:eu-west-1:123456789012:log-group:aws-cloudtrail-logs:*"}]
+        if "aws_vpc_flow_log" in sql:
+            return [{"log_destination_type": "cloud-watch-logs", "log_group_name": "vpc-flows", "region": "eu-west-2"}]
+        if "aws_s3_bucket" in sql:
+            return [{"name": "a", "logging": {"TargetBucket": "logs", "TargetPrefix": "s3/a/"}},
+                    {"name": "b", "logging": {"TargetBucket": "logs", "TargetPrefix": "s3/b/"}}]
+        if "aws_ec2_application_load_balancer" in sql:
+            return [{"name": "web", "load_balancer_attributes": [
+                {"Key": "access_logs.s3.enabled", "Value": "true"}, {"Key": "access_logs.s3.bucket", "Value": "lb-logs"},
+                {"Key": "access_logs.s3.prefix", "Value": "alb"}]},
+                {"name": "off", "load_balancer_attributes": [{"Key": "access_logs.s3.enabled", "Value": "false"}]}]
+        if "aws_ec2_network_load_balancer" in sql:
+            return []
+        if "aws_ec2_classic_load_balancer" in sql:
+            return [{"name": "old", "access_log_s3_bucket_name": "lb-logs", "access_log_s3_bucket_prefix": "clb"}]
+        if "aws_guardduty_publishing_destination" in sql:
+            return [{"destination_arn": "arn:aws:s3:::sec-findings/guardduty"}]
+        if "aws_wafv2_web_acl" in sql:
+            return [{"name": "edge", "logging_configuration": {"LogDestinationConfigs": [
+                "arn:aws:logs:us-east-1:123456789012:log-group:aws-waf-logs-edge"]}}]
+        return []
+
+
+def exports(*args: str) -> dict[str, Any]:
+    if args[:2] == ("bcm-data-exports", "list-exports"):
+        return {"Exports": [{"ExportArn": "f"}, {"ExportArn": "r"}]}
+    if args[:2] == ("bcm-data-exports", "get-export"):
+        q = "SELECT * FROM FOCUS_1_0_AWS" if "f" in args else "SELECT * FROM COST_OPTIMIZATION_RECOMMENDATIONS"
+        return {"Export": {"Name": args[3], "DataQuery": {"QueryStatement": q},
+                           "DestinationConfigurations": {"S3Destination": {"S3Bucket": "billing", "S3Prefix": args[3]}}}}
+    return {}
+
+
+def test_discovers_every_kind_and_cloudwatch_log_groups() -> None:
+    c = load_config(environ={}, sets=["tailpipe.securityhub=[{bucket: sh-export, prefix: findings}]",
+                                      "tailpipe.flow_log_groups=[{name: manual-flows, region: eu-west-1}]"])
+    found = tp.discover(c, steampipe=AllSources(), aws_cli=exports)
+    s = found.sources
+    assert s["cloudtrail"] == [{"log_group": "aws-cloudtrail-logs", "region": "eu-west-1", "origin": "trail org"}]
+    assert [g["log_group"] for g in s["flow_logs"]] == ["manual-flows", "vpc-flows"]
+    assert s["s3_access_logs"] == [{"bucket": "logs", "prefix": "s3/", "origin": "access logs of 2 bucket(s)"}]
+    assert [x["prefix"] for x in s["alb_access_logs"]] == ["alb/"] and s["clb_access_logs"][0]["prefix"] == "clb/"
+    assert s["guardduty"][0]["bucket"] == "sec-findings" and s["securityhub"][0]["bucket"] == "sh-export"
+    assert s["waf"] == [{"log_group": "aws-waf-logs-edge", "region": "us-east-1", "origin": "web ACL edge"}]
+    assert s["focus"][0]["prefix"] == "f/" and s["cost_recommendations"][0]["prefix"] == "r/"
+    text = tp.render(c, found)
+    assert 'source "aws_cloudwatch_log_group" {' in text and 'log_group_name = "aws-cloudtrail-logs"' in text
+    assert 'partition "aws_cost_and_usage_focus"' in text and 'partition "aws_waf_traffic_log"' in text
+    counts = tp.configured(Path("/nonexistent"))
+    assert set(counts) == set(tp.KINDS)
+
+
+def test_bad_log_groups_are_skipped() -> None:
+    f = tp.Found()
+    f.add_group("cloudtrail", 'bad"name', "eu-west-1", "x")
+    f.add_group("cur", "ok", "eu-west-1", "x")  # the CUR has no CloudWatch Logs source
+    assert f.sources["cloudtrail"] == [] and len(f.notes) == 2

@@ -1,12 +1,13 @@
-"""The assistant's `tailpipe_query` tool: data already collected by Tailpipe (DuckDB SQL, local): CloudTrail logs,
-VPC flow logs and Cost and Usage Reports.
+"""The assistant's `tailpipe_query` tool: data already collected by Tailpipe (DuckDB SQL, local): every table of the
+Tailpipe AWS plugin (CloudTrail, VPC flow logs, CUR, FOCUS, Cost Optimization Hub recommendations, S3 / ALB / NLB /
+CLB access logs, GuardDuty and Security Hub findings, WAF logs).
 
 Beyond what LookupEvents gives (`aws_cloudtrail_lookup_event`, 90 days of management events): full history and data
 events (S3 object reads and writes), from the trail's own log files that Tailpipe collected. Offered to the model
 only when the tailpipe CLI is installed. Nothing here calls AWS.
 
 Guard, on top of the general one (single read-only SELECT):
-  * only the tables aws_cloudtrail_log, aws_vpc_flow_log, aws_cost_and_usage_report (and the query's own CTEs):
+  * only the Tailpipe AWS plugin's tables (and the query's own CTEs):
     no table functions, no read_csv / read_parquet /
     glob / getenv or other file and environment access DuckDB offers;
   * a time range (tp_date, tp_timestamp, event_time, start_time or the CUR's usage date), so Tailpipe reads only
@@ -25,9 +26,13 @@ from sqlglot import exp
 from .sql_guard import UnsafeSQL, check_select
 
 TABLE = "aws_cloudtrail_log"
-TABLES = ("aws_cloudtrail_log", "aws_vpc_flow_log", "aws_cost_and_usage_report")
-TIME_COLUMNS = {"tp_date", "tp_timestamp", "event_time", "start_time", "line_item_usage_start_date",
-                "bill_billing_period_start_date"}
+TABLES = ("aws_cloudtrail_log", "aws_vpc_flow_log", "aws_cost_and_usage_report", "aws_cost_and_usage_focus",
+          "aws_cost_optimization_recommendation", "aws_s3_server_access_log", "aws_alb_access_log",
+          "aws_alb_connection_log", "aws_nlb_access_log", "aws_clb_access_log", "aws_guardduty_finding",
+          "aws_securityhub_finding", "aws_waf_traffic_log")
+TIME_COLUMNS = {"tp_date", "tp_timestamp", "event_time", "start_time", "timestamp", "line_item_usage_start_date",
+                "bill_billing_period_start_date", "charge_period_start", "billing_period_start",
+                "last_refresh_timestamp", "created_at", "updated_at", "first_observed_at", "last_observed_at"}
 DUCKDB_FORBIDDEN = {
     "read_csv", "read_csv_auto", "read_parquet", "parquet_scan", "read_json", "read_json_auto", "read_ndjson",
     "read_ndjson_auto", "read_json_objects", "read_text", "read_blob", "glob", "getenv", "sniff_csv", "iceberg_scan",

@@ -267,5 +267,71 @@ def summary(
         err.print("[dim]then run spendlens savings summary again.[/]")
 
 
+REC_TABLE = "aws_cost_optimization_recommendation"
+
+
+def history_sql(days: int) -> tuple[str, str]:
+    """(trend per refresh day, recommendations still open at the latest refresh, oldest first)."""
+    days = int(days)
+    window = f"tp_date >= current_date - interval {days} day"
+    trend = (f"select cast(tp_date as varchar) as refreshed, count(distinct recommendation_id) as recommendations, "
+             f"round(sum(estimated_monthly_savings_after_discount), 2) as monthly_savings from {REC_TABLE} "
+             f"where {window} group by tp_date order by tp_date")
+    oldest = (f"select recommendation_id, any_value(action_type) as action, any_value(current_resource_type) as "
+              f"resource_type, any_value(resource_arn) as resource, cast(min(tp_date) as varchar) as first_seen, "
+              f"date_diff('day', min(tp_date), max(tp_date)) as open_days, "
+              f"round(max(estimated_monthly_savings_after_discount), 2) as monthly_savings from {REC_TABLE} "
+              f"where {window} group by recommendation_id "
+              f"having max(tp_date) = (select max(tp_date) from {REC_TABLE} where {window}) "
+              f"order by open_days desc, monthly_savings desc")
+    return trend, oldest
+
+
+@app.command("history")
+def history(
+    days: Annotated[int, typer.Option("--days", "-d", min=1, max=400, help="The window, in days.")] = 90,
+    top: Annotated[int, typer.Option("--top", help="Recommendations to list.")] = 15,
+    fmt: FormatOpt = Format.table,
+    out: OutOpt = None,
+    config: ConfigOpt = None,
+    sets: SetOpt = None,
+) -> None:
+    """AWS's savings recommendations over time: the open savings at each refresh, and the ones left open longest.
+
+    From the Cost Optimization Hub Data Export collected by Tailpipe (local, no AWS calls). Set it up once: create
+    a Cost Optimization Recommendations export in Billing > Data Exports, then spendlens tailpipe init and collect.
+    Examples:
+      spendlens savings history
+      spendlens savings history --days 180 -f csv -o open-recommendations.csv
+    """
+    from ..graph.costs import CostSourceError, tailpipe_runner
+    from ..sources import tailpipe_ready
+
+    cfg = load(config, None, sets)
+    if not tailpipe_ready(cfg, "cost_recommendations"):
+        err.print("[yellow]No Cost Optimization Hub export in Tailpipe.[/] Create a Cost Optimization Recommendations "
+                  "export (Billing > Data Exports), then: spendlens tailpipe init && spendlens tailpipe collect "
+                  "cost_recommendations. For today's recommendations without it: spendlens savings hub")
+        raise typer.Exit(1)
+    trend_sql, oldest_sql = history_sql(days)
+    try:
+        run = tailpipe_runner(cfg.graph.tailpipe_path, timeout=600)
+        trend, oldest = run(trend_sql), run(oldest_sql)
+    except CostSourceError as e:
+        err.print(f"[red]Tailpipe:[/] {str(e).splitlines()[0]}")
+        raise typer.Exit(1) from e
+    if fmt is not Format.table:
+        emit(oldest[:top] if out is None else oldest, fmt, out, "Open savings recommendations, oldest first")
+        return
+    emit(trend, fmt, None, f"Open savings by refresh · last {days} days",
+         columns=["refreshed", "recommendations", "monthly_savings"])
+    emit(oldest[:top], fmt, None, "Still open at the latest refresh, oldest first",
+         columns=["action", "resource_type", "resource", "first_seen", "open_days", "monthly_savings"])
+    if trend:
+        first, last = trend[0], trend[-1]
+        err.print(f"[dim]{len(oldest)} open now, {last.get('monthly_savings')} a month · "
+                  f"{first.get('refreshed')}: {first.get('monthly_savings')} a month[/]")
+
+
 def register(reg: Registry) -> None:
     reg.add_typer(app, "savings")

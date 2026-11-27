@@ -316,6 +316,11 @@ class S3Location(_Strict):
     prefix: str = Field("", pattern=r"^[A-Za-z0-9!_.*'()/=+-]*$")
 
 
+class LogGroupLocation(_Strict):
+    name: str = Field(pattern=r"^[A-Za-z0-9_./#-]{1,512}$")
+    region: str = Field(pattern=r"^[a-z]{2}(-[a-z]+)+-\d$")
+
+
 class TailpipeConfig(_Strict):
     """Tailpipe: CloudTrail logs, Cost and Usage Reports and VPC flow logs, collected from S3 and queried locally.
 
@@ -328,6 +333,18 @@ class TailpipeConfig(_Strict):
     cloudtrail: list[S3Location] = Field(default_factory=list)
     flow_logs: list[S3Location] = Field(default_factory=list)
     cur: list[S3Location] = Field(default_factory=list)
+    focus: list[S3Location] = Field(default_factory=list)  # FOCUS 1.0 Data Export
+    cost_recommendations: list[S3Location] = Field(default_factory=list)  # Cost Optimization Hub Data Export
+    s3_access_logs: list[S3Location] = Field(default_factory=list)
+    alb_access_logs: list[S3Location] = Field(default_factory=list)
+    nlb_access_logs: list[S3Location] = Field(default_factory=list)
+    clb_access_logs: list[S3Location] = Field(default_factory=list)
+    guardduty: list[S3Location] = Field(default_factory=list)  # GuardDuty findings exported to S3
+    securityhub: list[S3Location] = Field(default_factory=list)  # Security Hub findings exported to S3 (e.g. Firehose)
+    waf: list[S3Location] = Field(default_factory=list)
+    cloudtrail_log_groups: list[LogGroupLocation] = Field(default_factory=list)  # CloudWatch Logs instead of S3
+    flow_log_groups: list[LogGroupLocation] = Field(default_factory=list)
+    waf_log_groups: list[LogGroupLocation] = Field(default_factory=list)
     collect_days: int = Field(30, ge=1, le=400)  # how far back `spendlens tailpipe collect` goes
 
 

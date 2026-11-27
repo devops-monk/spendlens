@@ -16,7 +16,7 @@ from __future__ import annotations
 import shutil
 from typing import Any
 
-KIND_TABLES = {"cloudtrail": "aws_cloudtrail_log", "flow_logs": "aws_vpc_flow_log", "cur": "aws_cost_and_usage_report"}
+from .tailpipe import KINDS as KIND_TABLES  # every kind of data Tailpipe can hold
 
 
 def tailpipe_ready(cfg: Any, kind: str | None = None) -> bool:

@@ -72,6 +72,7 @@ BUILTIN_FEATURES: tuple[str, ...] = (
     "spendlens.features.changes_cmd",
     "spendlens.features.cloudtrail_cmd",
     "spendlens.features.sources_cmd",
+    "spendlens.features.unused_cmd",
 )
 
 
@@ -135,7 +136,7 @@ class Registry:
 
 # `spendlens --help` groups commands by the job they do; a plugin's own commands go under "More"
 PANELS: dict[str, list[str]] = {
-    "Save money": ["waste", "rightsize", "savings", "graph"],
+    "Save money": ["waste", "rightsize", "unused", "savings", "graph"],
     "Understand spend": ["cost", "anomalies", "forecast"],
     "Govern and audit": ["tags", "cloudtrail", "changes", "find"],
     "Ask": ["ask", "session"],

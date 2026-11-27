@@ -48,6 +48,19 @@ def cur_sql(days: int) -> str:
             f"and line_item_usage_start_date < current_date group by line_item_resource_id")
 
 
+def focus_sql(days: int) -> str:
+    """The same per-resource cost from a FOCUS 1.0 export (aws_cost_and_usage_focus): EffectiveCost, which spreads
+    commitments like the CUR's amortised view; resource ids are ARNs or ids, as in the CUR."""
+    days = int(days)
+    if not 1 <= days <= 92:
+        raise ValueError("graph.cur_days must be between 1 and 92")
+    return ("select resource_id, sum(effective_cost) as cost, min(charge_period_start) as first_seen, "
+            "max(charge_period_start) as last_seen, any_value(billing_currency) as currency "
+            "from aws_cost_and_usage_focus where resource_id is not null and resource_id <> '' "
+            f"and charge_period_start >= current_date - interval {days} day "
+            "and charge_period_start < current_date group by resource_id")
+
+
 def tailpipe_runner(path: str = "tailpipe", timeout: int = 600) -> Runner:
     exe = shutil.which(path)
     if not exe:
@@ -103,10 +116,10 @@ def monthly(cost: float, first: Any, last: Any, window_days: int) -> float:
     return round(cost / active_days(first, last, window_days) * DAYS_PER_MONTH, 2)
 
 
-def from_cur(run: Runner, days: int) -> dict[str, dict[str, Any]]:
-    """resource id -> {monthly, cost, days, currency} from the CUR."""
+def from_cur(run: Runner, days: int, focus: bool = False) -> dict[str, dict[str, Any]]:
+    """resource id -> {monthly, cost, days, currency} from the CUR (or a FOCUS export)."""
     out = {}
-    for r in run(cur_sql(days)):
+    for r in run(focus_sql(days) if focus else cur_sql(days)):
         rid = str(r.get("resource_id") or "")
         try:
             cost = float(r.get("cost") or 0)
@@ -179,15 +192,19 @@ def price(g: Graph, cfg: Any, *, store: Any = None, runner: Runner | None = None
 
     if mode == "auto" and not cfg.tailpipe.enabled:
         notes.append("Tailpipe is turned off (tailpipe.enabled: false): the CUR was not read")
-    elif mode == "auto" and runner is None and not tailpipe_ready(cfg, "cur"):
-        pass  # no CUR configured for Tailpipe (sources.py): Cost Explorer data or estimates
+    elif mode == "auto" and runner is None and not (tailpipe_ready(cfg, "cur") or tailpipe_ready(cfg, "focus")):
+        pass  # no CUR or FOCUS export configured for Tailpipe (sources.py): Cost Explorer data or estimates
     elif mode in ("auto", "cur"):
+        # CUR 2.0 first; a FOCUS 1.0 export when that is what the account exports
+        focus = runner is None and not tailpipe_ready(cfg, "cur") and tailpipe_ready(cfg, "focus")
+        label = "FOCUS export" if focus else "CUR"
         try:
             run = runner or tailpipe_runner(cfg.graph.tailpipe_path)
-            costs = from_cur(run, cfg.graph.cur_days)
-            n = apply(g, costs, "cur", f"CUR, last {cfg.graph.cur_days} days")
+            costs = from_cur(run, cfg.graph.cur_days, focus=focus)
+            n = apply(g, costs, "cur", f"{label}, last {cfg.graph.cur_days} days")
             if n:
-                return {"source": "cur", "matched": n, "billed_resources": len(costs), "days": cfg.graph.cur_days}
+                return {"source": "cur", "matched": n, "billed_resources": len(costs), "days": cfg.graph.cur_days,
+                        **({"export": "focus"} if focus else {})}
             notes.append("the CUR in Tailpipe has no line items for these resources in the window")
         except (CostSourceError, ValueError) as e:
             notes.append(f"CUR via Tailpipe unavailable: {e}")

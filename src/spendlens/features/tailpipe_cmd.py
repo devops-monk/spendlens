@@ -30,10 +30,12 @@ def init(
     profile: ProfileOpt = None,
     sets: SetOpt = None,
 ) -> None:
-    """Find where CloudTrail logs, VPC flow logs and Cost and Usage Reports land in S3, and write the Tailpipe config.
+    """Find where AWS writes logs, findings and billing exports (S3 or CloudWatch Logs), and write the Tailpipe config.
 
-    Read-only: trails and flow logs through Steampipe, CUR exports through the AWS CLI. Locations set in finops.yaml
-    (tailpipe.cloudtrail / flow_logs / cur) are always used. Writes only ~/.tailpipe/config/spendlens.tpc.
+    Twelve kinds: CloudTrail, VPC flow logs, CUR 2.0, FOCUS, Cost Optimization Hub recommendations, S3 server access
+    logs, ALB / NLB / CLB access logs, GuardDuty and Security Hub findings, WAF logs. Read-only: through Steampipe and
+    the AWS CLI. Locations set in finops.yaml under tailpipe: are always used. Writes only
+    ~/.tailpipe/config/spendlens.tpc.
     Examples:
       spendlens tailpipe init
       spendlens tailpipe init --dry-run
@@ -45,11 +47,14 @@ def init(
     with activity("Finding CloudTrail, flow log and CUR locations [dim](read-only)[/]"):
         found = tp.discover(cfg, discover=discover)
     t = Table(title="Tailpipe sources", header_style=f"bold {BRAND}")
-    for c in ("data", "bucket", "prefix", "found in"):
+    for c in ("data", "from", "location", "found in"):
         t.add_column(c, overflow="fold")
     for kind, items in found.sources.items():
         for s in items:
-            t.add_row(tp.LABELS[kind], s["bucket"], s["prefix"], s["origin"])
+            if s.get("log_group"):
+                t.add_row(tp.LABELS[kind], "CloudWatch Logs", f"{s['log_group']} ({s['region']})", s["origin"])
+            else:
+                t.add_row(tp.LABELS[kind], "S3", f"{s['bucket']}/{s['prefix']}", s["origin"])
         if not items:
             t.add_row(tp.LABELS[kind], "[dim]none found[/]", "", "")
     console.print(t)
@@ -68,7 +73,10 @@ def init(
 
 @app.command("collect")
 def collect(
-    kind: Annotated[list[str] | None, typer.Argument(help="cloudtrail, flow_logs or cur (default: all configured).")] = None,
+    kind: Annotated[list[str] | None, typer.Argument(help="cloudtrail, flow_logs, cur, focus, cost_recommendations, "
+                                                         "s3_access_logs, alb_access_logs, nlb_access_logs, "
+                                                         "clb_access_logs, guardduty, securityhub or waf (default: "
+                                                         "all configured).")] = None,
     days: Annotated[int | None, typer.Option("--days", help="How far back (default tailpipe.collect_days).")] = None,
     config: ConfigOpt = None,
     sets: SetOpt = None,
@@ -118,6 +126,9 @@ def status(config: ConfigOpt = None, sets: SetOpt = None) -> None:
     run = tailpipe_runner(exe, timeout=120) if exe else None
     for k, table in tp.KINDS.items():
         rows, lo, hi = "", "", ""
+        if not have.get(k):
+            t.add_row(tp.LABELS[k], "0", "[dim]not configured[/]", "", "")
+            continue
         if run:
             try:
                 r = run(f"select count(*) as n, min(tp_date) as lo, max(tp_date) as hi from {table}")[0]
