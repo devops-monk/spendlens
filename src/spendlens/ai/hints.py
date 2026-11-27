@@ -79,6 +79,35 @@ def command_for(tool: str, a: dict[str, Any], source: str = "last") -> str | Non
         return _cloudtrail(a)
     if tool == "export_query":
         return _export(a)
+    if tool == "security_findings":
+        if a.get("image"):
+            base = f"spendlens security image {_q(a['image'])}"
+        elif a.get("function"):
+            base = f"spendlens security lambda {_q(a['function'])}"
+        elif a.get("instance"):
+            base = f"spendlens security instance {_q(a['instance'])}"
+        elif a.get("resource"):
+            base = f"spendlens security resource {_q(a['resource'])}"
+        elif a.get("sources") == ["detections"]:
+            return "spendlens security detections" + (f" --days {int(a['days'])}" if a.get("days") else "")
+        else:
+            base = "spendlens security findings"
+            if a.get("resource_type"):
+                base += f" --type {_q(a['resource_type'])}"
+            for k in ("cve", "package", "region"):
+                if a.get(k):
+                    base += f" --{k} {_q(a[k])}"
+            if a.get("exploitable"):
+                base += " --exploitable"
+            for src in a.get("sources") or []:
+                base += f" --source {_q(src)}"
+        if a.get("min_severity") and a["min_severity"].upper() != "LOW":
+            base += f" --severity {a['min_severity'].lower()}"
+        if a.get("fixable") and not (a.get("instance") or a.get("resource")):
+            base += " --fixable"  # instance and resource show every finding
+        return base
+    if tool == "security_status":
+        return "spendlens security status"
     if tool == "tailpipe_query":
         return f"tailpipe query {_sql(a['sql'])}" if a.get("sql") else None
     if tool == "history_query":

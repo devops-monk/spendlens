@@ -110,6 +110,14 @@ SECTIONS: list[tuple[str, str, str, list[tuple[str, str, str]]]] = [
         ("Set up Tailpipe for CloudTrail, flow logs and the CUR", "spendlens tailpipe init", "aws"),
         ("Collect them from S3", "spendlens tailpipe collect", "aws"),
     ]),
+    ("security", "Security", "Vulnerabilities, threats and a CI gate, from AWS's own security services. Read-only.", [
+        ("Every finding, worst first", "spendlens security findings --severity high", "aws"),
+        ("Is this image vulnerable?", "spendlens security image payments-api:1.4.2", "aws"),
+        ("Patch these first", "spendlens security findings --fixable --exploitable", "aws"),
+        ("Threat detections on collected logs", "spendlens security detections --days 7", "offline"),
+        ("Which security services are on", "spendlens security status", "aws"),
+        ("Fail CI on critical findings", "spendlens security gate --image payments-api:1.4.2", "aws"),
+    ]),
     ("files", "Files in, files out", "The assistant reads files you give it and writes the files you ask for.", [
         ("An Excel export (written to ./spendlens-output)", "spendlens ask \"Export idle resources with their cost to Excel\"", "aws"),
         ("A Word summary", "spendlens ask \"Write a one-page Word summary of this month's top savings\"", "aws"),

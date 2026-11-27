@@ -123,6 +123,18 @@ AWS Cost Optimization Hub, Savings Plan and RI coverage, and spendlens's own fin
 
 ![Executive brief](https://spendlens.devops-monk.com/static/shots/brief-light.webp)
 
+### Security guardrails
+`spendlens security` gathers what AWS's own security services know into one list, worst first, read-only. It covers vulnerabilities in ECR images, Lambda functions and EC2 instances (Amazon Inspector, ECR scanning), threats (GuardDuty), standards findings (Security Hub) and public access (IAM Access Analyzer). It also runs 98 MITRE-mapped detections on the logs Tailpipe collected. `security gate` exits 1 when a guardrail in `finops.yaml` is broken, for CI before a deploy.
+
+```bash
+docker run --rm -v ~/.aws:/home/finops/.aws:ro -e AWS_PROFILE -e AWS_REGION \
+  abhaypratap/spendlens security image payments-api:1.4.2 --severity high
+docker run --rm -v ~/.aws:/home/finops/.aws:ro -e AWS_PROFILE -e AWS_REGION \
+  abhaypratap/spendlens security gate --image payments-api:1.4.2 --fail-on high
+```
+
+Guide: [spendlens.devops-monk.com/docs/security](https://spendlens.devops-monk.com/docs/security/).
+
 ### CloudTrail: who did what, when
 `spendlens cloudtrail events` searches CloudTrail with any filter: a time range or exact dates, user or role, API calls (with `*` wildcards), service, resource, resource type, access key, source IP or CIDR, error codes, reads or writes, region. Presets cover console logins, deletes, deployments, security groups, IAM, access denied, errors and the root user. `cloudtrail summary` breaks the same events down by who, API call, service, source IP, error and day. Both export to CSV, Excel, JSON, JSON Lines, Markdown, HTML or YAML. `spendlens changes` is the short form for write events, and the AI assistant answers the same questions in plain English.
 
@@ -194,7 +206,7 @@ Add `--fresh` to `ask` or `brief` to skip the cache once.
 
 | | |
 |---|---|
-| **Tags** | `latest`, `0.4.10`, `0.4` (plus `sha-<commit>` per build) |
+| **Tags** | `latest`, `0.4.11`, `0.4` (plus `sha-<commit>` per build) |
 | **Platforms** | `linux/amd64` and `linux/arm64` (Graviton, Apple silicon), each built natively and smoke-tested |
 | **License** | spendlens: Apache-2.0. The image also contains Steampipe, Powerpipe and Tailpipe (AGPL-3.0, unmodified) and their AWS plugins (Apache-2.0); see `/usr/share/doc/spendlens/NOTICE` |
 | **User** | `finops` (uid 10001). Steampipe refuses to run as root |
@@ -217,7 +229,7 @@ If you bind-mount `/work` or `/data` on Linux, they must be writable by uid 1000
 ```yaml
 # GitLab
 spendlens:
-  image: { name: abhaypratap/spendlens:0.4.10, entrypoint: [""] }
+  image: { name: abhaypratap/spendlens:0.4.11, entrypoint: [""] }
   script:
     - spendlens-entrypoint report --out reports
     # report has just run every check: post from those saved runs, no second round of AWS calls

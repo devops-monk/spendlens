@@ -25,8 +25,11 @@ spendlens sources --json     # for scripts
 | Data | Sources, best first | Notes |
 |---|---|---|
 | **CloudTrail events** | Tailpipe → the trail's CloudWatch Logs → LookupEvents | Tailpipe only when its collected logs cover the time window you asked about; otherwise straight from AWS. `--source` on `spendlens cloudtrail` picks one |
-| **Resource costs** (graph, cleanup savings) | The CUR through Tailpipe → Cost Explorer resource data → price book | `graph.cost_source`: `auto`, `cur` or `estimate` |
+| **Resource costs** (graph, cleanup savings) | The CUR (or a FOCUS export) through Tailpipe → Cost Explorer resource data → price book | `graph.cost_source`: `auto`, `cur` or `estimate` |
 | **VPC flow logs** | Tailpipe | No Steampipe equivalent: `graph traffic` needs Tailpipe |
+| **Security findings** | Inspector, ECR scanning, Security Hub, GuardDuty, Access Analyzer (Steampipe, live) → log detections (Tailpipe, local) | A service that is off is reported as unavailable, never as "no findings" ([Security guardrails](../security/)) |
+| **Who uses a bucket or load balancer** | Tailpipe (S3 and load balancer access logs) | `unused buckets` / `unused load-balancers`; without logs a resource is "unknown", never "unused" |
+| **Savings recommendations over time** | Tailpipe (Cost Optimization Hub export) | `savings history`; today's recommendations come live from `savings hub` |
 | **Everything else** | Steampipe | Regions and accounts come from the Steampipe connection (see [Multi-account](../multi-account/)) |
 
 **Tailpipe is used automatically only when it can help.** It must be enabled (`tailpipe.enabled`, on by default), installed, and have sources configured, either by `spendlens tailpipe init` or by your own `.tpc` files. If it isn't, spendlens uses the Steampipe tables as usual. To turn Tailpipe off everywhere:

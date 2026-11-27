@@ -2,6 +2,25 @@
 
 What changed in each spendlens release, newest first. Upgrade with the [installer](https://spendlens.devops-monk.com/docs/getting-started/) or `docker pull abhaypratap/spendlens:latest`.
 
+## 0.4.11
+
+- **Security guardrails: `spendlens security`.** It gathers vulnerabilities, threats and risky configuration from AWS's own security services into one list, worst first. Read-only.
+  - **Sources:** Amazon Inspector (CVEs in ECR images, Lambda functions and EC2 instances, with the fixed version, fix and exploit flags, EPSS and score), ECR basic scanning, Security Hub, GuardDuty and IAM Access Analyzer.
+  - **Commands:** `findings`, `image`, `lambda`, `instance`, `resource`, `summary`, `status`, `detections` and `gate`.
+  - **The gate:** exits 1 when a guardrail in `finops.yaml` `security:` is broken (a severity, a fix deadline, an expired exception or a required service that is off), for CI before a deploy.
+  - **Trustworthy results:** a service that is off is reported, never read as "no findings", and Security Hub's copies of Inspector and GuardDuty findings aren't counted twice.
+  - **History:** runs are saved, so `history diff` shows new and resolved findings.
+- **98 log detections.** Turbot's official Tailpipe detection mods are bundled and pinned (CloudTrail 86, S3 access logs 6, VPC flow logs 6, MITRE ATT&CK mapped). `spendlens security detections` runs them on the logs Tailpipe collected, locally. Each hit shows the actor, source IP and time.
+- **The AI answers security questions** with `security_findings` and `security_status`, and lists the matching `spendlens security` commands after each answer.
+- **Tailpipe, used to the full:**
+  - **12 kinds of data:** CUR 2.0, FOCUS, Cost Optimization Hub recommendations, S3 / ALB / NLB / Classic LB access logs, GuardDuty and Security Hub findings, and WAF logs, besides CloudTrail and VPC flow logs.
+  - **CloudWatch Logs as a source** for CloudTrail, flow logs and WAF, with no S3 access needed.
+  - **Discovery:** `tailpipe init` finds all of these, read-only.
+  - **The AI** can query every Tailpipe AWS table.
+- **`spendlens unused buckets` and `unused load-balancers`:** resources nobody used in the window, from their access logs. Without logs they're "unknown", never "unused".
+- **`spendlens savings history`:** AWS's savings recommendations over time, and the ones left open longest.
+- **Billed costs from a FOCUS export** when the account has no CUR 2.0.
+
 ## 0.4.10
 
 - **Next time, without the AI.** After each answer, `spendlens ask` lists the commands that get the same data without the AI: `spendlens query`, `spendlens cloudtrail events` with the same filters, the graph commands and more. They're built from the tool calls that answered, so they run exactly the same query, with no tokens. `--no-hints` or `llm.command_hints: false` turns it off; `--json` has them as `cli_commands`.

@@ -44,6 +44,12 @@ preset covers common questions (console-logins, deletes, deployments, security-g
 root). When the question implies an action, pass the event names rather than a service alone (much faster without \
 Tailpipe). Name the people or roles, the API calls, the times (UTC) and the source; if partial, say how far back it \
 covered. To hand the events over as a file, write_file with its result_id.
+- Security questions (vulnerabilities, CVEs, "is this image / Lambda / instance safe", exploits, threats, public \
+access, "what should we patch first"): call security_findings with the scope the question names (image, function, \
+instance, resource, cve, package, min_severity, fixable, exploitable). Rank by severity, then known exploit, then \
+fix available. Name the CVE, package, fixed version and resource. If a source is listed as unavailable, say so (a \
+service that is off finds nothing): security_status shows which services are on. Never call something secure \
+because no findings came back from a source that could not be read.
 - "Which service was deployed last / when was X deployed": the current state answers it without CloudTrail. ECS: \
 aws_ecs_service.deployments (JSON array; each has CreatedAt, UpdatedAt, Status, RolloutState, TaskDefinition), \
 expanded with jsonb_array_elements. Lambda: aws_lambda_function.last_modified. Then cloudtrail_events with the \

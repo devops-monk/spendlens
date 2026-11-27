@@ -73,6 +73,7 @@ BUILTIN_FEATURES: tuple[str, ...] = (
     "spendlens.features.cloudtrail_cmd",
     "spendlens.features.sources_cmd",
     "spendlens.features.unused_cmd",
+    "spendlens.features.security_cmd",
 )
 
 
@@ -138,7 +139,7 @@ class Registry:
 PANELS: dict[str, list[str]] = {
     "Save money": ["waste", "rightsize", "unused", "savings", "graph"],
     "Understand spend": ["cost", "anomalies", "forecast"],
-    "Govern and audit": ["tags", "cloudtrail", "changes", "find"],
+    "Govern and audit": ["tags", "security", "cloudtrail", "changes", "find"],
     "Ask": ["ask", "session"],
     "Reports and notifications": ["report", "review", "brief", "dashboard", "open", "notify", "history"],
     "Data sources": ["sources", "query", "schema", "tailpipe", "cache"],

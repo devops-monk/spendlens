@@ -1,0 +1,1712 @@
+{
+ "name": "root_result_group",
+ "title": "S3 Server Access Log Detections",
+ "summary": {
+  "count": 0
+ },
+ "groups": [
+  {
+   "name": "aws_s3_server_access_log_detections.benchmark.s3_server_access_log_detections",
+   "title": "S3 Server Access Log Detections",
+   "description": "This benchmark contains recommendations when scanning S3 server access logs.",
+   "tags": {
+    "category": "Detections",
+    "folder": "S3",
+    "plugin": "aws",
+    "service": "AWS/S3",
+    "type": "Benchmark"
+   },
+   "summary": {
+    "count": 0
+   },
+   "groups": [],
+   "detection_runs": [
+    {
+     "dashboard": "aws_s3_server_access_log_detections.benchmark.s3_server_access_log_detections",
+     "name": "aws_s3_server_access_log_detections.detection.s3_bucket_accessed_using_insecure_tls_version",
+     "panel_type": "detection",
+     "status": "complete",
+     "tags": {
+      "category": "Detections",
+      "folder": "S3",
+      "mitre_attack_ids": "TA0001:T1078",
+      "plugin": "aws",
+      "service": "AWS/S3"
+     },
+     "title": "S3 Bucket Accessed Using Insecure TLS Version",
+     "properties": {
+      "display_columns": [
+       "timestamp",
+       "operation",
+       "resource",
+       "actor",
+       "source_ip",
+       "account_id",
+       "source_id",
+       "http_status",
+       "error_code"
+      ],
+      "name": "s3_bucket_accessed_using_insecure_tls_version",
+      "severity": "medium"
+     },
+     "data": {
+      "columns": [
+       {
+        "name": "timestamp",
+        "data_type": "TIMESTAMP"
+       },
+       {
+        "name": "operation",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "resource",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "actor",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "source_ip",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "account_id",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "source_id",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "http_status",
+        "data_type": "BIGINT"
+       },
+       {
+        "name": "error_code",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "access_point_arn",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "acl_required",
+        "data_type": "BOOLEAN"
+       },
+       {
+        "name": "authentication_type",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "bucket",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "bucket_owner",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "bytes_sent",
+        "data_type": "BIGINT"
+       },
+       {
+        "name": "cipher_suite",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "error_code_8tts",
+        "data_type": "VARCHAR",
+        "original_name": "error_code"
+       },
+       {
+        "name": "host_header",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "host_id",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "http_status_b13y",
+        "data_type": "BIGINT",
+        "original_name": "http_status"
+       },
+       {
+        "name": "key",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "object_size",
+        "data_type": "BIGINT"
+       },
+       {
+        "name": "operation_j9s5",
+        "data_type": "VARCHAR",
+        "original_name": "operation"
+       },
+       {
+        "name": "referer",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "remote_ip",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "request_id",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "request_uri",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "requester",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "signature_version",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "timestamp_acbd",
+        "data_type": "TIMESTAMP",
+        "original_name": "timestamp"
+       },
+       {
+        "name": "tls_version",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "total_time",
+        "data_type": "BIGINT"
+       },
+       {
+        "name": "turn_around_time",
+        "data_type": "BIGINT"
+       },
+       {
+        "name": "user_agent",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "version_id",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "tp_akas",
+        "data_type": "VARCHAR[]"
+       },
+       {
+        "name": "tp_date",
+        "data_type": "DATE"
+       },
+       {
+        "name": "tp_destination_ip",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "tp_domains",
+        "data_type": "VARCHAR[]"
+       },
+       {
+        "name": "tp_emails",
+        "data_type": "VARCHAR[]"
+       },
+       {
+        "name": "tp_id",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "tp_index",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "tp_ingest_timestamp",
+        "data_type": "TIMESTAMP"
+       },
+       {
+        "name": "tp_ips",
+        "data_type": "VARCHAR[]"
+       },
+       {
+        "name": "tp_partition",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "tp_source_ip",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "tp_source_location",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "tp_source_name",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "tp_source_type",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "tp_table",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "tp_tags",
+        "data_type": "VARCHAR[]"
+       },
+       {
+        "name": "tp_timestamp",
+        "data_type": "TIMESTAMP"
+       },
+       {
+        "name": "tp_usernames",
+        "data_type": "VARCHAR[]"
+       }
+      ],
+      "rows": []
+     }
+    },
+    {
+     "dashboard": "aws_s3_server_access_log_detections.benchmark.s3_server_access_log_detections",
+     "name": "aws_s3_server_access_log_detections.detection.s3_object_accessed_outside_business_hours",
+     "panel_type": "detection",
+     "status": "complete",
+     "tags": {
+      "category": "Detections",
+      "folder": "S3",
+      "mitre_attack_ids": "TA0006:T1078",
+      "plugin": "aws",
+      "service": "AWS/S3"
+     },
+     "title": "S3 Object Accessed Outside Business Hours",
+     "properties": {
+      "display_columns": [
+       "timestamp",
+       "operation",
+       "resource",
+       "actor",
+       "source_ip",
+       "account_id",
+       "source_id",
+       "http_status",
+       "error_code"
+      ],
+      "name": "s3_object_accessed_outside_business_hours",
+      "severity": "low"
+     },
+     "data": {
+      "columns": [
+       {
+        "name": "timestamp",
+        "data_type": "TIMESTAMP"
+       },
+       {
+        "name": "operation",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "resource",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "actor",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "source_ip",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "account_id",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "source_id",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "http_status",
+        "data_type": "BIGINT"
+       },
+       {
+        "name": "error_code",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "access_point_arn",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "acl_required",
+        "data_type": "BOOLEAN"
+       },
+       {
+        "name": "authentication_type",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "bucket",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "bucket_owner",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "bytes_sent",
+        "data_type": "BIGINT"
+       },
+       {
+        "name": "cipher_suite",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "error_code_8tts",
+        "data_type": "VARCHAR",
+        "original_name": "error_code"
+       },
+       {
+        "name": "host_header",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "host_id",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "http_status_b13y",
+        "data_type": "BIGINT",
+        "original_name": "http_status"
+       },
+       {
+        "name": "key",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "object_size",
+        "data_type": "BIGINT"
+       },
+       {
+        "name": "operation_j9s5",
+        "data_type": "VARCHAR",
+        "original_name": "operation"
+       },
+       {
+        "name": "referer",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "remote_ip",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "request_id",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "request_uri",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "requester",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "signature_version",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "timestamp_acbd",
+        "data_type": "TIMESTAMP",
+        "original_name": "timestamp"
+       },
+       {
+        "name": "tls_version",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "total_time",
+        "data_type": "BIGINT"
+       },
+       {
+        "name": "turn_around_time",
+        "data_type": "BIGINT"
+       },
+       {
+        "name": "user_agent",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "version_id",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "tp_akas",
+        "data_type": "VARCHAR[]"
+       },
+       {
+        "name": "tp_date",
+        "data_type": "DATE"
+       },
+       {
+        "name": "tp_destination_ip",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "tp_domains",
+        "data_type": "VARCHAR[]"
+       },
+       {
+        "name": "tp_emails",
+        "data_type": "VARCHAR[]"
+       },
+       {
+        "name": "tp_id",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "tp_index",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "tp_ingest_timestamp",
+        "data_type": "TIMESTAMP"
+       },
+       {
+        "name": "tp_ips",
+        "data_type": "VARCHAR[]"
+       },
+       {
+        "name": "tp_partition",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "tp_source_ip",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "tp_source_location",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "tp_source_name",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "tp_source_type",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "tp_table",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "tp_tags",
+        "data_type": "VARCHAR[]"
+       },
+       {
+        "name": "tp_timestamp",
+        "data_type": "TIMESTAMP"
+       },
+       {
+        "name": "tp_usernames",
+        "data_type": "VARCHAR[]"
+       }
+      ],
+      "rows": []
+     }
+    },
+    {
+     "dashboard": "aws_s3_server_access_log_detections.benchmark.s3_server_access_log_detections",
+     "name": "aws_s3_server_access_log_detections.detection.s3_object_accessed_using_insecure_tls_version",
+     "panel_type": "detection",
+     "status": "complete",
+     "tags": {
+      "category": "Detections",
+      "folder": "S3",
+      "mitre_attack_ids": "TA0001:T1078",
+      "plugin": "aws",
+      "service": "AWS/S3"
+     },
+     "title": "S3 Object Accessed Using Insecure TLS Version",
+     "properties": {
+      "display_columns": [
+       "timestamp",
+       "operation",
+       "resource",
+       "actor",
+       "source_ip",
+       "account_id",
+       "source_id",
+       "http_status",
+       "error_code"
+      ],
+      "name": "s3_object_accessed_using_insecure_tls_version",
+      "severity": "medium"
+     },
+     "data": {
+      "columns": [
+       {
+        "name": "timestamp",
+        "data_type": "TIMESTAMP"
+       },
+       {
+        "name": "operation",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "resource",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "actor",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "source_ip",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "account_id",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "source_id",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "http_status",
+        "data_type": "BIGINT"
+       },
+       {
+        "name": "error_code",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "access_point_arn",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "acl_required",
+        "data_type": "BOOLEAN"
+       },
+       {
+        "name": "authentication_type",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "bucket",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "bucket_owner",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "bytes_sent",
+        "data_type": "BIGINT"
+       },
+       {
+        "name": "cipher_suite",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "error_code_8tts",
+        "data_type": "VARCHAR",
+        "original_name": "error_code"
+       },
+       {
+        "name": "host_header",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "host_id",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "http_status_b13y",
+        "data_type": "BIGINT",
+        "original_name": "http_status"
+       },
+       {
+        "name": "key",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "object_size",
+        "data_type": "BIGINT"
+       },
+       {
+        "name": "operation_j9s5",
+        "data_type": "VARCHAR",
+        "original_name": "operation"
+       },
+       {
+        "name": "referer",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "remote_ip",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "request_id",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "request_uri",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "requester",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "signature_version",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "timestamp_acbd",
+        "data_type": "TIMESTAMP",
+        "original_name": "timestamp"
+       },
+       {
+        "name": "tls_version",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "total_time",
+        "data_type": "BIGINT"
+       },
+       {
+        "name": "turn_around_time",
+        "data_type": "BIGINT"
+       },
+       {
+        "name": "user_agent",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "version_id",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "tp_akas",
+        "data_type": "VARCHAR[]"
+       },
+       {
+        "name": "tp_date",
+        "data_type": "DATE"
+       },
+       {
+        "name": "tp_destination_ip",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "tp_domains",
+        "data_type": "VARCHAR[]"
+       },
+       {
+        "name": "tp_emails",
+        "data_type": "VARCHAR[]"
+       },
+       {
+        "name": "tp_id",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "tp_index",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "tp_ingest_timestamp",
+        "data_type": "TIMESTAMP"
+       },
+       {
+        "name": "tp_ips",
+        "data_type": "VARCHAR[]"
+       },
+       {
+        "name": "tp_partition",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "tp_source_ip",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "tp_source_location",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "tp_source_name",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "tp_source_type",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "tp_table",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "tp_tags",
+        "data_type": "VARCHAR[]"
+       },
+       {
+        "name": "tp_timestamp",
+        "data_type": "TIMESTAMP"
+       },
+       {
+        "name": "tp_usernames",
+        "data_type": "VARCHAR[]"
+       }
+      ],
+      "rows": [
+       {
+        "access_point_arn": null,
+        "account_id": "default",
+        "acl_required": null,
+        "actor": "arn:aws:iam::123456789012:user/alice",
+        "authentication_type": "AuthHeader",
+        "bucket": "awsexamplebucket1",
+        "bucket_owner": "79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be",
+        "bytes_sent": 113,
+        "cipher_suite": "TLS_AES_128_GCM_SHA256",
+        "error_code": null,
+        "error_code_8tts": null,
+        "host_header": "awsexamplebucket1.s3.us-west-1.amazonaws.com",
+        "host_id": "s9lzHYrFp76ZVxRcpX9+5cjAnEH2ROuNkd2BHfIa6UkFVdtjf5mKR3/eTPFvsiP/XV/VLi31234=",
+        "http_status": 200,
+        "http_status_b13y": 200,
+        "key": "secret.txt",
+        "object_size": 113,
+        "operation": "REST.GET.OBJECT",
+        "operation_j9s5": "REST.GET.OBJECT",
+        "referer": null,
+        "remote_ip": "192.0.2.3",
+        "request_id": "3E57427F3EXAMPLE",
+        "request_uri": "GET /awsexamplebucket1/secret.txt HTTP/1.1",
+        "requester": "arn:aws:iam::123456789012:user/alice",
+        "resource": "awsexamplebucket1",
+        "signature_version": "SigV4",
+        "source_id": "dc4gpp2hsmg61jiik0gg",
+        "source_ip": "192.0.2.3",
+        "timestamp": "2026-11-26T10:00:00Z",
+        "timestamp_acbd": "2026-11-26T10:00:00Z",
+        "tls_version": "TLSv1.1",
+        "total_time": 7,
+        "tp_akas": null,
+        "tp_date": "2026-11-26T00:00:00Z",
+        "tp_destination_ip": null,
+        "tp_domains": null,
+        "tp_emails": null,
+        "tp_id": "dc4gpp2hsmg61jiik0gg",
+        "tp_index": "default",
+        "tp_ingest_timestamp": "2026-11-27T04:53:56.231053Z",
+        "tp_ips": [
+         "192.0.2.3"
+        ],
+        "tp_partition": "test",
+        "tp_source_ip": "192.0.2.3",
+        "tp_source_location": "/private/tmp/claude-501/-Users-abhaypratapsingh-Documents-Personal-my-work-cost-and-finops-analysis/cb3542f9-f6bf-474f-9f57-d02bc9fe7c68/scratchpad/tp-test/logs/2026-11-26-10-00-00-ABC.log",
+        "tp_source_name": null,
+        "tp_source_type": "file",
+        "tp_table": "aws_s3_server_access_log",
+        "tp_tags": null,
+        "tp_timestamp": "2026-11-26T10:00:00Z",
+        "tp_usernames": [
+         "arn:aws:iam::123456789012:user/alice",
+         "79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be"
+        ],
+        "turn_around_time": 6,
+        "user_agent": "curl/7.79",
+        "version_id": null
+       }
+      ]
+     }
+    },
+    {
+     "dashboard": "aws_s3_server_access_log_detections.benchmark.s3_server_access_log_detections",
+     "name": "aws_s3_server_access_log_detections.detection.s3_object_accessed_using_suspicious_user_agent",
+     "panel_type": "detection",
+     "status": "complete",
+     "tags": {
+      "category": "Detections",
+      "folder": "S3",
+      "mitre_attack_ids": "TA0011:T1071.001,TA0009:T1119",
+      "plugin": "aws",
+      "service": "AWS/S3"
+     },
+     "title": "S3 Object Accessed Using Suspicious User-Agent",
+     "properties": {
+      "display_columns": [
+       "timestamp",
+       "operation",
+       "resource",
+       "actor",
+       "source_ip",
+       "account_id",
+       "source_id",
+       "http_status",
+       "error_code"
+      ],
+      "name": "s3_object_accessed_using_suspicious_user_agent",
+      "severity": "medium"
+     },
+     "data": {
+      "columns": [
+       {
+        "name": "timestamp",
+        "data_type": "TIMESTAMP"
+       },
+       {
+        "name": "operation",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "resource",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "actor",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "source_ip",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "account_id",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "source_id",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "http_status",
+        "data_type": "BIGINT"
+       },
+       {
+        "name": "error_code",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "access_point_arn",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "acl_required",
+        "data_type": "BOOLEAN"
+       },
+       {
+        "name": "authentication_type",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "bucket",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "bucket_owner",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "bytes_sent",
+        "data_type": "BIGINT"
+       },
+       {
+        "name": "cipher_suite",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "error_code_8tts",
+        "data_type": "VARCHAR",
+        "original_name": "error_code"
+       },
+       {
+        "name": "host_header",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "host_id",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "http_status_b13y",
+        "data_type": "BIGINT",
+        "original_name": "http_status"
+       },
+       {
+        "name": "key",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "object_size",
+        "data_type": "BIGINT"
+       },
+       {
+        "name": "operation_j9s5",
+        "data_type": "VARCHAR",
+        "original_name": "operation"
+       },
+       {
+        "name": "referer",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "remote_ip",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "request_id",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "request_uri",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "requester",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "signature_version",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "timestamp_acbd",
+        "data_type": "TIMESTAMP",
+        "original_name": "timestamp"
+       },
+       {
+        "name": "tls_version",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "total_time",
+        "data_type": "BIGINT"
+       },
+       {
+        "name": "turn_around_time",
+        "data_type": "BIGINT"
+       },
+       {
+        "name": "user_agent",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "version_id",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "tp_akas",
+        "data_type": "VARCHAR[]"
+       },
+       {
+        "name": "tp_date",
+        "data_type": "DATE"
+       },
+       {
+        "name": "tp_destination_ip",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "tp_domains",
+        "data_type": "VARCHAR[]"
+       },
+       {
+        "name": "tp_emails",
+        "data_type": "VARCHAR[]"
+       },
+       {
+        "name": "tp_id",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "tp_index",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "tp_ingest_timestamp",
+        "data_type": "TIMESTAMP"
+       },
+       {
+        "name": "tp_ips",
+        "data_type": "VARCHAR[]"
+       },
+       {
+        "name": "tp_partition",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "tp_source_ip",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "tp_source_location",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "tp_source_name",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "tp_source_type",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "tp_table",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "tp_tags",
+        "data_type": "VARCHAR[]"
+       },
+       {
+        "name": "tp_timestamp",
+        "data_type": "TIMESTAMP"
+       },
+       {
+        "name": "tp_usernames",
+        "data_type": "VARCHAR[]"
+       }
+      ],
+      "rows": [
+       {
+        "access_point_arn": null,
+        "account_id": "default",
+        "acl_required": null,
+        "actor": null,
+        "authentication_type": "AuthHeader",
+        "bucket": "awsexamplebucket1",
+        "bucket_owner": "79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be",
+        "bytes_sent": 243,
+        "cipher_suite": "TLS_AES_128_GCM_SHA256",
+        "error_code": "AccessDenied",
+        "error_code_8tts": "AccessDenied",
+        "host_header": "awsexamplebucket1.s3.us-west-1.amazonaws.com",
+        "host_id": "s9lzHYrFp76ZVxRcpX9+5cjAnEH2ROuNkd2BHfIa6UkFVdtjf5mKR3/eTPFvsiP/XV/VLi31235=",
+        "http_status": 403,
+        "http_status_b13y": 403,
+        "key": "public.txt",
+        "object_size": null,
+        "operation": "REST.GET.OBJECT",
+        "operation_j9s5": "REST.GET.OBJECT",
+        "referer": null,
+        "remote_ip": "198.51.100.9",
+        "request_id": "3E57427F3EXAMPLF",
+        "request_uri": "GET /awsexamplebucket1/public.txt HTTP/1.1",
+        "requester": null,
+        "resource": "awsexamplebucket1",
+        "signature_version": "SigV4",
+        "source_id": "dc4gpp2hsmg61jiik0h0",
+        "source_ip": "198.51.100.9",
+        "timestamp": "2026-11-26T10:05:00Z",
+        "timestamp_acbd": "2026-11-26T10:05:00Z",
+        "tls_version": "TLSv1.2",
+        "total_time": 7,
+        "tp_akas": null,
+        "tp_date": "2026-11-26T00:00:00Z",
+        "tp_destination_ip": null,
+        "tp_domains": null,
+        "tp_emails": null,
+        "tp_id": "dc4gpp2hsmg61jiik0h0",
+        "tp_index": "default",
+        "tp_ingest_timestamp": "2026-11-27T04:53:56.231065Z",
+        "tp_ips": [
+         "198.51.100.9"
+        ],
+        "tp_partition": "test",
+        "tp_source_ip": "198.51.100.9",
+        "tp_source_location": "/private/tmp/claude-501/-Users-abhaypratapsingh-Documents-Personal-my-work-cost-and-finops-analysis/cb3542f9-f6bf-474f-9f57-d02bc9fe7c68/scratchpad/tp-test/logs/2026-11-26-10-00-00-ABC.log",
+        "tp_source_name": null,
+        "tp_source_type": "file",
+        "tp_table": "aws_s3_server_access_log",
+        "tp_tags": null,
+        "tp_timestamp": "2026-11-26T10:05:00Z",
+        "tp_usernames": [
+         "",
+         "79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be"
+        ],
+        "turn_around_time": null,
+        "user_agent": "curl/7.79",
+        "version_id": null
+       },
+       {
+        "access_point_arn": null,
+        "account_id": "default",
+        "acl_required": null,
+        "actor": "arn:aws:iam::123456789012:user/alice",
+        "authentication_type": "AuthHeader",
+        "bucket": "awsexamplebucket1",
+        "bucket_owner": "79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be",
+        "bytes_sent": 113,
+        "cipher_suite": "TLS_AES_128_GCM_SHA256",
+        "error_code": null,
+        "error_code_8tts": null,
+        "host_header": "awsexamplebucket1.s3.us-west-1.amazonaws.com",
+        "host_id": "s9lzHYrFp76ZVxRcpX9+5cjAnEH2ROuNkd2BHfIa6UkFVdtjf5mKR3/eTPFvsiP/XV/VLi31234=",
+        "http_status": 200,
+        "http_status_b13y": 200,
+        "key": "secret.txt",
+        "object_size": 113,
+        "operation": "REST.GET.OBJECT",
+        "operation_j9s5": "REST.GET.OBJECT",
+        "referer": null,
+        "remote_ip": "192.0.2.3",
+        "request_id": "3E57427F3EXAMPLE",
+        "request_uri": "GET /awsexamplebucket1/secret.txt HTTP/1.1",
+        "requester": "arn:aws:iam::123456789012:user/alice",
+        "resource": "awsexamplebucket1",
+        "signature_version": "SigV4",
+        "source_id": "dc4gpp2hsmg61jiik0gg",
+        "source_ip": "192.0.2.3",
+        "timestamp": "2026-11-26T10:00:00Z",
+        "timestamp_acbd": "2026-11-26T10:00:00Z",
+        "tls_version": "TLSv1.1",
+        "total_time": 7,
+        "tp_akas": null,
+        "tp_date": "2026-11-26T00:00:00Z",
+        "tp_destination_ip": null,
+        "tp_domains": null,
+        "tp_emails": null,
+        "tp_id": "dc4gpp2hsmg61jiik0gg",
+        "tp_index": "default",
+        "tp_ingest_timestamp": "2026-11-27T04:53:56.231053Z",
+        "tp_ips": [
+         "192.0.2.3"
+        ],
+        "tp_partition": "test",
+        "tp_source_ip": "192.0.2.3",
+        "tp_source_location": "/private/tmp/claude-501/-Users-abhaypratapsingh-Documents-Personal-my-work-cost-and-finops-analysis/cb3542f9-f6bf-474f-9f57-d02bc9fe7c68/scratchpad/tp-test/logs/2026-11-26-10-00-00-ABC.log",
+        "tp_source_name": null,
+        "tp_source_type": "file",
+        "tp_table": "aws_s3_server_access_log",
+        "tp_tags": null,
+        "tp_timestamp": "2026-11-26T10:00:00Z",
+        "tp_usernames": [
+         "arn:aws:iam::123456789012:user/alice",
+         "79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be"
+        ],
+        "turn_around_time": 6,
+        "user_agent": "curl/7.79",
+        "version_id": null
+       }
+      ]
+     }
+    },
+    {
+     "dashboard": "aws_s3_server_access_log_detections.benchmark.s3_server_access_log_detections",
+     "name": "aws_s3_server_access_log_detections.detection.s3_object_accessed_with_large_request_size",
+     "panel_type": "detection",
+     "status": "complete",
+     "tags": {
+      "category": "Detections",
+      "folder": "S3",
+      "mitre_attack_ids": "TA0010:T1030",
+      "plugin": "aws",
+      "service": "AWS/S3"
+     },
+     "title": "S3 Object Accessed with Large Request Size",
+     "properties": {
+      "display_columns": [
+       "timestamp",
+       "operation",
+       "resource",
+       "actor",
+       "source_ip",
+       "account_id",
+       "source_id",
+       "http_status",
+       "error_code"
+      ],
+      "name": "s3_object_accessed_with_large_request_size",
+      "severity": "low"
+     },
+     "data": {
+      "columns": [
+       {
+        "name": "timestamp",
+        "data_type": "TIMESTAMP"
+       },
+       {
+        "name": "operation",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "resource",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "actor",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "source_ip",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "account_id",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "source_id",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "http_status",
+        "data_type": "BIGINT"
+       },
+       {
+        "name": "error_code",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "access_point_arn",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "acl_required",
+        "data_type": "BOOLEAN"
+       },
+       {
+        "name": "authentication_type",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "bucket",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "bucket_owner",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "bytes_sent",
+        "data_type": "BIGINT"
+       },
+       {
+        "name": "cipher_suite",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "error_code_8tts",
+        "data_type": "VARCHAR",
+        "original_name": "error_code"
+       },
+       {
+        "name": "host_header",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "host_id",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "http_status_b13y",
+        "data_type": "BIGINT",
+        "original_name": "http_status"
+       },
+       {
+        "name": "key",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "object_size",
+        "data_type": "BIGINT"
+       },
+       {
+        "name": "operation_j9s5",
+        "data_type": "VARCHAR",
+        "original_name": "operation"
+       },
+       {
+        "name": "referer",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "remote_ip",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "request_id",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "request_uri",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "requester",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "signature_version",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "timestamp_acbd",
+        "data_type": "TIMESTAMP",
+        "original_name": "timestamp"
+       },
+       {
+        "name": "tls_version",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "total_time",
+        "data_type": "BIGINT"
+       },
+       {
+        "name": "turn_around_time",
+        "data_type": "BIGINT"
+       },
+       {
+        "name": "user_agent",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "version_id",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "tp_akas",
+        "data_type": "VARCHAR[]"
+       },
+       {
+        "name": "tp_date",
+        "data_type": "DATE"
+       },
+       {
+        "name": "tp_destination_ip",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "tp_domains",
+        "data_type": "VARCHAR[]"
+       },
+       {
+        "name": "tp_emails",
+        "data_type": "VARCHAR[]"
+       },
+       {
+        "name": "tp_id",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "tp_index",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "tp_ingest_timestamp",
+        "data_type": "TIMESTAMP"
+       },
+       {
+        "name": "tp_ips",
+        "data_type": "VARCHAR[]"
+       },
+       {
+        "name": "tp_partition",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "tp_source_ip",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "tp_source_location",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "tp_source_name",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "tp_source_type",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "tp_table",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "tp_tags",
+        "data_type": "VARCHAR[]"
+       },
+       {
+        "name": "tp_timestamp",
+        "data_type": "TIMESTAMP"
+       },
+       {
+        "name": "tp_usernames",
+        "data_type": "VARCHAR[]"
+       }
+      ],
+      "rows": []
+     }
+    },
+    {
+     "dashboard": "aws_s3_server_access_log_detections.benchmark.s3_server_access_log_detections",
+     "name": "aws_s3_server_access_log_detections.detection.s3_object_accessed_with_large_response_size",
+     "panel_type": "detection",
+     "status": "complete",
+     "tags": {
+      "category": "Detections",
+      "folder": "S3",
+      "mitre_attack_ids": "TA0010:T1030",
+      "plugin": "aws",
+      "service": "AWS/S3"
+     },
+     "title": "S3 Object Accessed with Large Response Size",
+     "properties": {
+      "display_columns": [
+       "timestamp",
+       "operation",
+       "resource",
+       "actor",
+       "source_ip",
+       "account_id",
+       "source_id",
+       "http_status",
+       "error_code"
+      ],
+      "name": "s3_object_accessed_with_large_response_size",
+      "severity": "low"
+     },
+     "data": {
+      "columns": [
+       {
+        "name": "timestamp",
+        "data_type": "TIMESTAMP"
+       },
+       {
+        "name": "operation",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "resource",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "actor",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "source_ip",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "account_id",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "source_id",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "http_status",
+        "data_type": "BIGINT"
+       },
+       {
+        "name": "error_code",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "access_point_arn",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "acl_required",
+        "data_type": "BOOLEAN"
+       },
+       {
+        "name": "authentication_type",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "bucket",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "bucket_owner",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "bytes_sent",
+        "data_type": "BIGINT"
+       },
+       {
+        "name": "cipher_suite",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "error_code_8tts",
+        "data_type": "VARCHAR",
+        "original_name": "error_code"
+       },
+       {
+        "name": "host_header",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "host_id",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "http_status_b13y",
+        "data_type": "BIGINT",
+        "original_name": "http_status"
+       },
+       {
+        "name": "key",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "object_size",
+        "data_type": "BIGINT"
+       },
+       {
+        "name": "operation_j9s5",
+        "data_type": "VARCHAR",
+        "original_name": "operation"
+       },
+       {
+        "name": "referer",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "remote_ip",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "request_id",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "request_uri",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "requester",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "signature_version",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "timestamp_acbd",
+        "data_type": "TIMESTAMP",
+        "original_name": "timestamp"
+       },
+       {
+        "name": "tls_version",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "total_time",
+        "data_type": "BIGINT"
+       },
+       {
+        "name": "turn_around_time",
+        "data_type": "BIGINT"
+       },
+       {
+        "name": "user_agent",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "version_id",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "tp_akas",
+        "data_type": "VARCHAR[]"
+       },
+       {
+        "name": "tp_date",
+        "data_type": "DATE"
+       },
+       {
+        "name": "tp_destination_ip",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "tp_domains",
+        "data_type": "VARCHAR[]"
+       },
+       {
+        "name": "tp_emails",
+        "data_type": "VARCHAR[]"
+       },
+       {
+        "name": "tp_id",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "tp_index",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "tp_ingest_timestamp",
+        "data_type": "TIMESTAMP"
+       },
+       {
+        "name": "tp_ips",
+        "data_type": "VARCHAR[]"
+       },
+       {
+        "name": "tp_partition",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "tp_source_ip",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "tp_source_location",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "tp_source_name",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "tp_source_type",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "tp_table",
+        "data_type": "VARCHAR"
+       },
+       {
+        "name": "tp_tags",
+        "data_type": "VARCHAR[]"
+       },
+       {
+        "name": "tp_timestamp",
+        "data_type": "TIMESTAMP"
+       },
+       {
+        "name": "tp_usernames",
+        "data_type": "VARCHAR[]"
+       }
+      ],
+      "rows": []
+     }
+    }
+   ],
+   "panel_type": "benchmark"
+  }
+ ],
+ "detection_runs": null,
+ "panel_type": "benchmark"
+}

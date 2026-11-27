@@ -39,8 +39,13 @@ only Describe, List, Get and Lookup calls, a read-only role, and read-only SQL. 
 <p align="center"><sub>One self-contained HTML report, shown with the bundled demo data.</sub></p>
 
 > [!NOTE]
-> v0.4.10. spendlens is tested end to end through Steampipe against an AWS emulator. Verification against a live
+> v0.4.11. spendlens is tested end to end through Steampipe against an AWS emulator. Verification against a live
 > account with a read-only role is next (see [PLAN.md](PLAN.md)).
+
+## New in 0.4.11
+
+- **Security guardrails:** `spendlens security` checks images, Lambda functions and instances for vulnerabilities (Amazon Inspector, ECR scanning), lists threats and findings (GuardDuty, Security Hub, Access Analyzer), runs 98 MITRE-mapped detections on your logs, and gates CI on your guardrails. Read-only.
+- **Tailpipe to the full:** 12 kinds of data, CloudWatch Logs as a source, `unused buckets` / `unused load-balancers`, `savings history`, FOCUS costs.
 
 ## New in 0.4.10
 

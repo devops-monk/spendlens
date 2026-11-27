@@ -33,3 +33,9 @@ TAILPIPE_AWS_PLUGIN_VERSION).
 
 Python dependencies installed in the image keep their own licenses, which are
 recorded in each package's metadata under site-packages.
+
+Tailpipe detection mods by Turbot (Apache-2.0), vendored unchanged in src/spendlens/detections/:
+  tailpipe-mod-aws-cloudtrail-log-detections v0.3.0  https://github.com/turbot/tailpipe-mod-aws-cloudtrail-log-detections
+  tailpipe-mod-aws-s3-server-access-log-detections v0.2.0  https://github.com/turbot/tailpipe-mod-aws-s3-server-access-log-detections
+  tailpipe-mod-aws-vpc-flow-log-detections v0.1.0  https://github.com/turbot/tailpipe-mod-aws-vpc-flow-log-detections
+  Each keeps its LICENSE file.

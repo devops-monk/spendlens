@@ -162,7 +162,28 @@ tailpipe:                      # spendlens tailpipe init/collect: CloudTrail log
   cloudtrail: []               # e.g. [{bucket: my-org-trail, prefix: AWSLogs/}]
   flow_logs: []
   cur: []                      # the CUR 2.0 export bucket, e.g. [{bucket: my-billing, prefix: cur2}]
+  focus: []                    # a FOCUS 1.0 export (used for billed costs when there is no CUR 2.0)
+  cost_recommendations: []     # a Cost Optimization Hub recommendations export (spendlens savings history)
+  s3_access_logs: []           # S3 server access logs (spendlens unused buckets, security detections)
+  alb_access_logs: []          # load balancer access logs (spendlens unused load-balancers)
+  nlb_access_logs: []
+  clb_access_logs: []
+  guardduty: []                # GuardDuty findings exported to S3 (long history)
+  securityhub: []              # Security Hub findings exported to S3 (e.g. through Firehose)
+  waf: []                      # WAF logs
+  cloudtrail_log_groups: []    # CloudWatch Logs instead of S3, e.g. [{name: aws-cloudtrail-logs, region: eu-west-1}]
+  flow_log_groups: []
+  waf_log_groups: []
   collect_days: 30             # how far back `spendlens tailpipe collect` goes
+
+security:                      # spendlens security: Inspector, ECR, Security Hub, GuardDuty, Access Analyzer, log detections
+  sources: [inspector, securityhub, guardduty, access_analyzer]   # add detections to include the log detections
+  fail_on: CRITICAL            # spendlens security gate fails on findings at or above this severity
+  only_fixable: false          # true: the gate ignores vulnerabilities that have no fix yet
+  max_age_days: {critical: 15, high: 30}   # fix deadlines: older findings fail the gate
+  required_services: []        # e.g. [inspector, guardduty]: the gate fails when one is off in a configured region
+  ignore: []                   # accepted findings, e.g. [{id: CVE-2024-1234, reason: "no fix upstream", expires: 2027-01-31}]
+  max_rows: 2000
 
 aws:
   profile: null                # null = the credentials Steampipe's service started with (your assumed role); or a profile name

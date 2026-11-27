@@ -19,6 +19,10 @@ CATEGORIES: list[tuple[str, str, list[str]]] = [
     ("Cost analysis", "What changed, where, and who owns it, from Cost Explorer. Each period is one bounded request "
      "($0.01 each, billed by AWS).",
      ["cost diff", "cost trend", "cost showback", "cost resources"]),
+    ("Security", "Vulnerabilities (Amazon Inspector, ECR scanning) in images, Lambda functions and instances; threats "
+     "(GuardDuty, 98 log detections); Security Hub and Access Analyzer findings; and a CI gate. Read-only.",
+     ["security findings", "security image", "security lambda", "security instance", "security resource",
+      "security detections", "security summary", "security status", "security gate"]),
     ("CloudTrail and logs", "Who did what, when (CloudTrail, read-only): every filter, presets, summaries and "
      "exports; and Tailpipe: CloudTrail logs, VPC flow logs and Cost and Usage Reports collected from S3.",
      ["cloudtrail events", "cloudtrail summary", "cloudtrail trails", "cloudtrail presets", "changes",
@@ -42,6 +46,8 @@ CATEGORIES: list[tuple[str, str, list[str]]] = [
 TASKS: list[tuple[str, str]] = [
     ("Try spendlens without an AWS account", "report"),
     ("Check my setup and AWS access", "doctor"),
+    ("Check an image, Lambda function or instance for vulnerabilities", "security image"),
+    ("Fail a CI build on critical vulnerabilities", "security gate"),
     ("See where each kind of data comes from (Tailpipe, CloudWatch Logs, Steampipe ...)", "sources"),
     ("Find resources missing mandatory tags", "tags"),
     ("Find oversized or non-standard resources", "rightsize"),
@@ -86,6 +92,34 @@ RECIPES: dict[str, list[tuple[str, str]]] = {
         ("Write a scheduled GitLab pipeline (.gitlab-ci.yml)", "spendlens init --ci gitlab"),
         ("Write a scheduled GitHub Actions workflow", "spendlens init --ci github"),
         ("Overwrite an existing file", "spendlens init --force"),
+    ],
+    "security findings": [
+        ("Every security finding, worst first", "spendlens security findings"),
+        ("High and critical only", "spendlens security findings --severity high"),
+        ("Image vulnerabilities with a fix and a known exploit: patch these first",
+         "spendlens security findings --type image --fixable --exploitable"),
+        ("Where one CVE is, everywhere", "spendlens security findings --cve CVE-2024-3094"),
+        ("Everything with a vulnerable openssl, to Excel", "spendlens security findings --package openssl -o openssl.xlsx"),
+    ],
+    "security image": [
+        ("Vulnerabilities in one image", "spendlens security image payments-api:1.4.2"),
+        ("Only high and critical, with a fix", "spendlens security image payments-api:1.4.2 --severity high --fixable"),
+    ],
+    "security lambda": [("Vulnerabilities in one Lambda function", "spendlens security lambda orders-processor")],
+    "security instance": [("Vulnerabilities and threats on one EC2 instance", "spendlens security instance i-0abc123")],
+    "security resource": [("Everything every source says about one resource", "spendlens security resource my-bucket")],
+    "security detections": [
+        ("Threat detections on the logs Tailpipe collected, last 7 days", "spendlens security detections"),
+        ("CloudTrail only, high and critical, 30 days, to Excel",
+         "spendlens security detections --pack cloudtrail --severity high --days 30 -o detections.xlsx"),
+    ],
+    "security summary": [("Counts by severity, the most widespread CVEs, the worst resources",
+                          "spendlens security summary")],
+    "security status": [("Which security services are on, per region, and what Inspector scans",
+                         "spendlens security status")],
+    "security gate": [
+        ("Check the guardrails in finops.yaml; exit 1 on a violation", "spendlens security gate"),
+        ("Gate one image before deploying it", "spendlens security gate --image payments-api:1.4.2 --fail-on high"),
     ],
     "unused buckets": [
         ("S3 buckets nobody read or wrote in 30 days (S3 server access logs)", "spendlens unused buckets"),

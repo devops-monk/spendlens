@@ -174,6 +174,10 @@ Ask about activity in plain English: "What changed in production today, and who 
 
 The [CloudTrail activity](../cloudtrail/) page has everything else: where events come from, every filter, the presets, speed and limits, and the commands.
 
+## Security questions
+
+"Is this image safe to deploy?", "Which critical CVEs have a known exploit and a fix?", "What did GuardDuty find this week?" The assistant answers with `security_findings`, which reads Amazon Inspector, ECR scanning, Security Hub, GuardDuty, IAM Access Analyzer and the log detections, and with `security_status`, which shows which services are on. It never calls something safe because a service that is off returned nothing. See [Security guardrails](../security/).
+
 ## Exports of any size
 
 For a full list ("all instances to Excel", "every event this month as CSV"), the assistant uses `export_query`. It runs one read-only query and writes **every row** to a file in `./spendlens-output`, up to `llm.export_max_rows` (100,000). Only the file name, the row count and the first five rows come back to the model, so a large export costs no extra tokens. It works on live AWS (Steampipe), the history and Tailpipe.

@@ -20,6 +20,7 @@ Every layer is validated against the schema: unknown keys and wrong types fail f
 from __future__ import annotations
 
 import os
+from datetime import date
 from importlib import resources
 from pathlib import Path
 from typing import Any, Literal
@@ -360,6 +361,42 @@ class CloudTrailConfig(_Strict):
     max_rows: int = Field(500, ge=1, le=100000)  # per search; exports can ask for more with --limit
 
 
+class SecurityException(_Strict):
+    """An accepted finding: never fails the gate until it expires."""
+
+    id: str = Field(min_length=3, max_length=300)  # a CVE, a finding id, a detection name or a title
+    reason: str = Field(min_length=3, max_length=500)
+    expires: date | None = None  # after this date the finding fails the gate again
+    resource: str | None = None  # only on this resource (part of its id or name)
+
+
+class SecurityConfig(_Strict):
+    """`spendlens security` and its gate: where findings come from, and what fails."""
+
+    sources: list[Literal["inspector", "ecr", "securityhub", "guardduty", "access_analyzer", "detections"]] = Field(
+        default_factory=lambda: ["inspector", "securityhub", "guardduty", "access_analyzer"])
+    fail_on: Literal["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFORMATIONAL"] = "CRITICAL"
+    only_fixable: bool = False  # the gate ignores vulnerabilities with no fix yet
+    max_age_days: dict[str, int] = Field(default_factory=lambda: {"critical": 15, "high": 30})  # fix deadlines
+    required_services: list[Literal["inspector", "securityhub", "guardduty", "access_analyzer", "ecr_scanning"]] = \
+        Field(default_factory=list)  # the gate fails when one is off in a configured region
+    ignore: list[SecurityException] = Field(default_factory=list)
+    max_rows: int = Field(2000, ge=1, le=100000)
+
+    @field_validator("fail_on", mode="before")
+    @classmethod
+    def _upper(cls, v: Any) -> Any:
+        return v.upper() if isinstance(v, str) else v
+
+    @field_validator("max_age_days")
+    @classmethod
+    def _sev_keys(cls, v: dict[str, int]) -> dict[str, int]:
+        bad = [k for k in v if k.lower() not in ("critical", "high", "medium", "low", "informational")]
+        if bad:
+            raise ValueError(f"max_age_days keys are severities, not {bad}")
+        return {k.lower(): int(n) for k, n in v.items()}
+
+
 class HistoryConfig(_Strict):
     enabled: bool = True  # save every live run to the local SQLite store
     path: str | None = None  # default ~/.local/share/spendlens/spendlens.db; in CI restore/save between jobs
@@ -435,6 +472,7 @@ class Config(_Strict):
     graph: GraphConfig = Field(default_factory=GraphConfig)
     tailpipe: TailpipeConfig = Field(default_factory=TailpipeConfig)
     cloudtrail: CloudTrailConfig = Field(default_factory=CloudTrailConfig)
+    security: SecurityConfig = Field(default_factory=SecurityConfig)
     aws: AWSConfig = Field(default_factory=AWSConfig)
     powerpipe_vars: dict[str, Any] = Field(default_factory=dict)  # raw passthrough, merged last
     plugins: dict[str, dict[str, Any]] = Field(default_factory=dict)  # per-plugin settings

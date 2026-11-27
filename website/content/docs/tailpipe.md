@@ -1,8 +1,14 @@
-# Tailpipe: CloudTrail logs, flow logs and the CUR
+# Tailpipe: logs, findings and billing exports
 
-Some questions can't be answered from what AWS reports about resources today. "Who deleted this bucket four months ago?" "How much NAT gateway traffic goes to S3?" "What did this exact volume cost last month?" The answers sit in log files that AWS writes to S3: CloudTrail logs, VPC flow logs and the Cost and Usage Report (CUR).
+Some questions can't be answered from what AWS reports about resources today:
+- "Who deleted this bucket four months ago?"
+- "Has anyone read this bucket this quarter?"
+- "How much NAT gateway traffic goes to S3?"
+- "What did this exact volume cost last month?"
 
-[Tailpipe](https://tailpipe.io) collects those files from S3 into a local database (DuckDB) on your machine, and spendlens queries it there. It comes with spendlens: the installer and the Docker image include Tailpipe and its AWS plugin, and `spendlens tailpipe` sets it up for you.
+The answers sit in files AWS writes for you: CloudTrail logs, access logs, flow logs, findings and billing exports.
+
+[Tailpipe](https://tailpipe.io) collects those files into a local database (DuckDB) on your machine, from S3 buckets or CloudWatch Logs groups, and spendlens queries it there. It comes with spendlens: the installer and the Docker image include Tailpipe and its AWS plugin, and `spendlens tailpipe` sets it up for you.
 
 ## What it's used for
 
@@ -10,9 +16,19 @@ Some questions can't be answered from what AWS reports about resources today. "W
 |---|---|---|
 | CloudTrail logs | `aws_cloudtrail_log` | `spendlens changes` and the assistant's "what changed, who did it" answers beyond 90 days, with data events (S3 object reads and writes) and error codes |
 | VPC flow logs | `aws_vpc_flow_log` | `spendlens graph traffic`: data transfer priced by path (cross-AZ, through NAT gateways, out to the internet) |
-| Cost and Usage Report | `aws_cost_and_usage_report` | `spendlens graph collect`: the billed cost of each resource, instead of an estimate from the price book |
+| Cost and Usage Report (CUR 2.0) | `aws_cost_and_usage_report` | `spendlens graph collect`: the billed cost of each resource, instead of an estimate from the price book |
+| FOCUS 1.0 export | `aws_cost_and_usage_focus` | The same billed costs, when your account exports FOCUS instead of CUR 2.0 |
+| Cost Optimization Hub recommendations export | `aws_cost_optimization_recommendation` | `spendlens savings history`: AWS's savings recommendations over time, and the ones left open longest |
+| S3 server access logs | `aws_s3_server_access_log` | `spendlens unused buckets`: buckets nobody read or wrote; `security detections` (S3 pack) |
+| ALB, NLB and Classic LB access logs | `aws_alb_access_log`, `aws_nlb_access_log`, `aws_clb_access_log` | `spendlens unused load-balancers`: load balancers with no requests |
+| GuardDuty and Security Hub findings exported to S3 | `aws_guardduty_finding`, `aws_securityhub_finding` | Long finding history for the assistant (live findings come from [Security](../security/)) |
+| WAF logs | `aws_waf_traffic_log` | The assistant's questions about blocked and allowed requests |
 
-The AI assistant also gets a `tailpipe_query` tool over all three tables when there is data.
+CloudTrail logs and VPC flow logs also feed `spendlens security detections`, which runs 98 MITRE-mapped detections on them (see [Security guardrails](../security/#log-detections)).
+
+**Two ways to collect.** Every kind of data can be collected from its S3 bucket. CloudTrail, VPC flow logs and WAF logs can also come straight from their CloudWatch Logs group. That suits trails that send logs to CloudWatch Logs, and roles that can't read the S3 bucket. `spendlens tailpipe init` finds both, read-only.
+
+The AI assistant gets a `tailpipe_query` tool over every one of these tables when there is data, and it is told which ones have data.
 
 **Without Tailpipe, everything still works.** spendlens falls back to:
 - **CloudTrail LookupEvents** for changes. It keeps only 90 days of management events and returns 50 events a page, so a broad search is slow.
@@ -110,7 +126,7 @@ spendlens ask "Who deleted objects in the reports bucket last month?"
 
 ```bash
 spendlens tailpipe collect                 # the last tailpipe.collect_days (30 by default)
-spendlens tailpipe collect cloudtrail      # one kind only: cloudtrail, flow_logs or cur
+spendlens tailpipe collect cloudtrail      # one kind only (cloudtrail, flow_logs, cur, focus, s3_access_logs ...)
 spendlens tailpipe collect cloudtrail --days 90
 ```
 
@@ -150,8 +166,26 @@ tailpipe:
   cloudtrail: [{bucket: my-org-trail, prefix: AWSLogs/}]
   flow_logs:  [{bucket: my-flow-logs, prefix: vpc/}]
   cur:        [{bucket: my-billing, prefix: cur2}]
+  focus:      [{bucket: my-billing, prefix: focus}]
+  cost_recommendations: [{bucket: my-billing, prefix: recommendations}]
+  s3_access_logs:  [{bucket: my-s3-logs, prefix: s3/}]
+  alb_access_logs: [{bucket: my-lb-logs, prefix: alb/}]
+  guardduty:  [{bucket: my-security-exports, prefix: guardduty/}]
+  cloudtrail_log_groups: [{name: aws-cloudtrail-logs, region: eu-west-1}]   # CloudWatch Logs instead of S3
+  flow_log_groups:       [{name: vpc-flow-logs, region: eu-west-1}]
   collect_days: 30             # how far back `spendlens tailpipe collect` goes (1 to 400)
 ```
+
+What `init` finds on its own, read-only:
+- **CloudTrail:** from each trail's S3 bucket and CloudWatch Logs group.
+- **VPC flow logs:** from each flow log's S3 or CloudWatch Logs destination.
+- **S3 access logs:** from each bucket's logging settings, as one partition per log bucket.
+- **Load balancer access logs:** from each load balancer's attributes.
+- **GuardDuty:** from its publishing destinations.
+- **WAF logs:** from each web ACL's logging.
+- **CUR 2.0, FOCUS and Cost Optimization Hub exports:** from Data Exports, plus legacy CUR reports.
+
+Security Hub has no built-in S3 export, so list yours if you stream it to S3 (for example through Firehose).
 
 Or set it for one run: `spendlens tailpipe init --no-discover --set 'tailpipe.cur=[{bucket: my-billing, prefix: cur2}]'`.
 

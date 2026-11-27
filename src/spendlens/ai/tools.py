@@ -56,6 +56,12 @@ class AuditEntry:
     error: str | None = None
 
 
+def _sec_sources() -> tuple[str, ...]:
+    from ..security import SOURCES
+
+    return SOURCES
+
+
 def _ct_presets() -> list[str]:
     from ..cloudtrail import PRESETS
 
@@ -130,6 +136,18 @@ def _patterns(text: str) -> list[str]:
 
 
 # ------------------------------------------------------------------ toolbox
+
+
+class _NoSteampipe:
+    """Live AWS is off (--no-live): every Steampipe source reports that, and detections still run."""
+
+    def query(self, *a: Any, **k: Any) -> list[dict[str, Any]]:
+        from ..steampipe import SteampipeError
+
+        raise SteampipeError("live AWS is off in this session (--no-live)")
+
+    def close(self) -> None:
+        pass
 
 EXCERPT_CHARS = 4000  # of each tool result, kept for saved sessions
 
@@ -261,6 +279,38 @@ class Toolbox:
                                                    "(CloudWatch Logs, then LookupEvents), skipping Tailpipe; use it "
                                                    "when the person asks for Steampipe, live or current events."}}),
                 self.cloudtrail_events))
+        if self.live or self._tailpipe_available():
+            specs.append(ToolSpec(
+                "security_findings",
+                "Security findings, worst first, from AWS's own services (read-only): Amazon Inspector (CVEs in ECR "
+                "images, Lambda functions and EC2 instances, with exploit and fix availability, EPSS and score), ECR "
+                "basic scanning, Security Hub (standards controls, partner findings), GuardDuty (threats), IAM Access "
+                "Analyzer (public or external access) and, with Tailpipe logs, 98 MITRE-mapped log detections "
+                "(sources: detections). Use it for 'is this image / function / instance vulnerable', 'which "
+                "critical CVEs can we fix', 'who has a known exploit', 'what threats did GuardDuty see'. Returns counts "
+                "by severity, the most widespread CVEs, the resources with most findings, and the findings.",
+                _schema({"image": {"type": "string", "description": "An ECR image: repository, repository:tag or "
+                                                                    "repository@sha256:digest."},
+                         "function": {"type": "string", "description": "A Lambda function name."},
+                         "instance": {"type": "string", "description": "An EC2 instance id."},
+                         "resource": {"type": "string", "description": "Any resource id, name or ARN (part of it)."},
+                         "resource_type": {"type": "string", "enum": ["image", "lambda", "instance"]},
+                         "min_severity": {"type": "string", "enum": ["CRITICAL", "HIGH", "MEDIUM", "LOW"]},
+                         "cve": {"type": "string"}, "package": {"type": "string", "description": "Part of a "
+                                                                                                 "package name."},
+                         "fixable": {"type": "boolean", "description": "Only findings with a fix available."},
+                         "exploitable": {"type": "boolean", "description": "Only findings with a known exploit."},
+                         "sources": {"type": "array", "items": {"type": "string", "enum": list(_sec_sources())}},
+                         "days": {"type": "integer", "description": "Detections: only hits in the last N days."},
+                         "region": {"type": "string"}}),
+                self.security_findings))
+            if self.live:
+                specs.append(ToolSpec(
+                    "security_status",
+                    "Which security services (Inspector, Security Hub, GuardDuty, IAM Access Analyzer, ECR enhanced "
+                    "scanning) are on in each configured region, and what Inspector scans. Use it before saying "
+                    "'no findings': a service that is off finds nothing.",
+                    _schema({}), lambda a: self.security_status()))
         if self._tailpipe_available():
             specs.append(ToolSpec(
                 "tailpipe_query",
@@ -643,6 +693,37 @@ class Toolbox:
         out["row_count"] = len(out["rows"])
         out["_export_rows"] = res.rows  # every row, for write_file(result_id); never sent to the model
         return out
+
+    def security_findings(self, a: dict[str, Any]) -> dict[str, Any]:
+        from .. import security as sec
+        from ..steampipe import SteampipeError
+
+        sources = a.get("sources") or list(self.cfg.security.sources)
+        if not self.live:
+            sources = [x for x in sources if x == "detections"] or ["detections"]
+        try:
+            scope = sec.Scope(sources=sources, min_severity=(a.get("min_severity") or "LOW").upper(),
+                              image=a.get("image"), function=a.get("function"), instance=a.get("instance"),
+                              resource=a.get("resource"), resource_type=a.get("resource_type"), cve=a.get("cve"),
+                              package=a.get("package"), fixable=bool(a.get("fixable")),
+                              exploitable=bool(a.get("exploitable")), region=a.get("region"),
+                              limit=self.cfg.security.max_rows, days=a.get("days"))
+            res = sec.search(self.cfg, scope, steampipe=self._client() if self.live else _NoSteampipe())
+        except sec.SecurityError as e:
+            raise ToolError(str(e)) from e
+        except SteampipeError as e:
+            raise ToolError(str(e).splitlines()[0][:300]) from e
+        out = res.to_dict(rows=self.cfg.llm.max_rows)
+        out["row_count"] = len(out["findings"])
+        out["rows"] = out.pop("findings")
+        out["_export_rows"] = [f.row() for f in res.findings]
+        return out
+
+    def security_status(self) -> dict[str, Any]:
+        from .. import security as sec
+
+        self._require_live()
+        return sec.status(self.cfg, steampipe=self._client())
 
     def _tailpipe_tables(self) -> str:
         from ..tailpipe import KINDS, configured
