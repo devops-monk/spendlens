@@ -70,6 +70,7 @@ BUILTIN_FEATURES: tuple[str, ...] = (
     "spendlens.features.open_cmd",
     "spendlens.features.tailpipe_cmd",
     "spendlens.features.changes_cmd",
+    "spendlens.features.cloudtrail_cmd",
 )
 
 

@@ -22,7 +22,8 @@ def test_follow_up_in_a_new_command_remembers_the_conversation(provider):
     with StubLLM([("final", "There are 149 over-provisioned ECS tasks.")]) as stub:
         r = ask(stub, "Which ECS services are over-provisioned?", "--new", provider=provider)
         assert r.exit_code == 0, r.output
-        assert "session s-" in r.output and "spendlens ask -C" in r.output
+        flat = " ".join(r.output.split())
+        assert "session s-" in flat and "spendlens session open s-" in flat
     with StubLLM([("final", "uat1 has 72 of them.")]) as stub:
         r = ask(stub, "Which cluster has most?", "-C", provider=provider)
         assert r.exit_code == 0, r.output
@@ -61,7 +62,7 @@ def test_follow_ups_skip_the_answer_cache_and_context_is_capped(tmp_path):
         assert len(stub.requests) == 1 and json.loads(r.stdout[r.stdout.index("{"):])["answer"] == "second"
     s = Sessions(tmp_path / "s").open("cap")
     for i in range(CONTEXT_TURNS + 5):
-        s.add(f"q{i}", "a" * 5000, model="m", live=False, source="demo", tool_calls=0)
+        s.add(f"q{i}", "a" * 7000, model="m", live=False, source="demo", tool_calls=0)
     ctx = s.context()
     assert len(ctx) == CONTEXT_TURNS and ctx[0][0] == "q5" and ctx[-1][1].endswith("[answer shortened]")
 
@@ -118,3 +119,70 @@ def test_prompt_answers_in_markdown_and_files_go_through_write_file():
 
     p = system_prompt(load_config(environ={}), False)
     assert "no HTML in the answer itself" in p and "write_file" in p and "-o answer.html" in p
+
+
+def _sets(stub):
+    return ["--set", "llm.provider=openai_compatible", "--set", "llm.model=stub-model",
+            "--set", f"llm.base_url={stub.url}/v1"]
+
+
+def test_every_conversation_is_a_session_and_open_replays_the_data(tmp_path):
+    with StubLLM([("tool", "history_overview", {}), ("final", "Waste and tags have saved runs.")]) as stub:
+        r = ask(stub, "What has been saved?")
+        assert r.exit_code == 0, r.output
+    sid = " ".join(r.output.split()).split("spendlens session open ")[1].split()[0]
+    r = runner.invoke(app, ["session", "list"])
+    assert r.exit_code == 0 and sid in r.output and "What" in r.output
+    turn = Sessions(_root()).get(sid).turns[0]
+    assert turn["data"][0]["tool"] == "history_overview" and turn["data"][0]["result"]
+
+    with StubLLM([("final", "Mostly waste.")]) as stub:
+        r = runner.invoke(app, ["session", "open", sid, "Which has more alarms?", *_sets(stub)],
+                          env={"STUB_KEY": "x"})
+        assert r.exit_code == 0, r.output
+        m = [x for x in msgs(stub) if x["role"] != "system"]
+    assert "What has been saved?" in r.output and "Waste and tags have saved runs." in r.output  # earlier chat shown
+    assert [x["role"] for x in m] == ["user", "assistant", "user"] and m[2]["content"] == "Which has more alarms?"
+    assert m[1]["content"].startswith("Waste and tags have saved runs.")
+    assert "[Data behind this answer" in m[1]["content"] and "history_overview" in m[1]["content"]
+    assert len(Sessions(_root()).get(sid).turns) == 2  # the follow-up is saved in the same session
+
+
+def _root():
+    from spendlens.ai.session import sessions_dir
+    from spendlens.common import history_path, load
+
+    return sessions_dir(history_path(load(None)))
+
+
+def test_auto_sessions_are_pruned_but_named_ones_kept_and_can_be_off():
+    s = Sessions(_root())
+    named = s.open("keep-me")
+    named.add("q", "a", model="m", live=False, source="demo", tool_calls=0)
+    for i in range(5):
+        x = s.auto()
+        x.add(f"q{i}", "a", model="m", live=False, source="demo", tool_calls=0)
+    assert s.prune(2) == 3
+    names = [x.name for x in s.list()]
+    assert "keep-me" in names and len(names) == 3
+    with StubLLM([("final", "no session")]) as stub:
+        r = ask(stub, "q", extra_sets=["llm.sessions_auto=false"])
+        assert r.exit_code == 0 and "session open" not in r.output
+    assert len(s.list()) == 3
+
+
+def test_open_without_a_session_and_data_budget():
+    r = runner.invoke(app, ["session", "open", "s-20990101-000000"])
+    assert r.exit_code == 1
+    s = Sessions(_root()).open("budget")
+    s.add("q", "a", model="m", live=False, source="demo", tool_calls=1,
+          data=[{"tool": "aws_query", "arguments": {"sql": "select 1"}, "ok": True, "rows": 1, "result": "x" * 9000}])
+    assert len(s.context(data_chars=1000)[0][1]) < 2500 and "[shortened]" in s.context(data_chars=1000)[0][1]
+    assert s.context(data_chars=0)[0][1] == "a"
+
+
+
+def test_two_automatic_sessions_in_one_second_get_different_ids():
+    s = Sessions(_root())
+    a, b = s.auto(), s.auto()
+    assert a.name != b.name

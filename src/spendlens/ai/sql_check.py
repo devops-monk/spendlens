@@ -127,9 +127,39 @@ def check(sql: str, cat: Catalog, *, max_rows: int | None = None) -> CheckResult
     for scope in scopes:
         _check_scope(scope, cat, res)
     _check_star(tree, cat, res)
+    _check_lookup_events(tree, res)
     if max_rows and isinstance(tree, (exp.Select, exp.Union)) and not tree.args.get("limit"):
         res.sql = f"{text}\nlimit {max_rows + 1}"  # textual: the query runs exactly as written, plus a row cap
     return res
+
+
+LOOKUP_ATTRS = ("event_id", "event_name", "event_source", "read_only", "username", "resource_name", "resource_type",
+                "access_key_id")
+
+
+def _check_lookup_events(tree: exp.Expression, res: CheckResult) -> None:
+    """LookupEvents takes ONE lookup attribute: two '=' filters make the API reject the call, and the plugin hides
+    the error (no rows). A sort makes Steampipe read every page before returning a row."""
+    if "aws_cloudtrail_lookup_event" not in res.tables:
+        return
+    used = []
+    for eq in tree.find_all(exp.EQ):
+        col, other = (eq.left, eq.right) if isinstance(eq.left, exp.Column) else (eq.right, eq.left)
+        if isinstance(col, exp.Column) and col.name.lower() in LOOKUP_ATTRS and isinstance(
+                other, exp.Literal | exp.Boolean | exp.Placeholder | exp.Cast):
+            used.append(col.name.lower())
+    if len(set(used)) > 1:
+        keep, *rest = sorted(set(used), key=LOOKUP_ATTRS.index)
+        res.errors.append(Problem(
+            f"aws_cloudtrail_lookup_event: LookupEvents takes ONE lookup attribute, but {', '.join(sorted(set(used)))} "
+            "are all '=' filters (AWS rejects the call and no rows come back)",
+            f"keep {keep} = '...' and write the others so Steampipe applies them, e.g. "
+            + ", ".join(f"lower({c}) = lower('...')" for c in rest)
+            + "; or use the cloudtrail_events tool, which does this for you"))
+    if tree.args.get("order"):
+        res.warnings.append(Problem("aws_cloudtrail_lookup_event: ORDER BY makes Steampipe read every page before the "
+                                    "first row (minutes for a busy account)",
+                                    "drop ORDER BY: LookupEvents returns events newest first; use a LIMIT"))
 
 
 def _aws_sources(scope: Scope, cat: Catalog) -> dict[str, Table]:

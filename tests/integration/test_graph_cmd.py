@@ -156,8 +156,12 @@ def test_review_has_suggested_tags_card(tmp_path):
     assert "spendlens graph owners --script tag-review.sh" in html
 
 
-def test_collect_prices_from_the_cur_via_tailpipe(fake_steampipe, tmp_path):
+def test_collect_prices_from_the_cur_via_tailpipe(fake_steampipe, tmp_path, monkeypatch):
     import stat
+
+    monkeypatch.setenv("TAILPIPE_INSTALL_DIR", str(tmp_path / "tp"))  # a CUR partition in the user's own .tpc
+    (tmp_path / "tp" / "config").mkdir(parents=True)
+    (tmp_path / "tp" / "config" / "mine.tpc").write_text('partition "aws_cost_and_usage_report" "cur" {}\n')
 
     rows_ = [{"resource_id": "vol-0rptdata", "cost": 30.0, "first_seen": "2026-10-01", "last_seen": "2026-10-30"},
              {"resource_id": "i-0payapi1", "cost": 50.0, "first_seen": "2026-10-01", "last_seen": "2026-10-30"}]

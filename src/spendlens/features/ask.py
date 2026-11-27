@@ -57,6 +57,21 @@ def _preview(content: str) -> list[Any]:
         out = json.loads(content)
     except ValueError:
         return [f"[dim]{content[:300]}{'…' if len(content) > 300 else ''}[/]"]
+    if isinstance(out, dict) and isinstance(out.get("queries"), list):  # cloudtrail_events: the SQL it ran, the rows
+        parts: list[Any] = []
+        for q in out["queries"][:4]:
+            parts.append(f"[dim]{q.get('source')}:[/]")
+            parts.append(Syntax(str(q.get("sql") or ""), "sql", word_wrap=True, background_color="default"))
+        if len(out["queries"]) > 4:
+            parts.append(f"[dim]… {len(out['queries']) - 4} more queries[/]")
+        rows = out.get("rows") or []
+        if rows and isinstance(rows[0], dict):
+            cols = ["event_time", "who", "event_name", "event_source", "source_ip", "error_code"]
+            parts.append(_preview_table(cols, [[r.get(c) for c in cols] for r in rows]))
+        span = f"{out.get('source')} · {out.get('count')} event(s) · from {str(out.get('covered_from'))[:16]}"
+        parts.append(f"[dim]{span}{' · partial' if out.get('partial') else ''}[/]")
+        parts += [f"[dim]{n}[/]" for n in out.get("notes") or []]
+        return parts
     if isinstance(out, dict) and isinstance(out.get("rows"), list) and out.get("columns"):
         return [_preview_table(out["columns"], out["rows"])]
     if isinstance(out, dict) and isinstance(out.get("features"), list):  # history_overview
@@ -144,6 +159,9 @@ def ask(
     out_dir: Annotated[Path | None, typer.Option("--out-dir", help="Where the assistant writes files you ask for "
                                                                    "(default llm.output_dir: ./spendlens-output).")
                        ] = None,
+    tailpipe: Annotated[bool | None, typer.Option("--tailpipe/--no-tailpipe", help="Use Tailpipe's collected "
+                                                  "CloudTrail logs, flow logs and CUR (default tailpipe.enabled). "
+                                                  "--no-tailpipe: Steampipe tables only.")] = None,
     fresh: Annotated[bool, typer.Option("--fresh", help="Ignore cached answers and live results; ask and query "
                                                         "again (results are still cached for next time).")] = False,
     config: ConfigOpt = None,
@@ -174,18 +192,23 @@ def ask(
         raise typer.BadParameter("Ask a question, or use -i for an interactive session.", param_hint="QUESTION")
     cfg = load(config, profile, sets)
     live = cfg.llm.live if live is None else live
+    if tailpipe is not None:
+        cfg.tailpipe.enabled = tailpipe
     db = demo_db_path() if source is Source.demo else history_path(cfg)
     from ..ai.cache import AICache
 
     cache = AICache.for_config(cfg, history_path(cfg))
+    from ..ai.session import SessionError, Sessions, sessions_dir, step_data
+
+    sessions = Sessions(sessions_dir(history_path(cfg)))
     sess = None
     if session or new or resume:
-        from ..ai.session import SessionError, Sessions, sessions_dir
-
         try:
-            sess = Sessions(sessions_dir(history_path(cfg))).open(session, new=new, resume=resume)
+            sess = sessions.open(session, new=new, resume=resume)
         except SessionError as e:
             raise typer.BadParameter(str(e), param_hint="--session") from e
+    elif cfg.llm.sessions_auto:
+        sess = sessions.auto()  # saved once it has an answer: spendlens session list / open
     from ..ai.files import FileError, InputFile, OutputDir
 
     toolbox = Toolbox(cfg, db, live=live, extra=_plugin_tools(), fresh=fresh, cache=cache,
@@ -201,8 +224,8 @@ def ask(
         err.print(f"[red]AI setup:[/] {e}")
         raise typer.Exit(2) from e
     agent = Agent(provider, toolbox, system_prompt(cfg, live), max_steps or cfg.llm.max_steps)
-    if sess is not None:
-        agent.preload(sess.context())
+    if sess is not None and sess.turns:
+        agent.preload(sess.context(cfg.llm.session_turns, cfg.llm.session_data_chars))
     streamed = show_tools and not json_out
     if streamed:  # show every step as it happens, not all at the end
         from ..ui import activity
@@ -210,7 +233,7 @@ def ask(
         toolbox.on_event = LiveSteps()
         agent.waiting = lambda: activity(f"[dim]{cfg.llm.model} is thinking[/]")
     where = (f" · session {sess.name} ({len(sess.turns)} earlier question{'' if len(sess.turns) == 1 else 's'})"
-             if sess is not None else "")
+             if sess is not None and (sess.turns or session or new or resume) else "")
     err.print(f"[dim]spendlens ask · {provider.label} · {cfg.llm.model} · history: {source.value}"
               f"{' + live AWS' if live else ''}{where}[/]")
     try:
@@ -270,15 +293,18 @@ def ask(
                 _save(out, q, ans.text, ans.model, live, [s.__dict__ for s in ans.steps], db, cfg)
             if sess is not None and ans.text.strip() and not ans.refused:
                 sess.add(q, ans.text, model=ans.model, live=live, source=source.value, tool_calls=len(ans.steps),
-                         steps=[s.__dict__ for s in ans.steps])
+                         steps=[s.__dict__ for s in ans.steps],
+                         data=step_data(ans.steps, toolbox.excerpts[-len(ans.steps):] if ans.steps else []))
             if ans.refused and not interactive:
                 raise typer.Exit(4)
     finally:
         toolbox.close()
         cache.close()
         if sess is not None and sess.turns:
-            err.print(f"[dim]session {sess.name} · {len(sess.turns)} question(s) · follow up with: "
-                      f"spendlens ask -C \"...\" (or -S {sess.name})[/]")
+            sessions.set_current(sess.name)
+            sessions.prune(cfg.llm.sessions_keep)
+            err.print(f"[dim]session {sess.name} · {len(sess.turns)} question(s) · continue it: "
+                      f"spendlens session open {sess.name} (or ask -C \"...\")[/]")
 
 
 def _attach(toolbox: Toolbox, f: Any) -> None:

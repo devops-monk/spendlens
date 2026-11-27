@@ -56,6 +56,12 @@ class AuditEntry:
     error: str | None = None
 
 
+def _ct_presets() -> list[str]:
+    from ..cloudtrail import PRESETS
+
+    return list(PRESETS)
+
+
 def _schema(props: dict[str, Any] | None = None, required: list[str] | None = None) -> dict[str, Any]:
     return {"type": "object", "properties": props or {}, "required": required or [], "additionalProperties": False}
 
@@ -125,6 +131,8 @@ def _patterns(text: str) -> list[str]:
 
 # ------------------------------------------------------------------ toolbox
 
+EXCERPT_CHARS = 4000  # of each tool result, kept for saved sessions
+
 
 @dataclass
 class Toolbox:
@@ -133,6 +141,7 @@ class Toolbox:
     live: bool = False
     extra: list[ToolSpec] = field(default_factory=list)
     audit: list[AuditEntry] = field(default_factory=list)
+    excerpts: list[str] = field(default_factory=list)  # the start of each call's result, aligned with audit
     fresh: bool = False  # skip cache reads (still write)
     cache: Any = None  # AICache | None
     live_ttls: list[float] = field(default_factory=list)  # remaining freshness (s) of each live result used
@@ -210,24 +219,47 @@ class Toolbox:
         ]
         if self.live or self._tailpipe_available():  # CloudTrail needs one of the two
             specs.append(ToolSpec(
-                "aws_changes",
-                "What changed in the AWS account and who changed it: CloudTrail write events, newest first, with counts "
-                "by who and by API call. Uses the trail's logs in Tailpipe when collected (any age, data events), else "
-                "CloudTrail LookupEvents (last 90 days, management events). Routine calls (role assumptions, KMS, log "
-                "delivery) are left out. Use it first for 'what changed', 'who changed X', 'who deleted ...'. "
-                "Without Tailpipe, a search by service alone is slow (LookupEvents reads every event of that service, "
-                "50 a page): when the question implies an action, pass event instead, e.g. ECS deployments = "
-                "UpdateService (then CreateService), Lambda deploys = UpdateFunctionCode, RDS changes = "
-                "ModifyDBInstance. Results stop after about a minute: partial = true and covered_hours say how far "
-                "back it got.",
-                _schema({"hours": {"type": "integer", "description": "How far back (default 24; 168 = a week)."},
-                         "user": {"type": "string", "description": "Optional: part of a user or role name / ARN."},
-                         "resource": {"type": "string", "description": "Optional: a resource id or name."},
-                         "service": {"type": "string", "description": "Optional: a service, e.g. ec2, iam, s3."},
-                         "event": {"type": "string", "description": "Optional: an API call, e.g. DeleteBucket, "
-                                                                    "UpdateService. Fast: prefer it to service."}}),
-                lambda a: self.aws_changes(a.get("hours") or 24, a.get("user"), a.get("resource"), a.get("service"),
-                                           a.get("event"))))
+                "cloudtrail_events",
+                "CloudTrail: who did what, when, from where, and whether it failed. Events newest first with counts by "
+                "who, API call, service, source IP, error and day, plus the SQL that was run. Reads the trail's logs in "
+                "Tailpipe when collected (any age, data events), else the trail's CloudWatch Logs group, else "
+                "LookupEvents (last 90 days, management events). Use it for 'what changed', 'who changed / deleted / "
+                "created X', 'what did <user> do', console logins, access denied, security group changes. Writes only "
+                "by default; reads='all' for reads too (logins, Get/Describe/List calls). Without Tailpipe a broad "
+                "search (a service alone, or nothing) is slow, 50 events a page: pass event names when the question "
+                "implies an action (ECS deployments = UpdateService, CreateService; Lambda deploys = "
+                "UpdateFunctionCode; RDS changes = ModifyDBInstance), or a preset. Slow searches stop after about a "
+                "minute: partial = true and covered_from say how far back it got. Rows can be exported with "
+                "write_file(result_id=...).",
+                _schema({"hours": {"type": "number", "description": "The last N hours (default 24; 168 = a week). "
+                                                                   "Or use from/to."},
+                         "from": {"type": "string", "description": "Start: 2026-11-01, '2026-11-01 14:30' (UTC) or "
+                                                                   "6h / 2d / 1w ago."},
+                         "to": {"type": "string", "description": "End (default now); a date alone = end of that day."},
+                         "preset": {"type": "string", "enum": list(_ct_presets()),
+                                    "description": "Ready-made filters; other filters narrow it further."},
+                         "user": {"type": "string", "description": "Part of a user, role or session name or ARN."},
+                         "events": {"type": "array", "items": {"type": "string"},
+                                    "description": "API calls, exact (fast) or with * (Delete*)."},
+                         "service": {"type": "string", "description": "e.g. ec2, iam, s3, ecs."},
+                         "resource": {"type": "string", "description": "A resource id, name or ARN."},
+                         "resource_type": {"type": "string", "description": "e.g. AWS::ECS::Service."},
+                         "access_key": {"type": "string", "description": "An access key id."},
+                         "source_ip": {"type": "string", "description": "An IP or CIDR range."},
+                         "errors": {"type": "array", "items": {"type": "string"},
+                                    "description": "Error codes, exact or with * (AccessDenied*)."},
+                         "errors_only": {"type": "boolean", "description": "Only failed calls."},
+                         "reads": {"type": "string", "enum": ["writes", "reads", "all"],
+                                   "description": "writes (default), reads or all."},
+                         "region": {"type": "string", "description": "Only events in this region."},
+                         "include_noise": {"type": "boolean",
+                                           "description": "Keep routine calls (AssumeRole, KMS, log delivery)."},
+                         "source": {"type": "string", "enum": ["auto", "tailpipe", "steampipe", "cloudwatch", "lookup"],
+                                    "description": "auto (default: Tailpipe, then the trail's CloudWatch Logs, then "
+                                                   "LookupEvents). steampipe = straight from AWS through Steampipe "
+                                                   "(CloudWatch Logs, then LookupEvents), skipping Tailpipe; use it "
+                                                   "when the person asks for Steampipe, live or current events."}}),
+                self.cloudtrail_events))
         if self._tailpipe_available():
             specs.append(ToolSpec(
                 "tailpipe_query",
@@ -345,10 +377,12 @@ class Toolbox:
             raise ToolError(str(e)) from e
 
     def _remember(self, name: str, args: dict[str, Any], out: Any) -> Any:
-        """Tabular results get a result_id the model can hand to write_file."""
+        """Tabular results get a result_id the model can hand to write_file (with every row when the tool kept
+        more than it sends, as _export_rows)."""
+        full = out.pop("_export_rows", None) if isinstance(out, dict) else None
         if self.outdir is None or not isinstance(out, dict):
             return out
-        rows = out.get("rows")
+        rows = full if isinstance(full, list) and full else out.get("rows")
         if not isinstance(rows, list) or not rows:
             return out
         cols = out.get("columns")
@@ -371,6 +405,7 @@ class Toolbox:
 
     def _log(self, call_id: str, entry: AuditEntry, content: str, is_error: bool = False) -> ToolResult:
         self.audit.append(entry)
+        self.excerpts.append(content[:EXCERPT_CHARS])  # what this call returned, for saved sessions
         self._emit("done", entry.tool, entry.arguments, entry, content)
         return ToolResult(call_id, content, is_error)
 
@@ -466,15 +501,18 @@ class Toolbox:
     _tailpipe_ok: Any = None
 
     def _tailpipe_available(self) -> bool:
+        if not self.cfg.tailpipe.enabled:  # tailpipe.enabled: false / ask --no-tailpipe
+            return False
         if self._tailpipe_ok is None:
+            from ..tailpipe import configured
             from .tailpipe_tools import available
 
-            self._tailpipe_ok = available(self.cfg.graph.tailpipe_path)
+            # installed AND sources configured (spendlens tailpipe init); otherwise the Steampipe tables, as usual
+            self._tailpipe_ok = available(self.cfg.graph.tailpipe_path) and any(configured().values())
         return bool(self._tailpipe_ok)
 
-    def aws_changes(self, hours: int, user: str | None, resource: str | None, service: str | None,
-                    event: str | None) -> dict[str, Any]:
-        from ..changes import find_changes
+    def cloudtrail_events(self, a: dict[str, Any]) -> dict[str, Any]:
+        from .. import cloudtrail as ct
         from ..steampipe import SteampipeError
 
         tailpipe = self._tailpipe_available()
@@ -482,14 +520,33 @@ class Toolbox:
             return {"note": "CloudTrail needs live AWS (ask without --no-live) or CloudTrail logs collected by "
                             "Tailpipe (`spendlens tailpipe init` then `spendlens tailpipe collect`).", "row_count": 0}
         try:
-            res = find_changes(self.cfg, int(hours), user=user, resource=resource, service=service, event=event,
-                               source="auto" if tailpipe else "lookup_events",
-                               steampipe=self._client() if self.live else None)
+            f = ct.Filters.build(hours=a.get("hours"), start=a.get("from"), end=a.get("to"), preset=a.get("preset"),
+                                 user=a.get("user"), events=a.get("events") or a.get("event"),
+                                 service=a.get("service"), resource=a.get("resource"),
+                                 resource_type=a.get("resource_type"), access_key=a.get("access_key"),
+                                 source_ip=a.get("source_ip"), errors=a.get("errors"),
+                                 errors_only=a.get("errors_only") or None, reads=a.get("reads"),
+                                 region=a.get("region"), include_noise=a.get("include_noise") or None)
+            want = {"steampipe": "aws", "live": "aws"}.get(str(a.get("source") or "auto"), str(a.get("source") or "auto"))
+            if want == "tailpipe" and not tailpipe:
+                raise ToolError("Tailpipe is off or has no data here: use source auto or steampipe")
+            if want not in ct.SOURCES:
+                raise ToolError("source: auto, tailpipe, steampipe, cloudwatch or lookup")
+            if want in ("aws", "cloudwatch", "lookup") and not self.live:
+                raise ToolError("live AWS is off in this session (--no-live): only Tailpipe's logs can be read")
+            src = want if want != "auto" else ("auto" if tailpipe else "aws")
+            res = ct.search(self.cfg, f, source=src, limit=self.cfg.cloudtrail.max_rows,
+                            max_wait_s=self.cfg.cloudtrail.max_wait_s,
+                            steampipe=self._client() if self.live else None, allow_aws=self.live)
+        except ct.CloudTrailError as e:
+            raise ToolError(str(e)) from e
         except SteampipeError as e:
             raise ToolError(str(e).splitlines()[0][:300]) from e
-        rows = [{k: str(v)[:300] if v is not None else None for k, v in r.items()}
-                for r in res["rows"][: self.cfg.llm.max_rows]]
-        return {**res, "rows": rows, "row_count": len(rows)}
+        out = res.to_dict(rows=self.cfg.llm.max_rows)
+        out["rows"] = [{k: str(v)[:300] if v is not None else None for k, v in r.items()} for r in out["rows"]]
+        out["row_count"] = len(out["rows"])
+        out["_export_rows"] = res.rows  # every row, for write_file(result_id); never sent to the model
+        return out
 
     def tailpipe_query(self, sql: str, describe: str | None = None) -> dict[str, Any]:
         from ..graph.costs import CostSourceError, tailpipe_runner

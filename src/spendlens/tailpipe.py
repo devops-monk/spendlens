@@ -195,7 +195,7 @@ def collect_cmd(exe: str, kind: str, days: int, today: date | None = None) -> li
 
 
 def configured(path: Path | None = None) -> dict[str, int]:
-    """Partitions per kind in the managed file."""
-    p = path or managed_path()
-    text = p.read_text() if p.is_file() else ""
-    return {k: len(re.findall(rf'partition "{t}"', text)) for k, t in KINDS.items()}
+    """Partitions per kind: in `path`, or in every Tailpipe config file (spendlens.tpc and your own .tpc files)."""
+    files = [path] if path else sorted(config_dir().glob("*.tpc"))
+    text = "\n".join(p.read_text(errors="replace") for p in files if p.is_file())
+    return {k: len(re.findall(rf'partition\s+"{t}"', text)) for k, t in KINDS.items()}

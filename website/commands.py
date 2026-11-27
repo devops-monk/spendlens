@@ -18,9 +18,10 @@ CATEGORIES: list[tuple[str, str, list[str]]] = [
     ("Cost analysis", "What changed, where, and who owns it, from Cost Explorer. Each period is one bounded request "
      "($0.01 each, billed by AWS).",
      ["cost diff", "cost trend", "cost showback", "cost resources"]),
-    ("Activity and logs", "What changed in the account and who changed it (CloudTrail, read-only), and Tailpipe: "
-     "CloudTrail logs, VPC flow logs and Cost and Usage Reports collected from S3 and queried locally.",
-     ["changes", "tailpipe init", "tailpipe collect", "tailpipe status"]),
+    ("CloudTrail and logs", "Who did what, when (CloudTrail, read-only): every filter, presets, summaries and "
+     "exports; and Tailpipe: CloudTrail logs, VPC flow logs and Cost and Usage Reports collected from S3.",
+     ["cloudtrail events", "cloudtrail summary", "cloudtrail trails", "cloudtrail presets", "changes",
+      "tailpipe init", "tailpipe collect", "tailpipe status"]),
     ("Anomalies and forecast", "Spot unusual daily spend and see where the month will land against your budgets.",
      ["anomalies", "forecast"]),
     ("Savings", "AWS's own recommendations, commitment coverage, and one de-duplicated savings total.",
@@ -29,7 +30,7 @@ CATEGORIES: list[tuple[str, str, list[str]]] = [
      ["report", "review", "dashboard", "brief", "notify"]),
     ("AI assistant", "Ask questions in plain English; answers come from your saved runs (and, with --live, read-only "
      "Steampipe queries). The schema and cache commands are the assistant's own tools, for you.",
-     ["ask", "session list", "session show", "session delete", "session clear", "schema find", "schema show",
+     ["ask", "session list", "session open", "session show", "session delete", "session clear", "schema find", "schema show",
       "schema check", "cache show", "cache clear"]),
     ("History", "Every live run is saved locally, so you can compare runs, search them and re-render reports without "
      "AWS calls.",
@@ -54,6 +55,8 @@ TASKS: list[tuple[str, str]] = [
     ("See a multi-month trend", "cost trend"),
     ("Find which resources' cost changed this week", "cost resources"),
     ("See what changed in the account, and who changed it", "changes"),
+    ("Search CloudTrail with any filter, and export it", "cloudtrail events"),
+    ("Who did most, which calls failed, from which IPs", "cloudtrail summary"),
     ("Set up CloudTrail, flow log and CUR collection", "tailpipe init"),
     ("Catch unusual daily spikes", "anomalies"),
     ("Know if we'll go over budget this month", "forecast"),
@@ -81,6 +84,30 @@ RECIPES: dict[str, list[tuple[str, str]]] = {
         ("Write a scheduled GitLab pipeline (.gitlab-ci.yml)", "spendlens init --ci gitlab"),
         ("Write a scheduled GitHub Actions workflow", "spendlens init --ci github"),
         ("Overwrite an existing file", "spendlens init --force"),
+    ],
+    "cloudtrail events": [
+        ("ECS deployments this week", "spendlens cloudtrail events --days 7 --event UpdateService"),
+        ("IAM changes between two dates, to Excel",
+         "spendlens cloudtrail events --from 2026-11-01 --to 2026-11-20 --service iam -o iam.xlsx"),
+        ("Console logins this month, failed ones included", "spendlens cloudtrail events --preset console-logins --days 30"),
+        ("Everything one person deleted", "spendlens cloudtrail events --user alice --event 'Delete*' --days 30"),
+        ("Access denied in the last 6 hours", "spendlens cloudtrail events --preset access-denied --hours 6"),
+        ("Calls from outside the office network",
+         "spendlens cloudtrail events --source-ip 203.0.113.0/24 --reads all --days 7"),
+        ("Every call made with one access key, as CSV",
+         "spendlens cloudtrail events --access-key AKIAEXAMPLE --reads all --days 30 -o key.csv"),
+        ("Changes to one resource, with the SQL used", "spendlens cloudtrail events --resource sg-0abc123 --days 90 --show-sql"),
+    ],
+    "cloudtrail summary": [
+        ("Who did most this week, which calls, services, IPs and errors", "spendlens cloudtrail summary --days 7"),
+        ("Deletes this month, as an Excel workbook (one sheet per breakdown)",
+         "spendlens cloudtrail summary --preset deletes --days 30 -o deletes.xlsx"),
+    ],
+    "cloudtrail trails": [
+        ("The trails, where they deliver, and which sources spendlens reads", "spendlens cloudtrail trails"),
+    ],
+    "cloudtrail presets": [
+        ("Ready-made filters for common questions", "spendlens cloudtrail presets"),
     ],
     "changes": [
         ("What changed in the last 24 hours, and who changed it", "spendlens changes"),
@@ -319,7 +346,13 @@ RECIPES: dict[str, list[tuple[str, str]]] = {
         ("History only, no live AWS", "spendlens ask --no-live \"Summarise the waste findings\""),
     ],
     "session list": [
-        ("Every saved ask session (* = the one -C continues)", "spendlens session list"),
+        ("Every saved conversation, with its id (* = the one -C continues)", "spendlens session list"),
+    ],
+    "session open": [
+        ("Reopen a conversation: see the earlier chat and keep asking", "spendlens session open s-20261127-141502"),
+        ("One follow-up, with the earlier answers and data in context",
+         "spendlens session open s-20261127-141502 \"Which of those are in eu-west-1?\""),
+        ("The last session used, without the transcript", "spendlens session open -q"),
     ],
     "session show": [
         ("The questions and answers of the current session", "spendlens session show"),

@@ -22,33 +22,26 @@ spendlens ask --source demo "Summarise the waste findings"
 | `-a, --file FILE` | Attach a file for the assistant to read: csv, xlsx, json, yaml, pdf, docx, logs, Terraform and other text. Repeatable. File paths written in the question are attached too |
 | `--out-dir DIR` | Where the assistant writes files you ask for (default `llm.output_dir`, `./spendlens-output`) |
 | `--show-tools` | Show each tool call as it runs: the tool, its SQL, the result and the first rows |
-| `--max-steps` | Tool-call limit per question (default `llm.max_steps`, 12). At the limit the assistant answers from what it found and says it may be incomplete |
+| `--max-steps` | Tool-call limit per question (default `llm.max_steps`, 20). At the limit the assistant answers from what it found and says it may be incomplete |
 | `--json` | The answer plus the full audit trail, machine-readable |
 | `--fresh` | Ignore cached answers and live results; ask and query again |
+| `--no-tailpipe` | Don't use Tailpipe's collected logs and CUR for this question: Steampipe tables only (`--tailpipe` turns it on when `tailpipe.enabled` is off) |
 | `--new` | Start a new session that later questions can follow up (with `-S NAME`: start that session over) |
 | `-C, --continue` | Follow up in the last session used: the assistant remembers its earlier questions and answers |
 | `-S, --session NAME` | Continue (or start) a named session |
 | `-o, --out FILE` | Also save the answer as a page: `.html` (styled, light and dark, with the tool calls) or `.md` |
 
-## Sessions: follow up across commands
+## Sessions: reopen any conversation
 
-`-i` keeps a conversation going while it's open. A session keeps it between separate commands, so you can ask, read the answer, and follow up later:
+Every conversation is saved as a session. `spendlens session list` shows them with their ids. `spendlens session open ID` shows the earlier chat and continues it, with the earlier questions, answers and the data behind them in the assistant's context.
 
 ```bash
-spendlens ask --new "Which ECS services are over-provisioned?"   # starts a session
-spendlens ask -C "Which cluster has the most?"                   # remembers the first answer
-spendlens ask -C --live "Show their CPU and memory settings"     # mix history and live
-spendlens ask -S rds "How many Aurora clusters are there?"       # a separate, named session
+spendlens session list
+spendlens session open s-20261127-141502 "And which of those are in eu-west-1?"
+spendlens ask -C "Which cluster has the most?"        # follow up in the last session used
 ```
 
-Each session stores the questions and the final answers in `sessions/<name>.json` next to the history DB. A follow-up replays the last 12 exchanges as plain text, so the model has the context without paying again for earlier tool results. It works with every provider; a follow-up is never answered from the answer cache.
-
-| Command | What it does |
-|---|---|
-| `spendlens session list` | Every session, most recent first; `*` marks the one `-C` continues |
-| `spendlens session show [NAME]` | The questions and answers of a session (default: the current one); `-o session.html` saves them all as one page |
-| `spendlens session delete NAME` | Delete one session |
-| `spendlens session clear --yes` | Delete every session |
+The [Sessions page](../sessions/) covers what is saved, every command, how the assistant remembers, and how many sessions are kept.
 
 ## Save an answer as a page
 
@@ -166,20 +159,19 @@ spendlens ask "Which security group rules changed in the last 24 hours, and by w
 spendlens ask "Show console logins this week, with source IPs"
 ```
 
-**`aws_changes` first.** For "what changed" and "who changed X", the assistant calls `aws_changes`. It lists CloudTrail write events, newest first, with counts by person or role and by API call, and filters by user, resource, service or API call. Routine calls (role assumptions, KMS, log delivery) are left out. It uses the trail's logs in Tailpipe when they have been collected (any age, data events), otherwise CloudTrail LookupEvents (90 days of management events). The same thing is a command:
+**`cloudtrail_events` first.** For CloudTrail questions the assistant calls `cloudtrail_events`. It takes every filter: a time range or exact dates, user, event names (with wildcards), service, resource, resource type, access key, source IP or CIDR, error codes, reads or writes, region, and presets such as console logins, deletes or access denied. It returns the events newest first, with counts by who, API call, service, source IP, error and day, plus the SQL it ran (shown with `--show-tools`). It reads the trail's logs in Tailpipe when collected, then the trail's CloudWatch Logs group, then LookupEvents. Ask for a file and it writes every event it found. The [CloudTrail page](../cloudtrail/) has every filter, the presets and the commands:
 
 ```bash
-spendlens changes                                   # the last 24 hours
-spendlens changes --days 7 --event UpdateService      # ECS deployments
-spendlens changes --days 7 --service ec2
-spendlens changes --user alice --days 30
-spendlens changes --resource sg-0abc123 --days 90 -f csv -o sg-changes.csv
+spendlens cloudtrail events --days 7 --event UpdateService      # ECS deployments
+spendlens cloudtrail events --from 2026-11-01 --to 2026-11-20 --service iam -o iam.xlsx
+spendlens cloudtrail summary --preset access-denied --hours 24
+spendlens changes --days 7 --service ec2                        # the short form, write events
 ```
 
 **Without Tailpipe, an action is faster than a service.** LookupEvents returns 50 events a page and is rate-limited, and it takes one filter. An event name (`UpdateService` for ECS deployments, `UpdateFunctionCode` for Lambda deploys, `ModifyDBInstance` for RDS changes), a resource or a user matches few events and comes back in seconds. A whole service, or the whole account, can mean thousands of events: spendlens then searches newest first in widening windows (the last hour, 6 hours, a day, 3 days, a week and so on) and stops after about a minute (`--max-wait`, 60 seconds by default) with what it found and how far back it got. The assistant picks the event name for you when the question implies one, and says when an answer covers only part of the window. With CloudTrail logs collected by Tailpipe, there is no such limit.
 
 **Other ways it searches:**
-- **LookupEvents first.** It uses `aws_cloudtrail_lookup_event`, the last 90 days of management events with no setup. It always sets `start_time` and `end_time`, starts with the last 24 hours and widens only if needed. It narrows with one filter such as the event name (`DeleteBucket`, `TerminateInstances`, `ConsoleLogin`), the resource name or the user.
+- **Its own SQL, when the tool cannot express a question.** On `aws_cloudtrail_lookup_event` (the last 90 days of management events, no setup) it always sets `start_time` and `end_time`, starts with the last 24 hours and widens only if needed. It narrows with one filter such as the event name (`DeleteBucket`, `TerminateInstances`, `ConsoleLogin`), the resource name or the user.
 - **Time ranges are enforced.** Before any query reaches AWS, a CloudTrail query without a time range that AWS receives is refused, with the exact fix. A filter on `event_time` alone doesn't count: AWS would page through 90 days at about two calls a second.
 - **Older or more detailed events** (error codes, source IPs beyond 90 days) come from the trail's CloudWatch Logs log group (`aws_cloudtrail_trail_event`), if your trail sends logs there.
 - **Older history, data events, flow logs and the CUR, with Tailpipe.** The installer and the Docker image include [Tailpipe](https://tailpipe.io) and its AWS plugin. `spendlens tailpipe init` finds where your CloudTrail logs, VPC flow logs and Cost and Usage Reports land in S3 (read-only: trails and flow logs through Steampipe, CUR exports through the AWS CLI, which needs version 2.15 or later for CUR 2.0 exports, plus any locations in `finops.yaml` under `tailpipe:`) and writes `~/.tailpipe/config/spendlens.tpc`. `spendlens tailpipe collect` collects them (the last `tailpipe.collect_days`, 30 by default); `spendlens tailpipe status` shows what is there. The [Tailpipe page](../tailpipe/) has the design, the commands in order and troubleshooting. The assistant then gets a `tailpipe_query` tool: local DuckDB queries over `aws_cloudtrail_log`, `aws_vpc_flow_log` and `aws_cost_and_usage_report`, with no AWS calls. Each query must have a time range and is capped in rows; table functions and file-reading functions such as `read_csv` and `getenv` are refused.

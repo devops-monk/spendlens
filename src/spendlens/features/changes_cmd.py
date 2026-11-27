@@ -23,8 +23,9 @@ def changes(
     service: Annotated[str | None, typer.Option("--service", "-S", help="Only this service, e.g. ec2, iam, s3.")] = None,
     event: Annotated[str | None, typer.Option("--event", "-e", help="Only this API call, e.g. "
                                                                     "AuthorizeSecurityGroupIngress.")] = None,
-    source: Annotated[str, typer.Option("--source", help="auto: Tailpipe's CloudTrail logs if collected, else "
-                                                         "LookupEvents; tailpipe; lookup_events.")] = "auto",
+    source: Annotated[str, typer.Option("--source", help="auto: Tailpipe's CloudTrail logs if collected, then the "
+                                                         "trail's CloudWatch Logs, else LookupEvents; tailpipe; "
+                                                         "cloudwatch; lookup_events.")] = "auto",
     top: Annotated[int, typer.Option("--top", help="Events to list.")] = 50,
     max_wait: Annotated[int, typer.Option("--max-wait", help="Seconds to give LookupEvents before showing what it "
                                                              "found (Tailpipe is not limited).")] = 60,
@@ -35,6 +36,8 @@ def changes(
     sets: SetOpt = None,
 ) -> None:
     """What changed in the AWS account, and who changed it: CloudTrail write events, newest first.
+
+    The short form of `spendlens cloudtrail events` (which has every filter, read events, presets and exports).
 
     Read-only. Uses the trail's logs collected by Tailpipe when there are any (any age, data events), else
     CloudTrail LookupEvents (90 days, management events). Routine calls (role assumptions, KMS, log delivery) are
@@ -47,10 +50,11 @@ def changes(
       spendlens changes --resource sg-0abc123 -f csv -o sg-changes.csv
     """
     from ..changes import find_changes
+    from ..cloudtrail import CloudTrailError
     from ..steampipe import SteampipeError
 
-    if source not in ("auto", "tailpipe", "lookup_events"):
-        raise typer.BadParameter("auto, tailpipe or lookup_events", param_hint="--source")
+    if source not in ("auto", "tailpipe", "cloudwatch", "lookup_events"):
+        raise typer.BadParameter("auto, tailpipe, cloudwatch or lookup_events", param_hint="--source")
     cfg = load(config, profile, sets)
     window = (days * 24) if days else hours
     from ..ui import activity
@@ -59,7 +63,7 @@ def changes(
         with activity("Reading CloudTrail [dim](read-only)[/]"):
             res = find_changes(cfg, window, user=user, resource=resource, service=service, event=event, source=source,
                                max_wait_s=max(5, max_wait))
-    except SteampipeError as e:
+    except (SteampipeError, CloudTrailError) as e:
         from ..doctor import credential_fix
 
         err.print(f"[red]CloudTrail:[/] {credential_fix(str(e), cfg.aws.profile, str(e).splitlines()[0])}")

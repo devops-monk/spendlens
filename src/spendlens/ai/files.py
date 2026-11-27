@@ -257,6 +257,37 @@ def _xlsx_bytes(sheets: list[tuple[str, list[str], list[list[Any]]]]) -> bytes:
     return buf.getvalue()
 
 
+TABLE_EXT = (".csv", ".tsv", ".json", ".jsonl", ".md", ".html", ".yaml", ".yml", ".xlsx")
+
+
+def table_data(ext: str, title: str, tables: list[tuple[str, list[str], list[list[Any]]]]) -> bytes | str:
+    """Tables as a file of type ext (.csv .tsv .json .jsonl .md .html .yaml .xlsx). Only .xlsx and .md keep every
+    table; the others write the first."""
+    if ext == ".xlsx":
+        return _xlsx_bytes(tables)
+    _, cols, rows = tables[0]
+    if ext in (".csv", ".tsv"):
+        buf = io.StringIO()
+        w = csv.writer(buf, delimiter="\t" if ext == ".tsv" else ",", lineterminator="\n")
+        w.writerow(cols)
+        w.writerows([[_cell(v) for v in r] for r in rows])
+        return buf.getvalue()
+    if ext == ".json":
+        return json.dumps([dict(zip(cols, r, strict=False)) for r in rows], default=str, indent=2) + "\n"
+    if ext == ".jsonl":
+        return "".join(json.dumps(dict(zip(cols, r, strict=False)), default=str) + "\n" for r in rows)
+    if ext == ".md":
+        return "".join((f"## {t}\n\n" if t else "") + _md_table(c, r) + "\n" for t, c, r in tables)
+    if ext == ".html":
+        return _html_table(title, cols, rows)
+    if ext in (".yaml", ".yml"):
+        import yaml
+
+        return yaml.safe_dump([dict(zip(cols, [_cell(v) for v in r], strict=False)) for r in rows], sort_keys=False)
+    raise FileError(f"table data cannot be written as {ext}; use csv, tsv, xlsx, json, jsonl, md, html or yaml, "
+                    "or send content")
+
+
 @dataclass
 class OutputDir:
     root: Path
@@ -293,29 +324,7 @@ class OutputDir:
                 raise FileError("a .docx needs content (Markdown headings, lists, paragraphs) and/or table data")
             data = _docx_from_markdown(content or "", tables)
         elif tables and content is None:
-            _, cols, rows = tables[0]
-            if ext in (".csv", ".tsv"):
-                buf = io.StringIO()
-                w = csv.writer(buf, delimiter="\t" if ext == ".tsv" else ",", lineterminator="\n")
-                w.writerow(cols)
-                w.writerows([[_cell(v) for v in r] for r in rows])
-                data = buf.getvalue()
-            elif ext == ".json":
-                data = json.dumps([dict(zip(cols, r, strict=False)) for r in rows], default=str, indent=2) + "\n"
-            elif ext in (".jsonl",):
-                data = "".join(json.dumps(dict(zip(cols, r, strict=False)), default=str) + "\n" for r in rows)
-            elif ext == ".md":
-                data = "".join((f"## {t}\n\n" if t else "") + _md_table(c, r) + "\n" for t, c, r in tables)
-            elif ext in (".html",):
-                data = _html_table(title, cols, rows)
-            elif ext in (".yaml", ".yml"):
-                import yaml
-
-                data = yaml.safe_dump([dict(zip(cols, [_cell(v) for v in r], strict=False)) for r in rows],
-                                      sort_keys=False)
-            else:
-                raise FileError(f"table data cannot be written as {ext}; use csv, tsv, xlsx, json, jsonl, md, html "
-                                "or yaml, or send content")
+            data = table_data(ext, title, tables)
         else:
             if content is None:
                 raise FileError("give content (text) or table data (columns + rows, or result_id)")

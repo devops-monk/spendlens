@@ -175,7 +175,13 @@ def price(g: Graph, cfg: Any, *, store: Any = None, runner: Runner | None = None
     if mode == "estimate":
         return info
     notes = []
-    if mode in ("auto", "cur"):
+    from ..tailpipe import configured
+
+    if mode == "auto" and not cfg.tailpipe.enabled:
+        notes.append("Tailpipe is turned off (tailpipe.enabled: false): the CUR was not read")
+    elif mode == "auto" and runner is None and not configured().get("cur"):
+        pass  # no CUR configured for Tailpipe (spendlens tailpipe init): use Cost Explorer data or estimates
+    elif mode in ("auto", "cur"):
         try:
             run = runner or tailpipe_runner(cfg.graph.tailpipe_path)
             costs = from_cur(run, cfg.graph.cur_days)

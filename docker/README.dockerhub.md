@@ -121,17 +121,19 @@ AWS Cost Optimization Hub, Savings Plan and RI coverage, and spendlens's own fin
 
 ![Executive brief](https://spendlens.devops-monk.com/static/shots/brief-light.webp)
 
-### What changed, and who changed it
-`spendlens changes` lists CloudTrail write events, newest first, with who made each one: filter by user, resource, service or API call. Routine calls (role assumptions, KMS, log delivery) are left out. The AI assistant answers the same questions in plain English.
+### CloudTrail: who did what, when
+`spendlens cloudtrail events` searches CloudTrail with any filter: a time range or exact dates, user or role, API calls (with `*` wildcards), service, resource, resource type, access key, source IP or CIDR, error codes, reads or writes, region. Presets cover console logins, deletes, deployments, security groups, IAM, access denied, errors and the root user. `cloudtrail summary` breaks the same events down by who, API call, service, source IP, error and day. Both export to CSV, Excel, JSON, JSON Lines, Markdown, HTML or YAML. `spendlens changes` is the short form for write events, and the AI assistant answers the same questions in plain English.
 
 ```bash
+docker run --rm -v ~/.aws:/home/finops/.aws:ro -v "$PWD:/work" -e AWS_PROFILE -e AWS_REGION \
+  abhaypratap/spendlens cloudtrail events --from 2026-11-01 --to 2026-11-20 --service iam -o iam.xlsx
 docker run --rm -v ~/.aws:/home/finops/.aws:ro -e AWS_PROFILE -e AWS_REGION \
-  abhaypratap/spendlens changes --days 7 --service ec2
+  abhaypratap/spendlens cloudtrail events --preset console-logins --days 30
 docker run --rm -v ~/.aws:/home/finops/.aws:ro -e AWS_PROFILE -e AWS_REGION \
   abhaypratap/spendlens ask "What changed in the account today, and who did it?"   # AI via Bedrock, same role
 ```
 
-Without setup it uses CloudTrail LookupEvents (the last 90 days of management events). With Tailpipe, it reads the trail's own logs: any age, and data events too.
+It reads the best source it can reach. CloudTrail logs collected by Tailpipe go furthest back and include data events. Next is the trail's CloudWatch Logs group, if it has one. LookupEvents needs no setup and covers the last 90 days of management events. A slow search stops after a minute and shows what it found. Guide: [spendlens.devops-monk.com/docs/cloudtrail](https://spendlens.devops-monk.com/docs/cloudtrail/).
 
 ### Tailpipe: CloudTrail logs, flow logs and the CUR, queried locally
 Tailpipe and its AWS plugin are in the image. `spendlens tailpipe init` finds where your CloudTrail logs, VPC flow logs and Cost and Usage Reports land in S3 (read-only) and writes the Tailpipe config; `spendlens tailpipe collect` copies them for local queries. Keep a volume on `/home/finops/.tailpipe` so the collected data outlives the container:

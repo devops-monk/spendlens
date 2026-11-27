@@ -48,13 +48,20 @@ def fake_tailpipe(tmp_path, rows):
     return exe
 
 
-def test_tool_is_offered_only_with_tailpipe_and_runs(tmp_path):
+def test_tool_is_offered_only_with_tailpipe_and_runs(tmp_path, monkeypatch):
     names = {s.name for s in Toolbox(load_config(environ={}, sets=["graph.tailpipe_path=/nonexistent/tailpipe"]),
                                      demo_db_path()).specs()}
-    assert "tailpipe_query" not in names and "aws_changes" not in names  # no Tailpipe, no live AWS
+    assert "tailpipe_query" not in names and "cloudtrail_events" not in names  # no Tailpipe, no live AWS
     exe = fake_tailpipe(tmp_path, [{"event_name": "DeleteBucket", "arn": "arn:aws:iam::1:user/alice"}])
+    monkeypatch.setenv("TAILPIPE_INSTALL_DIR", str(tmp_path / "tp"))
     tb = Toolbox(load_config(environ={}, sets=[f"graph.tailpipe_path={exe}"]), demo_db_path())
-    assert {"tailpipe_query", "aws_changes"} <= {s.name for s in tb.specs()}
+    assert "tailpipe_query" not in {s.name for s in tb.specs()}  # installed, but no sources configured
+    (tmp_path / "tp" / "config").mkdir(parents=True)
+    (tmp_path / "tp" / "config" / "spendlens.tpc").write_text('partition "aws_cloudtrail_log" "x" {}\n')
+    off = Toolbox(load_config(environ={}, sets=[f"graph.tailpipe_path={exe}", "tailpipe.enabled=false"]), demo_db_path())
+    assert "tailpipe_query" not in {s.name for s in off.specs()}  # turned off
+    tb = Toolbox(load_config(environ={}, sets=[f"graph.tailpipe_path={exe}"]), demo_db_path())
+    assert {"tailpipe_query", "cloudtrail_events"} <= {s.name for s in tb.specs()}
     r = tb.execute("1", "tailpipe_query", {"sql": OK})
     assert not r.is_error and "alice" in r.content and "Tailpipe" in r.content
     assert "limit 501" in (tmp_path / "args").read_text()

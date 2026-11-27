@@ -155,6 +155,9 @@ def check_regions(cfg: Config) -> Check:
 
 def check_tailpipe(cfg: Config) -> Check:
     """Tailpipe: CloudTrail logs, VPC flow logs and the CUR collected locally (no AWS calls here)."""
+    if not cfg.tailpipe.enabled:
+        return Check("tailpipe", "ok", "turned off (tailpipe.enabled: false): CloudTrail, the AI and the graph use "
+                     "Steampipe only", "")
     exe = shutil.which(cfg.graph.tailpipe_path)
     if not exe:
         return Check("tailpipe", "warn" if cfg.graph.cost_source == "cur" else "ok",

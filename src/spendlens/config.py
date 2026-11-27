@@ -242,7 +242,7 @@ class LLMConfig(_Strict):
     effort: Effort | None = "medium"  # Claude only: thinking depth / token spend
     temperature: float | None = Field(None, ge=0, le=2)  # OpenAI-family only (current Claude models reject it)
     max_tokens: int = Field(16000, ge=256, le=128000)
-    max_steps: int = Field(12, ge=1, le=50)  # tool calls per question
+    max_steps: int = Field(20, ge=1, le=50)  # tool calls per question (joins and multi-table questions need room)
     output_dir: str = "spendlens-output"  # where ask's write_file tool writes (ask --out-dir)
     live: bool = True  # ask may query live AWS (read-only) by default; --no-live keeps it to saved runs
     fallbacks: bool = True  # Claude refusal fallbacks (server-side on the Anthropic API, SDK middleware on Bedrock)
@@ -252,6 +252,10 @@ class LLMConfig(_Strict):
     query_timeout_s: int = Field(300, ge=1)  # hard limit for one live query; then it is cancelled
     query_wait_s: int = Field(30, ge=1, le=600)  # wait this long per call, then the model waits again for the job
     cache: AICacheConfig = Field(default_factory=AICacheConfig)
+    sessions_auto: bool = True  # every ask conversation is saved as a session (spendlens session list / open)
+    sessions_keep: int = Field(100, ge=1, le=10000)  # automatic sessions kept, newest first (named ones are kept)
+    session_turns: int = Field(20, ge=1, le=200)  # earlier questions replayed to the model when a session continues
+    session_data_chars: int = Field(6000, ge=0, le=100000)  # tool data replayed per earlier question; 0 = answers only
 
 
 class Notifications(_Strict):
@@ -314,12 +318,25 @@ class TailpipeConfig(_Strict):
     `spendlens tailpipe init` writes ~/.tailpipe/config/spendlens.tpc from these lists plus, with discover, what the
     account reports (CloudTrail trails and flow logs via Steampipe, CUR exports via the AWS CLI), all read-only."""
 
+    enabled: bool = True  # false: never read Tailpipe automatically (AI, cloudtrail, changes, graph); Steampipe only
     discover: bool = True
     profile: str | None = Field(None, pattern=r"^[A-Za-z0-9_.+=,@/-]+$")  # default: aws.profile
     cloudtrail: list[S3Location] = Field(default_factory=list)
     flow_logs: list[S3Location] = Field(default_factory=list)
     cur: list[S3Location] = Field(default_factory=list)
     collect_days: int = Field(30, ge=1, le=400)  # how far back `spendlens tailpipe collect` goes
+
+
+class CloudTrailConfig(_Strict):
+    """`spendlens cloudtrail` and the assistant's cloudtrail_events tool: where events are read from, and for how long.
+
+    Sources, best first: CloudTrail logs collected by Tailpipe, the trail's CloudWatch Logs group, LookupEvents."""
+
+    log_group: str | None = Field(None, pattern=r"^[A-Za-z0-9_./#-]{1,512}$")  # default: the trail's own log group
+    log_group_region: str | None = Field(None, pattern=r"^[a-z]{2}(-[a-z]+)+-\d$")
+    discover_log_group: bool = True  # find the log group from aws_cloudtrail_trail.log_group_arn
+    max_wait_s: float = Field(60.0, ge=5, le=1800)  # LookupEvents / CloudWatch Logs: stop and show what was found
+    max_rows: int = Field(500, ge=1, le=100000)  # per search; exports can ask for more with --limit
 
 
 class HistoryConfig(_Strict):
@@ -396,6 +413,7 @@ class Config(_Strict):
     history: HistoryConfig = Field(default_factory=HistoryConfig)
     graph: GraphConfig = Field(default_factory=GraphConfig)
     tailpipe: TailpipeConfig = Field(default_factory=TailpipeConfig)
+    cloudtrail: CloudTrailConfig = Field(default_factory=CloudTrailConfig)
     aws: AWSConfig = Field(default_factory=AWSConfig)
     powerpipe_vars: dict[str, Any] = Field(default_factory=dict)  # raw passthrough, merged last
     plugins: dict[str, dict[str, Any]] = Field(default_factory=dict)  # per-plugin settings

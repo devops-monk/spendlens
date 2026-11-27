@@ -84,7 +84,7 @@ def test_fallback_order_and_modes(tmp_path):
     g = graph(cfg)
     with HistoryStore(db, read_only=True) as s:
         info = price(g, cfg, store=s)
-    assert info["source"] == "cost_explorer" and info["matched"] == 1 and "Tailpipe" in info["notes"][0]
+    assert info["source"] == "cost_explorer" and info["matched"] == 1  # no CUR configured for Tailpipe: not tried
     assert g.find("vol-0rptroot")[0].monthly_cost == round(14 / 7 * 30.4375, 2)
     g = graph(cfg)
     assert price(g, load_config(environ={}, sets=["graph.cost_source=estimate"]), store=None)["source"] == "estimate"

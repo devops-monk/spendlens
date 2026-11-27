@@ -53,7 +53,7 @@ def test_cloudtrail_queries_must_be_bounded_where_aws_sees_it():
 
 def test_prompt_explains_cloudtrail():
     p = system_prompt(load_config(environ={}), True)
-    assert "aws_cloudtrail_lookup_event first" in p and "ConsoleLogin" in p and "data events" in p
+    assert "cloudtrail_events first" in p and "console-logins" in p and "data events" in p and "ONE" in p
     assert "aws_cloudtrail_lookup_event first" not in system_prompt(load_config(environ={}), False)  # live only
 
 

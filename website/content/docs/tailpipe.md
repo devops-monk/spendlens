@@ -36,7 +36,7 @@ Tailpipe adds history, detail and speed.
                                                         │
                                                         ▼
                                                 spendlens changes · graph collect · graph traffic
-                                                spendlens ask (tailpipe_query, aws_changes)
+                                                spendlens ask (tailpipe_query, cloudtrail_events)
                                                    local SQL, no AWS calls
 ```
 
@@ -49,6 +49,19 @@ Tailpipe adds history, detail and speed.
 - **Queries are local.** Once collected, a question costs no AWS calls, has no rate limits and isn't capped at 90 days.
 - **The assistant's access is guarded.** Each `tailpipe_query` must be a single SELECT on one of the three tables, with a time range, and is capped in rows. Table functions and file or environment functions (`read_csv`, `getenv` and the like) are refused.
 - **Data stays with you.** Collected files live in `~/.tailpipe` on your machine, or in the Docker volume. Remove that folder to delete them.
+
+## When spendlens uses it
+
+spendlens reads Tailpipe on its own only when sources are configured: CloudTrail, flow logs or the CUR, through `spendlens tailpipe init` or your own `.tpc` files. Without them, everything works as usual from the Steampipe tables. For CloudTrail it also checks that the collected logs cover the time range you asked about, and otherwise reads from AWS through Steampipe (see [CloudTrail activity](../cloudtrail/#where-the-events-come-from)).
+
+To turn it off completely, set this in `finops.yaml`:
+
+```yaml
+tailpipe:
+  enabled: false     # never read Tailpipe automatically: Steampipe tables only
+```
+
+For one AI question, use `spendlens ask --no-tailpipe "..."`. For one CloudTrail search, use `spendlens cloudtrail events --source aws`.
 
 ## Before you start
 
@@ -113,10 +126,11 @@ Re-run `spendlens tailpipe init` only when buckets change: a new trail, a new ex
 | `spendlens tailpipe collect [KIND] [--days N]` | Runs `tailpipe collect` for each configured kind (all by default) from N days back | S3 reads |
 | `spendlens tailpipe status` | Partitions configured, rows collected and the date range for each kind | None |
 | `spendlens doctor` | Includes a `tailpipe` line: installed, configured, rows per kind, and the next command | None for Tailpipe |
-| `spendlens changes --source tailpipe` | What changed, from the trail's logs only (`auto`, the default, tries Tailpipe first) | None |
+| `spendlens cloudtrail events --source tailpipe` | CloudTrail events with every filter, from the trail's logs only (`auto`, the default, tries Tailpipe first; see [CloudTrail activity](../cloudtrail/)) | None |
+| `spendlens changes --source tailpipe` | The short form for write events | None |
 | `spendlens graph collect` | Prices resources from the CUR when it has been collected (`graph.cost_source: auto` or `cur`) | Inventory reads |
 | `spendlens graph traffic` | Prices data transfer paths from flow logs | None for the flow logs |
-| `spendlens ask "..."` | The assistant uses `tailpipe_query` and `aws_changes` when there is data | Only for other tools |
+| `spendlens ask "..."` | The assistant uses `tailpipe_query` and `cloudtrail_events` when there is data | Only for other tools |
 
 `init` and `collect` also take `--config`, `--set` and (for `init`) `--profile`, like other commands. Tailpipe itself is still there for direct queries:
 

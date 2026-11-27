@@ -236,7 +236,7 @@
           of <b>tools</b>; the model replies "call this tool", spendlens runs it and returns the result, and the model
           decides the next step. Seven tools cover your saved runs, the resource graph and its traffic analysis. Five
           more cover the whole Steampipe AWS plugin, live and read-only (on by default; <code>--no-live</code> turns
-          them off). <code>aws_changes</code> answers "what changed, who changed it" from CloudTrail,
+          them off). <code>cloudtrail_events</code> answers "who did what, when" from CloudTrail, with every filter,
           <code>tailpipe_query</code> reads CloudTrail logs, flow logs and the CUR that Tailpipe collected, and
           <code>read_file</code> / <code>write_file</code> read the files you attach and write the ones you ask for.</p>
         <ul class="chips"><li>16 tools</li><li>Read-only in AWS</li><li>Schema from the plugin's source</li><li>Files in and out</li></ul>
@@ -302,9 +302,11 @@
           each with one saving, counted once against the waste alarms they include.</td></tr>
         <tr><td><code>suggested_owners</code></td><td>always</td><td>Owner tags for untagged resources, from what they are
           attached to, with a confidence and the reason.</td></tr>
-        <tr><td><code>aws_changes</code></td><td>live or Tailpipe</td><td>CloudTrail write events, newest first, with
-          counts by who and by API call; filtered by user, resource, service or API call. From Tailpipe's CloudTrail
-          logs when collected, else LookupEvents (90 days).</td></tr>
+        <tr><td><code>cloudtrail_events</code></td><td>live or Tailpipe</td><td>CloudTrail events, newest first, with
+          counts by who, API call, service, source IP, error and day, and the SQL it ran. Filters: time range or dates,
+          user, event names (wildcards), service, resource, resource type, access key, source IP or CIDR, errors,
+          reads or writes, region, presets. From Tailpipe's CloudTrail logs, then the trail's CloudWatch Logs, else
+          LookupEvents (90 days).</td></tr>
         <tr><td><code>tailpipe_query</code></td><td>with Tailpipe</td><td>One bounded DuckDB query on
           <code>aws_cloudtrail_log</code>, <code>aws_vpc_flow_log</code> or <code>aws_cost_and_usage_report</code>:
           full CloudTrail history and data events, traffic, billed cost per resource. Local, no AWS calls.</td></tr>

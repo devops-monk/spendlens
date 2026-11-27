@@ -105,6 +105,10 @@ llm:
   max_rows: 500
   live: true                     # ask may query live AWS (read-only); spendlens ask --no-live for saved runs only
   output_dir: spendlens-output   # where ask writes the files you ask for (ask --out-dir)
+  sessions_auto: true            # save every ask conversation (spendlens session list / open ID)
+  sessions_keep: 100             # the newest automatic sessions kept; named ones (ask -S NAME) are never deleted
+  session_turns: 20              # earlier questions replayed when a session continues
+  session_data_chars: 6000       # tool data replayed per earlier question; 0 = answers only
   query_wait_s: 30               # live queries: wait per call, then the AI waits again for slow queries
   query_timeout_s: 300           # a live query running longer is cancelled
   cache:                         # reuse recent live results and answers (saves AWS calls and tokens)
@@ -142,7 +146,15 @@ graph:                         # spendlens graph: how resources connect, cleanup
   cur_days: 30                 # CUR window, in full days before today
   owner_from_cloudtrail: false # opt-in: who created each resource (CloudTrail, last 90 days) as an Owner suggestion
 
+cloudtrail:                    # spendlens cloudtrail / the assistant: Tailpipe logs, then the trail's CloudWatch Logs, then LookupEvents
+  log_group: null              # the trail's CloudWatch Logs group; null = found from the trail (read-only)
+  log_group_region: null       # e.g. eu-west-1 (default: from the trail)
+  discover_log_group: true
+  max_wait_s: 60               # stop a slow LookupEvents / CloudWatch search and show what it found
+  max_rows: 500                # events per search (exports: --limit)
+
 tailpipe:                      # spendlens tailpipe init/collect: CloudTrail logs, VPC flow logs and the CUR, queried locally
+  enabled: true                # false: never read Tailpipe automatically (AI, cloudtrail, graph): Steampipe tables only
   discover: true               # find the S3 locations from the account (read-only), besides the lists below
   cloudtrail: []               # e.g. [{bucket: my-org-trail, prefix: AWSLogs/}]
   flow_logs: []

@@ -391,7 +391,7 @@ def ai_tools() -> tuple[str, str]:
     b.append(f'<rect x="220" y="612" width="440" height="200" rx="16" fill="none" stroke="{ACCENT}" stroke-opacity="0.8" '
              f'stroke-width="1.5" stroke-dasharray="2 5"/>')
     b.append(_t(240, 636, "Activity, logs and files · when available", 12, anchor="start", weight=700, fill=ACCENT))
-    for i, (n, wht) in enumerate([("aws_changes", "what changed · who changed it"),
+    for i, (n, wht) in enumerate([("cloudtrail_events", "who did what · any filter"),
                                   ("tailpipe_query", "CloudTrail · flow logs · CUR"),
                                   ("read_file", "files you attach"),
                                   ("write_file", "xlsx · csv · docx · md · scripts")]):
@@ -424,7 +424,7 @@ def ai_tools() -> tuple[str, str]:
                              "Tailpipe and file tools, with the data sources behind them", "".join(b))
     return svg, ("The model knows only what its tools tell it. The history tools carry the database schema; the AWS "
                  "tools search a catalog built from the Steampipe AWS plugin's own source and checked against the columns "
-                 "your installed plugin reports; aws_changes and tailpipe_query read CloudTrail, flow logs and the CUR; "
+                 "your installed plugin reports; cloudtrail_events and tailpipe_query read CloudTrail, flow logs and the CUR; "
                  "read_file and write_file handle the files you give and ask for.")
 
 
