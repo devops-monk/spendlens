@@ -223,9 +223,18 @@ def ask(
     except AIError as e:
         err.print(f"[red]AI setup:[/] {e}")
         raise typer.Exit(2) from e
+    from ..privacy import Redactor, leaves_account
+
+    red = toolbox.redactor = Redactor(cfg.llm.redact)
     agent = Agent(provider, toolbox, system_prompt(cfg, live), max_steps or cfg.llm.max_steps)
     if sess is not None and sess.turns:
-        agent.preload(sess.context(cfg.llm.session_turns, cfg.llm.session_data_chars))
+        agent.preload([(red.redact(q), red.redact(a))
+                       for q, a in sess.context(cfg.llm.session_turns, cfg.llm.session_data_chars)])
+    if cfg.llm.egress_notice and leaves_account(provider.label) and (live or toolbox.inputs) and not json_out:
+        hidden = f"; hidden from it: {', '.join(cfg.llm.redact)}" if cfg.llm.redact else (
+            "; llm.redact can hide account ids, emails and IPs")
+        err.print(f"[dim]data note: account data the tools read is sent to {provider.label}, outside your AWS "
+                  f"account (Bedrock keeps it inside){hidden}. llm.egress_notice: false hides this note.[/]")
     streamed = show_tools and not json_out
     if streamed:  # show every step as it happens, not all at the end
         from ..ui import activity
@@ -264,7 +273,8 @@ def ask(
                 continue
             ttls_before = len(toolbox.live_ttls)
             try:
-                ans = agent.ask(q)
+                ans = agent.ask(red.redact(q))
+                ans.text = red.restore(ans.text)  # placeholders back to the real values, for you
             except Exception as e:
                 err.print(f"[red]{type(e).__name__}:[/] {str(e)[:500]}")
                 if not interactive:

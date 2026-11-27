@@ -105,6 +105,8 @@ llm:
   max_rows: 500
   live: true                     # ask may query live AWS (read-only); spendlens ask --no-live for saved runs only
   output_dir: spendlens-output   # where ask writes the files you ask for (ask --out-dir)
+  redact: []                     # hide from the AI provider: [account_ids, emails, ips] (answers still show them)
+  egress_notice: true            # say when account data goes to a provider outside your AWS account
   sessions_auto: true            # save every ask conversation (spendlens session list / open ID)
   sessions_keep: 100             # the newest automatic sessions kept; named ones (ask -S NAME) are never deleted
   session_turns: 20              # earlier questions replayed when a session continues

@@ -142,6 +142,7 @@ class Toolbox:
     extra: list[ToolSpec] = field(default_factory=list)
     audit: list[AuditEntry] = field(default_factory=list)
     excerpts: list[str] = field(default_factory=list)  # the start of each call's result, aligned with audit
+    redactor: Any = None  # privacy.Redactor: placeholders for account ids / emails / IPs sent to the provider
     fresh: bool = False  # skip cache reads (still write)
     cache: Any = None  # AICache | None
     live_ttls: list[float] = field(default_factory=list)  # remaining freshness (s) of each live result used
@@ -477,13 +478,17 @@ class Toolbox:
 
     def _log(self, call_id: str, entry: AuditEntry, content: str, is_error: bool = False) -> ToolResult:
         self.audit.append(entry)
-        self.excerpts.append(content[:EXCERPT_CHARS])  # what this call returned, for saved sessions
+        self.excerpts.append(content[:EXCERPT_CHARS])  # what this call returned, for saved sessions (real values)
         self._emit("done", entry.tool, entry.arguments, entry, content)
+        if self.redactor is not None:
+            content = self.redactor.redact(content)  # what the provider sees
         return ToolResult(call_id, content, is_error)
 
     def execute(self, call_id: str, name: str, arguments: dict[str, Any] | None) -> ToolResult:
         spec = next((s for s in self.specs() if s.name == name), None)
         args = arguments if isinstance(arguments, dict) else {}
+        if self.redactor is not None:
+            args = self.redactor.restore(args)  # placeholders the model used -> the real values, before running
         self._emit("start", name, args)
         t0 = time.monotonic()
         if spec is None:

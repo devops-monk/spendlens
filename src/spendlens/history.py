@@ -125,6 +125,9 @@ class HistoryStore:
         else:
             self.path.parent.mkdir(parents=True, exist_ok=True)
             self.conn = sqlite3.connect(self.path)
+            from .privacy import private
+
+            private(self.path)  # findings, costs and the resource graph: your user only
             self._migrate()
         self.conn.row_factory = sqlite3.Row
         self.conn.execute("pragma foreign_keys = on")

@@ -253,6 +253,8 @@ class LLMConfig(_Strict):
     query_timeout_s: int = Field(300, ge=1)  # hard limit for one live query; then it is cancelled
     query_wait_s: int = Field(30, ge=1, le=600)  # wait this long per call, then the model waits again for the job
     cache: AICacheConfig = Field(default_factory=AICacheConfig)
+    redact: list[Literal["account_ids", "emails", "ips"]] = Field(default_factory=list)  # hidden from the provider
+    egress_notice: bool = True  # say when account data goes to a provider outside your AWS account (not Bedrock)
     sessions_auto: bool = True  # every ask conversation is saved as a session (spendlens session list / open)
     sessions_keep: int = Field(100, ge=1, le=10000)  # automatic sessions kept, newest first (named ones are kept)
     session_turns: int = Field(20, ge=1, le=200)  # earlier questions replayed to the model when a session continues

@@ -86,6 +86,9 @@ class AICache:
             try:
                 self.path.parent.mkdir(parents=True, exist_ok=True)
                 self._db = sqlite3.connect(self.path, timeout=5, check_same_thread=False)
+                from ..privacy import private
+
+                private(self.path)  # cached query results and answers: your user only
                 self._db.executescript(SCHEMA)
                 self._db.execute("delete from kv where expires < ?", (time.time(),))
                 self._db.commit()

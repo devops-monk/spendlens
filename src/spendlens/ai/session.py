@@ -57,10 +57,14 @@ class Session:
         return cls(path, d["name"], d.get("created", _now()), d.get("updated", _now()), d.get("turns", []))
 
     def save(self) -> None:
+        from ..privacy import private
+
         self.path.parent.mkdir(parents=True, exist_ok=True)
+        private(self.path.parent, folder=True)  # sessions hold answers and tool data: your user only
         tmp = self.path.with_suffix(".tmp")
         tmp.write_text(json.dumps({"name": self.name, "created": self.created, "updated": self.updated,
                                    "turns": self.turns}, indent=1, default=str))
+        private(tmp)
         tmp.replace(self.path)  # atomic: a crash never leaves half a session
 
     def context(self, turns: int = CONTEXT_TURNS, data_chars: int = DATA_CHARS) -> list[tuple[str, str]]:
