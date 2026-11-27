@@ -339,7 +339,79 @@ class Toolbox:
                          "title": {"type": "string", "description": "Sheet / table title (optional)."}},
                         ["name"]),
                 lambda a: self.write_file(a)))
+            engines = ["history"] + (["aws"] if self.live else []) + (["tailpipe"] if self._tailpipe_available() else [])
+            out.append(ToolSpec(
+                "export_query",
+                f"Run ONE read-only query and write EVERY row to a file in {self.outdir.root} (up to "
+                f"{self.cfg.llm.export_max_rows:,} rows), without the rows coming back to you: you get the file, the "
+                "row count, the columns and the first 5 rows. Use it whenever the person wants a full list or export "
+                "(\"all instances to Excel\"), or when a result was truncated. engine: aws (Steampipe SQL, the same "
+                "rules as aws_query: check columns with aws_describe_table first), history (SQLite, as history_query) "
+                "or tailpipe (DuckDB, as tailpipe_query). Types: .csv .tsv .xlsx .json .jsonl .md .html .yaml.",
+                _schema({"sql": {"type": "string", "description": "One SELECT."},
+                         "name": {"type": "string", "description": "File name with extension, e.g. instances.xlsx"},
+                         "engine": {"type": "string", "enum": engines, "description": "Where the query runs."},
+                         "title": {"type": "string", "description": "Sheet / table title (optional)."}},
+                        ["sql", "name", "engine"]),
+                lambda a: self.export_query(a["sql"], a["name"], a["engine"], a.get("title"))))
         return out
+
+    def export_query(self, sql: str, name: str, engine: str, title: str | None = None) -> dict[str, Any]:
+        """Query -> file, all rows (llm.export_max_rows), none of them sent to the model."""
+        from .files import FileError
+
+        cap = self.cfg.llm.export_max_rows
+        if engine == "aws":
+            from ..steampipe import SteampipeError
+            from .sql_check import check, explain_error
+
+            self._require_live()
+            res = check(sql, self.catalog(), max_rows=cap)
+            if not res.ok:
+                raise ToolError("the query was not run; fix it first: "
+                                + json.dumps([p.as_dict() for p in res.errors], separators=(",", ":")))
+            try:
+                with self._client() as c:
+                    got = c.query(res.sql, limit=cap + 1)
+            except SteampipeError as e:
+                hint = explain_error(str(e), res.tables, self.catalog())
+                raise ToolError(f"Steampipe error: {str(e)[:500]}" + (f"\nHow to fix: {hint}" if hint else "")) from e
+            cols = list(got[0].keys()) if got else []
+            rows = [[r[k] for k in cols] for r in got]
+        elif engine == "history":
+            stmt = check_select(sql, "sqlite")
+            try:
+                cur = self._history().execute(stmt)
+            except sqlite3.DatabaseError as e:
+                raise ToolError(f"SQLite error: {e}") from e
+            cols = [d[0] for d in cur.description or []]
+            rows = [list(r) for r in cur.fetchmany(cap + 1)]
+        elif engine == "tailpipe":
+            from ..graph.costs import CostSourceError, tailpipe_runner
+            from .tailpipe_tools import check as tp_check
+
+            if not self._tailpipe_available():
+                raise ToolError("Tailpipe is off or has no sources configured here")
+            try:
+                got = tailpipe_runner(self.cfg.graph.tailpipe_path, timeout=int(self.cfg.llm.query_timeout_s))(
+                    tp_check(sql, cap))
+            except CostSourceError as e:
+                raise ToolError(f"tailpipe: {e}") from e
+            cols = list(got[0].keys()) if got else []
+            rows = [[r[k] for k in cols] for r in got]
+        else:
+            raise ToolError("engine: aws, history or tailpipe")
+        truncated = len(rows) > cap
+        rows = rows[:cap]
+        if not rows:
+            return {"note": "the query returned no rows: no file was written", "row_count": 0}
+        try:
+            w = self.outdir.write(name, tables=[(title or Path(name).stem, cols, rows)])
+        except FileError as e:
+            raise ToolError(str(e)) from e
+        preview = json.loads(json.dumps(rows[:5], default=str))
+        return {**w, "rows_written": len(rows), "truncated": truncated, "columns": cols, "first_rows": preview,
+                "row_count": None, **({"note": f"stopped at llm.export_max_rows ({cap:,})"} if truncated else {})}
 
     def read_file(self, name: str, offset: int = 0, sheet: str | None = None) -> dict[str, Any]:
         from .files import FileError
@@ -435,11 +507,30 @@ class Toolbox:
                          self._serialise(out))
 
     def _serialise(self, out: Any) -> str:
-        text = out if isinstance(out, str) else json.dumps(out, default=str, separators=(",", ":"))
+        """JSON for the model, at most llm.max_result_chars. Tabular results lose whole rows from the end (the JSON
+        stays valid, and the result says how many rows are shown); other results are cut with a marker."""
+        dump = (lambda o: json.dumps(o, default=str, separators=(",", ":")))
+        text = out if isinstance(out, str) else dump(out)
         limit = self.cfg.llm.max_result_chars
-        if len(text) > limit:
-            text = text[:limit] + f'... [truncated at {limit} characters; narrow the query or aggregate]'
-        return text
+        if len(text) <= limit:
+            return text
+        rows = out.get("rows") if isinstance(out, dict) else None
+        if isinstance(rows, list) and rows:
+            lo, hi = 0, len(rows)  # the most rows that fit
+            while lo < hi:
+                mid = (lo + hi + 1) // 2
+                if len(dump({**out, "rows": rows[:mid], "rows_shown": mid})) + 300 <= limit:
+                    lo = mid
+                else:
+                    hi = mid - 1
+            note = (f"only the first {lo} of {len(rows)} rows fit in the {limit}-character result limit: do not total "
+                    "or count from them; aggregate in SQL (count, sum, group by) or narrow the query. "
+                    "export_query writes every row to a file.")
+            short = {**out, "rows": rows[:lo], "rows_shown": lo, "rows_returned": len(rows), "note_rows": note}
+            if len(dump(short)) <= limit:
+                return dump(short)
+        return text[:limit] + f'... [truncated at {limit} characters; narrow the query or aggregate]'
+
 
     def close(self) -> None:
         if self._sqlite is not None:

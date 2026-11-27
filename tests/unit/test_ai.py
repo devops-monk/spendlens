@@ -1,3 +1,4 @@
+import json
 import sqlite3
 from types import SimpleNamespace as NS
 
@@ -92,8 +93,15 @@ def test_toolbox_truncates_and_caps_rows(db):
                                                  "where i < 50) select i, printf('%080d', i) from n"})
     assert '"row_count":2' in r.content and '"truncated":true' in r.content
     big = Toolbox(load_config(sets=["llm.max_result_chars=1000"], environ={}), db)
-    r = big.execute("1", "history_query", {"sql": "select printf('%05000d', 1)"})
-    assert len(r.content) < 1100 and "truncated at 1000" in r.content
+    r = big.execute("1", "history_query", {"sql": "select printf('%05000d', 1)"})  # one row larger than the limit
+    out = json.loads(r.content)  # still valid JSON: whole rows are dropped, never cut
+    assert len(r.content) <= 1000 and out["rows_shown"] == 0 and "aggregate in SQL" in out["note_rows"]
+    many = Toolbox(load_config(sets=["llm.max_result_chars=3000", "llm.max_rows=500"], environ={}), db)
+    r = many.execute("1", "history_query", {"sql": "with recursive n(i) as (select 1 union all select i+1 from n "
+                                                   "where i < 200) select i, printf('%040d', i) from n"})
+    out = json.loads(r.content)
+    assert len(r.content) <= 3000 and 0 < out["rows_shown"] < 200 and out["rows_returned"] == 200
+    assert out["rows"][-1][0] == out["rows_shown"]  # the first rows, in order
 
 
 def test_live_tools_offered_only_with_live(db):

@@ -248,6 +248,7 @@ class LLMConfig(_Strict):
     fallbacks: bool = True  # Claude refusal fallbacks (server-side on the Anthropic API, SDK middleware on Bedrock)
     fallback_model: str | None = None  # Bedrock middleware target (default anthropic.claude-opus-4-8)
     max_rows: int = Field(500, ge=1)
+    export_max_rows: int = Field(100000, ge=1, le=5000000)  # export_query: rows written to a file (never to the model)
     max_result_chars: int = Field(20000, ge=1000)  # per tool result sent to the model
     query_timeout_s: int = Field(300, ge=1)  # hard limit for one live query; then it is cancelled
     query_wait_s: int = Field(30, ge=1, le=600)  # wait this long per call, then the model waits again for the job

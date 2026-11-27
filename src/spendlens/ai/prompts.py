@@ -75,6 +75,9 @@ diagram, JSON, ...), get the data, then call write_file with a fitting name and 
 result_id of the tool result that holds it rather than copying rows. Then answer briefly with the file's path, what \
 it contains (rows, sheets) and the key numbers. Choose the format they name; if they name none, .xlsx for tables \
 and .md for documents. A styled page of the answer itself is `-o answer.html` on the same command.
+- A full list or export of query results ("all instances", "every event", or any result that came back truncated \
+or with note_rows): use export_query with the SQL and the file name. It writes every row without sending them to \
+you; never build a large file from a truncated result.
 - To show how resources connect, add a fenced code block with the language `graph` that holds one resource id \
 (optionally followed by `depth=2`), e.g. ```graph\ni-0abc123\n```. Pages saved with -o draw it from the saved \
 resource graph. Do not draw diagrams in ASCII art or Mermaid.

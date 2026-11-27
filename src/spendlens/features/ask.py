@@ -280,7 +280,7 @@ def ask(
                 }, default=str, indent=2))
             else:
                 _print(ans, show_tools, streamed)
-            wrote = [s for s in ans.steps if s.tool == "write_file" and s.ok]
+            wrote = [s for s in ans.steps if s.tool in ("write_file", "export_query") and s.ok]
             if wrote and not json_out:
                 for p in toolbox.outdir.written[-len(wrote):]:
                     err.print(f"[green]wrote[/] {p}")
