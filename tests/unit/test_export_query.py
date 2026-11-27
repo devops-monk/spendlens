@@ -26,10 +26,10 @@ class Client:
     def __init__(self, rows: list[dict[str, Any]]) -> None:
         self.rows, self.sql = rows, []
 
-    def __enter__(self) -> "Client":
+    def __enter__(self):
         return self
 
-    def __exit__(self, *a: Any) -> None:
+    def __exit__(self, *a: object) -> None:
         pass
 
     def query(self, sql: str, params: Any = None, *, limit: int | None = None, **kw: Any) -> list[dict[str, Any]]:
