@@ -269,7 +269,7 @@ Set up the CUR once:
 # 2. Tailpipe and its AWS plugin come with spendlens. Find the export (and your CloudTrail and flow log buckets)
 #    and collect them:
 spendlens tailpipe init       # read-only; needs AWS CLI 2.15+ to find CUR 2.0 exports, or set tailpipe.cur in finops.yaml
-spendlens tailpipe collect
+spendlens tailpipe collect     # see the Tailpipe page for the full setup
 # 3. Check that spendlens can see it, then collect the graph:
 spendlens doctor              # "tailpipe: Cost and Usage Reports: N rows"
 spendlens graph collect       # "N resources priced from the CUR (Tailpipe)"
