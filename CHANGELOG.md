@@ -2,6 +2,11 @@
 
 What changed in each spendlens release, newest first. Upgrade with the [installer](https://spendlens.devops-monk.com/docs/getting-started/) or `docker pull abhaypratap/spendlens:latest`.
 
+## Unreleased
+
+- **Next time, without the AI.** After each answer, `spendlens ask` lists the commands that get the same data without the AI: `spendlens query`, `spendlens cloudtrail events` with the same filters, the graph commands and more. They're built from the tool calls that answered, so they run exactly the same query, with no tokens. `--no-hints` or `llm.command_hints: false` turns it off; `--json` has them as `cli_commands`.
+- **Copy buttons** on the home page's commands; the site's CSS and JS are versioned by content, so browsers never keep a stale copy.
+
 ## 0.4.9
 
 - **CloudTrail, as its own feature.** `spendlens cloudtrail events` searches with any filter: a time range or exact dates, user, API calls with `*`, service, resource, resource type, access key, source IP or CIDR, error codes, reads or writes, region. It has presets (console logins, deletes, deployments, security groups, IAM, access denied, errors, root), `summary` breakdowns, `trails`, and exports to CSV, Excel, JSON, JSON Lines, Markdown, HTML or YAML. Sources, best first: Tailpipe, the trail's CloudWatch Logs group (new), then LookupEvents.

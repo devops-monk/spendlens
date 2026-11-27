@@ -159,6 +159,9 @@ def ask(
     out_dir: Annotated[Path | None, typer.Option("--out-dir", help="Where the assistant writes files you ask for "
                                                                    "(default llm.output_dir: ./spendlens-output).")
                        ] = None,
+    hints: Annotated[bool | None, typer.Option("--hints/--no-hints", help="After the answer, show the spendlens "
+                                               "commands that get the same data without the AI (default "
+                                               "llm.command_hints).")] = None,
     tailpipe: Annotated[bool | None, typer.Option("--tailpipe/--no-tailpipe", help="Use Tailpipe's collected "
                                                   "CloudTrail logs, flow logs and CUR (default tailpipe.enabled). "
                                                   "--no-tailpipe: Steampipe tables only.")] = None,
@@ -194,6 +197,7 @@ def ask(
     live = cfg.llm.live if live is None else live
     if tailpipe is not None:
         cfg.tailpipe.enabled = tailpipe
+    show_hints = cfg.llm.command_hints if hints is None else hints
     db = demo_db_path() if source is Source.demo else history_path(cfg)
     from ..ai.cache import AICache
 
@@ -265,6 +269,8 @@ def ask(
             first = False
             if key and not fresh and (hit := cache.get("answer", key)):
                 _print_cached(hit, q, json_out)
+                if show_hints and not json_out:
+                    _hints(hit[0].get("steps") or [], source.value)
                 if out:
                     _save(out, q, hit[0]["answer"], hit[0].get("model") or "", live, hit[0].get("steps") or [], db, cfg)
                 if sess is not None:
@@ -287,9 +293,12 @@ def ask(
                     "usage": {"input_tokens": ans.input_tokens, "output_tokens": ans.output_tokens,
                               "cache_read_tokens": ans.cache_read_tokens},
                     "steps": [s.__dict__ for s in ans.steps],
+                    "cli_commands": _commands(ans.steps, source.value),
                 }, default=str, indent=2))
             else:
                 _print(ans, show_tools, streamed)
+                if show_hints:
+                    _hints(ans.steps, source.value)
             wrote = [s for s in ans.steps if s.tool in ("write_file", "export_query") and s.ok]
             if wrote and not json_out:
                 for p in toolbox.outdir.written[-len(wrote):]:
@@ -369,6 +378,24 @@ def _answer_key(cfg, label: str, source: Source, live: bool, db, q: str) -> str:
 
     return digest("answer", normalise_question(q), label, cfg.llm.model, source.value, live,
                   history_fingerprint(db), scope(cfg) if live else "")
+
+
+def _commands(steps: list[Any], source: str) -> list[str]:
+    from ..ai.hints import commands
+
+    return commands(steps, source)
+
+
+def _hints(steps: list[Any], source: str) -> None:
+    """The commands that get this answer's data without the AI: no tokens, same rows every time."""
+    cmds = _commands(steps, source)
+    if not cmds:
+        return
+    from rich.markup import escape
+
+    err.print("[bold]Without AI[/] [dim](no tokens, same data; add -f csv / -o file to export):[/]")
+    for c in cmds:
+        err.print(f"  [cyan]{escape(c)}[/]", soft_wrap=True)
 
 
 def _print_cached(hit: tuple, q: str, json_out: bool) -> None:

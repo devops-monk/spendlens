@@ -25,6 +25,7 @@ spendlens ask --source demo "Summarise the waste findings"
 | `--max-steps` | Tool-call limit per question (default `llm.max_steps`, 20). At the limit the assistant answers from what it found and says it may be incomplete |
 | `--json` | The answer plus the full audit trail, machine-readable |
 | `--fresh` | Ignore cached answers and live results; ask and query again |
+| `--no-hints` | Don't list the commands that get the same data without the AI (on by default: `llm.command_hints`) |
 | `--no-tailpipe` | Don't use Tailpipe's collected logs and CUR for this question: Steampipe tables only (`--tailpipe` turns it on when `tailpipe.enabled` is off) |
 | `--new` | Start a new session that later questions can follow up (with `-S NAME`: start that session over) |
 | `-C, --continue` | Follow up in the last session used: the assistant remembers its earlier questions and answers |
@@ -42,6 +43,29 @@ spendlens ask -C "Which cluster has the most?"        # follow up in the last se
 ```
 
 The [Sessions page](../sessions/) covers what is saved, every command, how the assistant remembers, and how many sessions are kept.
+
+## Next time, without the AI
+
+After each answer, spendlens lists the commands that get the same data without the AI:
+
+```
+Without AI (no tokens, same data; add -f csv / -o file to export):
+  spendlens cloudtrail events --days 7 -e UpdateService
+  spendlens query 'select instance_type, count(*) as n from aws_ec2_instance group by instance_type'
+```
+
+The list is built from the tool calls that answered the question, not written by the model, so each command runs exactly the query or check the assistant used. Once you know the command, run it directly: it uses no AI tokens, gives the same rows every time, and works in scripts and CI.
+
+| The assistant used | The command |
+|---|---|
+| a live query (`aws_query`) | `spendlens query '<the SQL>'` |
+| CloudTrail (`cloudtrail_events`) | `spendlens cloudtrail events` with the same filters |
+| an export (`export_query`) | `spendlens query '<the SQL>' -f csv -o file.csv` (history: `sqlite3`; Tailpipe: `tailpipe query`) |
+| saved runs (`history_query`, `history_overview`) | `sqlite3 "$(spendlens history path)" '<the SQL>'`, `spendlens history list` |
+| the resource graph | `spendlens graph show`, `graph orphans`, `graph owners`, `graph traffic` |
+| cost history (`history_cost`) | `spendlens cost trend` |
+
+Only calls that succeeded are listed, without repeats, at most four. `--json` output carries them as `cli_commands`. Turn the list off with `--no-hints`, or `llm.command_hints: false`.
 
 ## Save an answer as a page
 
