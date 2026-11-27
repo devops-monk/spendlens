@@ -1,0 +1,113 @@
+# Answer-quality questions for `scripts/eval_ai.py`.
+#
+# Each question has a reference query, run read-only on the same account, that gives the true answer. The
+# assistant passes a question when its answer contains every value in `expect` (columns of the reference result's
+# first row; numbers match with or without thousands separators). The reference queries are checked offline in
+# tests/unit/test_eval_questions.py, so their tables and columns always exist.
+#
+#   id:        short name
+#   question:  what the person asks
+#   reference: one read-only Steampipe query
+#   expect:    columns of its first row the answer must contain
+#   area:      inventory | security | cost | activity | network
+
+- id: ec2-running
+  area: inventory
+  question: How many EC2 instances are running right now?
+  reference: select count(*) as n from aws_ec2_instance where instance_state = 'running'
+  expect: [n]
+
+- id: ec2-top-type
+  area: inventory
+  question: Which EC2 instance type do we run the most of, and how many of them are running?
+  reference: >-
+    select instance_type, count(*) as n from aws_ec2_instance where instance_state = 'running'
+    group by instance_type order by n desc, instance_type limit 1
+  expect: [instance_type, n]
+
+- id: ebs-unattached
+  area: cost
+  question: How many EBS volumes are not attached to anything?
+  reference: select count(*) as n from aws_ebs_volume where jsonb_array_length(attachments) = 0
+  expect: [n]
+
+- id: eip-unused
+  area: cost
+  question: How many Elastic IPs are not associated with anything?
+  reference: select count(*) as n from aws_vpc_eip where association_id is null
+  expect: [n]
+
+- id: s3-buckets
+  area: inventory
+  question: How many S3 buckets do we have?
+  reference: select count(*) as n from aws_s3_bucket
+  expect: [n]
+
+- id: rds-instances
+  area: inventory
+  question: How many RDS database instances are there?
+  reference: select count(*) as n from aws_rds_db_instance
+  expect: [n]
+
+- id: lambda-runtime
+  area: inventory
+  question: Which Lambda runtime is used by the most functions?
+  reference: >-
+    select runtime, count(*) as n from aws_lambda_function where runtime is not null
+    group by runtime order by n desc, runtime limit 1
+  expect: [runtime]
+
+- id: vpcs
+  area: network
+  question: How many VPCs are there?
+  reference: select count(*) as n from aws_vpc
+  expect: [n]
+
+- id: ssh-open
+  area: security
+  question: How many security groups allow SSH (port 22) from anywhere on the internet (0.0.0.0/0)?
+  reference: >-
+    select count(distinct group_id) as n from aws_vpc_security_group_rule
+    where type = 'ingress' and cidr_ipv4 = '0.0.0.0/0'
+    and (ip_protocol = '-1' or (from_port <= 22 and to_port >= 22))
+  expect: [n]
+
+- id: iam-no-mfa
+  area: security
+  question: How many IAM users have no MFA device?
+  reference: select count(*) as n from aws_iam_user where not mfa_enabled
+  expect: [n]
+
+- id: kms-customer
+  area: security
+  question: How many customer-managed KMS keys are there?
+  reference: select count(*) as n from aws_kms_key where key_manager = 'CUSTOMER'
+  expect: [n]
+
+- id: logs-no-retention
+  area: cost
+  question: How many CloudWatch log groups never expire (no retention set)?
+  reference: select count(*) as n from aws_cloudwatch_log_group where retention_in_days is null
+  expect: [n]
+
+- id: ecs-latest-deploy
+  area: activity
+  question: Which ECS service was deployed most recently?
+  reference: >-
+    select s.service_name from aws_ecs_service s, jsonb_array_elements(s.deployments) d
+    order by (d ->> 'CreatedAt')::timestamptz desc limit 1
+  expect: [service_name]
+
+- id: account-id
+  area: inventory
+  question: What is the AWS account id?
+  reference: select account_id from aws_account
+  expect: [account_id]
+
+- id: ct-update-service
+  area: activity
+  question: How many times was UpdateService called in the last 7 days?
+  reference: >-
+    select count(*) as n from aws_cloudtrail_lookup_event where start_time = now() - interval '7 days'
+    and end_time = now() and event_name = 'UpdateService'
+  expect: [n]
