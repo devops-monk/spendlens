@@ -39,8 +39,12 @@ only Describe, List, Get and Lookup calls, a read-only role, and read-only SQL. 
 <p align="center"><sub>One self-contained HTML report, shown with the bundled demo data.</sub></p>
 
 > [!NOTE]
-> v0.4.11. spendlens is tested end to end through Steampipe against an AWS emulator. Verification against a live
+> v0.4.12. spendlens is tested end to end through Steampipe against an AWS emulator. Verification against a live
 > account with a read-only role is next (see [PLAN.md](PLAN.md)).
+
+## New in 0.4.12
+
+- **Fix:** Amazon Inspector findings rated UNTRIAGED now count as informational instead of being dropped from every severity filter. The [Security](https://spendlens.devops-monk.com/docs/security/) page shows severity filters and file exports with examples.
 
 ## New in 0.4.11
 
