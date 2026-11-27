@@ -586,3 +586,9 @@ main:has(.localnav) .cs-section[id] { scroll-margin-top: 104px; }
 @media (max-width: 900px) { .ro-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 560px) { .ro-grid { grid-template-columns: 1fr; } .ro-band { padding: 14px 16px; gap: 12px; }
   .ro-icon { width: 36px; height: 36px; } }
+
+/* copy buttons: also on the home page's install steps; always visible there and on touch screens */
+.steps pre, pre.copyable { position: relative; padding-right: 64px; }
+.steps pre .copy, pre.copyable .copy { opacity: .85; }
+.steps pre:hover .copy, pre.copyable:hover .copy { opacity: 1; }
+@media (hover: none) { .copy { opacity: .85; } }

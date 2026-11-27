@@ -13,7 +13,7 @@
   if (mb && links) mb.addEventListener("click", () => {
     const open = links.classList.toggle("open"); mb.setAttribute("aria-expanded", String(open));
   });
-  document.querySelectorAll(".prose pre").forEach((pre) => {
+  document.querySelectorAll(".prose pre, .steps pre, pre.copyable").forEach((pre) => {
     const b = document.createElement("button");
     b.className = "copy"; b.type = "button"; b.textContent = "Copy";
     b.addEventListener("click", async () => {
