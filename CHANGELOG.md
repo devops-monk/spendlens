@@ -2,6 +2,11 @@
 
 What changed in each spendlens release, newest first. Upgrade with the [installer](https://spendlens.devops-monk.com/docs/getting-started/) or `docker pull abhaypratap/spendlens:latest`.
 
+## Unreleased
+
+- **Fix:** Amazon Inspector findings rated UNTRIAGED were left out of every severity filter. They now count as informational.
+- **Docs:** the Security page explains filtering by severity and exporting to a file, with examples for images, Lambda functions, instances, CVEs and packages.
+
 ## 0.4.11
 
 - **Security guardrails: `spendlens security`.** It gathers vulnerabilities, threats and risky configuration from AWS's own security services into one list, worst first. Read-only.

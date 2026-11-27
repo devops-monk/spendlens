@@ -230,3 +230,33 @@ def test_ai_tool_and_hint(tmp_path) -> None:
     assert command_for("security_findings", {"instance": "i-1", "fixable": True}) == "spendlens security instance i-1"
     assert command_for("security_findings", {"sources": ["detections"], "days": 7}) == \
         "spendlens security detections --days 7"
+
+
+def test_unknown_severities_are_informational_not_dropped() -> None:
+    assert sec.label("UNTRIAGED") == "INFORMATIONAL" and sec.label(None) == "INFORMATIONAL"
+    f = sec.from_inspector({**INSPECTOR[1], "severity": "UNTRIAGED"}, TODAY)
+    assert f.severity == "INFORMATIONAL" and sec.matches(f, sec.Scope(min_severity="INFORMATIONAL"))
+    assert not sec.matches(f, sec.Scope(min_severity="LOW"))
+
+
+@pytest.mark.parametrize("sev,expected", [("critical", {"CRITICAL"}), ("high", {"CRITICAL", "HIGH"}),
+                                          ("medium", {"CRITICAL", "HIGH", "MEDIUM"})])
+def test_severity_is_a_floor(sev: str, expected: set[str]) -> None:
+    res = sec.search(cfg(), sec.Scope(min_severity=sev.upper()), steampipe=Steampipe(), today=TODAY)
+    assert {f.severity for f in res.findings} <= expected and res.findings
+
+
+def test_image_exports(tmp_path, fake_client) -> None:
+    r = CliRunner().invoke(app, ["security", "image", "payments-api:1.4.2", "-f", "json"])
+    rows = json.loads(r.stdout)
+    assert r.exit_code == 0 and rows[0]["vulnerability_id"] == "CVE-2024-3094" and rows[0]["fixed_in"] == "5.6.2"
+    assert [x["vulnerability_id"] for x in rows if x["fix_available"] == "YES"] == ["CVE-2024-3094"]  # the jq recipe
+    for ext in ("csv", "xlsx", "jsonl", "md", "html", "yaml", "tsv"):
+        out = tmp_path / f"v.{ext}"
+        r = CliRunner().invoke(app, ["security", "image", "payments-api:1.4.2", "--severity", "high", "-o", str(out)])
+        assert r.exit_code == 0 and out.stat().st_size > 0, (ext, r.output)
+    assert (tmp_path / "v.csv").read_text().splitlines()[0].startswith("severity,source,title,resource_type")
+    out = tmp_path / "review.xlsx"
+    assert CliRunner().invoke(app, ["security", "summary", "-o", str(out)]).exit_code == 0
+    import openpyxl
+    assert openpyxl.load_workbook(out).sheetnames == ["by severity", "by resource type", "top CVEs", "findings"]

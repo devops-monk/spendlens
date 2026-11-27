@@ -42,7 +42,7 @@ spendlens security gate --image payments-api:1.4.2      # fail the build on crit
 | `spendlens security summary` | Counts by severity, source and resource type; the most widespread CVEs; the resources with most findings |
 | `spendlens security gate` | Checks your guardrails and exits 1 on a violation (below) |
 
-Every command takes `-o file.csv` (or `.xlsx`, `.json`, `.jsonl`, `.md`, `.html`, `.yaml`). `security findings` saves each full run to the history, so `spendlens history diff` shows which findings are new and which were resolved since the last run.
+Every command takes `--severity` (see [Filter by severity](#filter-by-severity)) and `-o file.csv` (or `.xlsx`, `.json`, `.jsonl`, `.md`, `.html`, `.yaml`; see [Export to a file](#export-to-a-file)). `security findings` saves each full run to the history, so `spendlens history diff` shows which findings are new and which were resolved since the last run.
 
 ## Recipes
 
@@ -66,6 +66,100 @@ spendlens security findings --source access_analyzer
 spendlens security status
 spendlens security summary -o security-review.xlsx
 ```
+
+## Filter by severity
+
+`--severity` sets the **lowest** severity to show, and everything above it is included. Results are always sorted worst first: by severity, then by score and EPSS.
+
+| Option | Shows |
+|---|---|
+| `--severity critical` | Critical only |
+| `--severity high` | Critical and high |
+| `--severity medium` | Critical, high and medium |
+| `--severity low` (default) | Everything except informational |
+
+```bash
+# Critical only, across the account
+spendlens security findings --severity critical
+
+# Critical and high in one image
+spendlens security image payments-api:1.4.2 --severity high
+
+# Critical and high in one Lambda function, only the ones with a fix
+spendlens security lambda orders-processor --severity high --fixable
+
+# Critical and high on one instance (vulnerabilities and GuardDuty threats)
+spendlens security instance i-0abc1234567890def --severity high
+
+# Every image: critical and high, a fix exists and an exploit is known (patch these first)
+spendlens security findings --type image --severity high --fixable --exploitable
+
+# Log detections rated high or critical in the last 30 days
+spendlens security detections --severity high --days 30
+```
+
+Severity also combines with the other filters: `--source`, `--type image/lambda/instance`, `--cve`, `--package`, `--fixable`, `--exploitable`, `--resource` and `--region`.
+
+Each source's own scale is mapped onto the same five levels, so one `--severity` works everywhere:
+- Inspector, ECR scanning and Security Hub labels are used as they are.
+- GuardDuty's 0–10 score: 9 and above is critical, 7 and above high, 4 and above medium.
+- Access Analyzer: public access is high, other external access is medium.
+
+The summary at the end of every command counts the findings at each level, for example `14 finding(s): 2 critical · 5 high · 7 medium`.
+
+## Export to a file
+
+Every `security` command writes a file with `-o`. The format comes from the extension, or from `-f` to print to the terminal.
+
+| Format | `-o` | Good for |
+|---|---|---|
+| CSV / TSV | `vulns.csv`, `vulns.tsv` | Spreadsheets, tickets, other tools |
+| Excel | `vulns.xlsx` | Sharing; bold header, first row frozen. `summary` adds a sheet per breakdown |
+| JSON | `vulns.json` | Scripts and pipelines (`jq`) |
+| JSON Lines | `vulns.jsonl` | Log tools and SIEMs: one finding per line |
+| Markdown / HTML | `vulns.md`, `vulns.html` | Pull requests, wikis, email |
+| YAML | `vulns.yaml` | Config-style review |
+
+```bash
+# One image: every vulnerability, then only what to patch now
+spendlens security image payments-api:1.4.2 -o payments-api-1.4.2.csv
+spendlens security image payments-api:1.4.2 --severity high --fixable -o payments-api-fix-now.xlsx
+
+# One exact build, by digest, as JSON for the pipeline
+spendlens security image payments-api@sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945 -o vulns.json
+spendlens security image payments-api:1.4.2 -f json | jq '.[] | select(.fix_available == "YES") | .vulnerability_id'
+
+# A Lambda function and an instance
+spendlens security lambda orders-processor --severity high -o orders-processor.csv
+spendlens security instance i-0abc1234567890def -o i-0abc.md
+
+# Every image in the account, critical and high, in one workbook
+spendlens security findings --type image --severity high -o images-high.xlsx
+
+# One CVE wherever it is, one package everywhere
+spendlens security findings --cve CVE-2024-3094 -o cve-2024-3094.csv
+spendlens security findings --package openssl --severity medium -o openssl.xlsx
+
+# For a SIEM or log tool: one finding per line
+spendlens security findings --severity high -o findings.jsonl
+
+# The review pack: counts by severity, source and type, top CVEs, then every finding
+spendlens security summary -o security-review.xlsx
+
+# Log detections, last 30 days
+spendlens security detections --days 30 -o detections.csv
+```
+
+**Columns in every file**, in this order:
+- **What:** `severity`, `source`, `title`, `resource_type`, `resource`.
+- **Vulnerability details:** `vulnerability_id`, `package`, `fixed_in`, `fix_available`, `exploit_available`, `score`, `epss`.
+- **Log detections only:** `actor`, `source_ip`, `action`, `mitre`.
+- **When and where:** `first_seen`, `age_days`, `region`, `account_id`, `status`.
+- **What to do:** `remediation`, `url`, `id`.
+
+Columns that don't apply to a source are empty.
+
+**From the AI assistant:** ask for a file, for example `spendlens ask "Export the critical and high vulnerabilities in payments-api:1.4.2 to Excel"`. It writes every finding to `./spendlens-output`.
 
 ## Log detections
 

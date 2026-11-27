@@ -113,6 +113,12 @@ def at_least(severity: str) -> list[str]:
     return [x for x in SEVERITIES if RANK[x] <= RANK[s]]
 
 
+def label(severity: Any) -> str:
+    """A source's severity on the common scale; anything else (Inspector's UNTRIAGED, empty) is INFORMATIONAL."""
+    s = str(severity or "").upper()
+    return s if s in RANK else "INFORMATIONAL"
+
+
 def _age(first_seen: str, today: date) -> int | None:
     try:
         return (today - datetime.fromisoformat(str(first_seen)[:19].replace("Z", "")).date()).days
@@ -241,7 +247,7 @@ def from_inspector(r: dict[str, Any], today: date) -> SecFinding:
     elif rtype == "lambda" and r.get("lambda_function_name"):
         resource = str(r["lambda_function_name"])
     first = str(r.get("first_seen") or "")
-    return SecFinding("inspector", str(r.get("arn") or ""), str(r.get("severity") or "LOW").upper(),
+    return SecFinding("inspector", str(r.get("arn") or ""), label(r.get("severity")),
                       str(r.get("title") or ""), rtype, resource, str(r.get("region") or ""),
                       str(r.get("account_id") or ""), str(r.get("status") or ""), str(r.get("vulnerability_id") or ""),
                       pkg, fixed, str(r.get("fix_available") or ""), str(r.get("exploit_available") or ""),
@@ -255,7 +261,7 @@ def from_ecr(r: dict[str, Any], today: date) -> SecFinding:
     pkg = f"{attrs.get('package_name', '')}@{attrs.get('package_version', '')}".strip("@")
     image = f"{r.get('repository_name')}:{r.get('image_tag')}" if r.get("image_tag") else str(r.get("repository_name"))
     score = attrs.get("CVSS3_SCORE") or attrs.get("CVSS2_SCORE")
-    return SecFinding("ecr", f"{image}/{r.get('name')}", str(r.get("severity") or "LOW").upper(),
+    return SecFinding("ecr", f"{image}/{r.get('name')}", label(r.get("severity")),
                       str(r.get("description") or r.get("name") or "")[:300], "image", image, str(r.get("region") or ""),
                       str(r.get("account_id") or ""), "ACTIVE", str(r.get("name") or ""), pkg, "", "", "",
                       float(score) if score else None, None, str(r.get("scanned_at") or "")[:19], "", "",
@@ -268,7 +274,7 @@ def from_securityhub(r: dict[str, Any], today: date) -> SecFinding:
     rem = r.get("remediation") if isinstance(r.get("remediation"), dict) else {}
     rec = rem.get("Recommendation") if isinstance(rem.get("Recommendation"), dict) else {}
     first = str(r.get("first_seen") or "")
-    return SecFinding("securityhub", str(r.get("id") or ""), str(r.get("severity") or "LOW").upper(),
+    return SecFinding("securityhub", str(r.get("id") or ""), label(r.get("severity")),
                       str(r.get("title") or ""), str(first_res.get("Type") or ""), str(first_res.get("Id") or ""),
                       str(r.get("region") or ""), str(r.get("account_id") or ""), str(r.get("workflow_status") or ""),
                       "", "", "", "", "", None, None, first[:19], str(r.get("last_seen") or "")[:19],
